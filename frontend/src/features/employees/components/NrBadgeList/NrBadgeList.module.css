@@ -1,0 +1,19 @@
+.row {
+    display: flex;
+    gap: 0.4em;
+    flex-wrap: wrap;
+}
+
+.badge {
+    padding: 0.2em 0.6em;
+    border-radius: var(--radius-pill, 999px);
+    background: #ecebfd;
+    color: var(--color-indigo, #4f46e5);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.empty {
+    font-size: 0.78rem;
+    color: var(--color-textMuted, #6b7280);
+}

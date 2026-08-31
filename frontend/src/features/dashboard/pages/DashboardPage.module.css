@@ -1,0 +1,64 @@
+.metricGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1em;
+    margin-bottom: 1.5em;
+}
+
+.metricCard {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4em;
+    padding: 1.25em;
+    border-radius: var(--radius-lg, 16px);
+    border: 1px solid var(--color-border, #d1d5db);
+    background: var(--color-white, #fff);
+    box-shadow: var(--shadow-sm, 0 2px 8px rgba(15, 23, 42, 0.06));
+    cursor: pointer;
+    text-align: left;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.metricCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md, 0 8px 24px rgba(15, 23, 42, 0.08));
+}
+
+.metricIcon {
+    font-size: 1.6rem;
+}
+
+.metricIcon[data-tone='indigo'] { color: var(--color-indigo, #4f46e5); }
+.metricIcon[data-tone='warning'] { color: var(--color-warning, #f5a524); }
+.metricIcon[data-tone='info'] { color: var(--color-info, #3b82f6); }
+.metricIcon[data-tone='danger'] { color: var(--color-danger, #e5484d); }
+
+.metricValue {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: var(--color-teal, #004643);
+}
+
+.metricLabel {
+    font-size: 0.85rem;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.phase2Row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5em;
+    flex-wrap: wrap;
+}
+
+.phase2Title {
+    font-weight: 700;
+    color: var(--color-teal, #004643);
+}
+
+.phase2Subtitle {
+    font-size: 0.85rem;
+    color: var(--color-textMuted, #6b7280);
+}

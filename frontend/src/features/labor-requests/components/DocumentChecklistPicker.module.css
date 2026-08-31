@@ -1,0 +1,42 @@
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.75em;
+}
+
+.option {
+    display: flex;
+    gap: 0.75em;
+    align-items: flex-start;
+    padding: 0.9em 1em;
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: var(--radius-md, 10px);
+    cursor: pointer;
+    background: #fff;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.option:hover {
+    border-color: var(--color-indigo, #4f46e5);
+}
+
+.selected {
+    border-color: var(--color-indigo, #4f46e5);
+    background: #f4f3ff;
+}
+
+.name {
+    display: block;
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+
+.suggested {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    margin-top: 0.3em;
+    font-size: 0.75rem;
+    color: var(--color-success, #2f9e44);
+    font-weight: 700;
+}

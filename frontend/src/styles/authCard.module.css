@@ -1,0 +1,50 @@
+/* Compartilhado pelas telas publicas de fornecedor (login, MFA, cadastro):
+   cartao teal centralizado sobre o PublicLayout. */
+.card {
+    max-width: 460px;
+    width: 100%;
+}
+
+.wide {
+    max-width: 720px;
+}
+
+.eyebrow {
+    color: var(--color-cream, #faf0ca);
+    opacity: 0.75;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.4em;
+}
+
+.title {
+    margin: 0 0 0.3em;
+    font-size: 1.7rem;
+}
+
+.subtitle {
+    margin: 0 0 1.5em;
+    opacity: 0.85;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1em;
+}
+
+.registerLink {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    width: 100%;
+    margin-top: 1.25em;
+    background: transparent;
+    border: none;
+    color: var(--color-cream, #faf0ca);
+    font-weight: 700;
+    cursor: pointer;
+}

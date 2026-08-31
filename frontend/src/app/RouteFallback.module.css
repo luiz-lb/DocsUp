@@ -1,0 +1,19 @@
+.wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+}
+
+.spinner {
+    width: 2.5em;
+    height: 2.5em;
+    border-radius: 50%;
+    border: 3px solid var(--color-border, #d1d5db);
+    border-top-color: var(--color-indigo, #4f46e5);
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

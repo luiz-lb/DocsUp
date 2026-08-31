@@ -1,0 +1,5 @@
+.location {
+    font-size: 0.78rem;
+    color: var(--color-textMuted, #6b7280);
+    margin-top: 0.15em;
+}

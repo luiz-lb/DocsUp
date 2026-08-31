@@ -1,0 +1,49 @@
+.banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9em;
+    padding: 1em 1.25em;
+    border-radius: var(--radius-md, 10px);
+    border: 1px solid transparent;
+}
+
+.icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 0.1em;
+}
+
+.content {
+    flex: 1;
+}
+
+.title {
+    font-weight: 700;
+}
+
+.description {
+    margin-top: 0.2em;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.actions {
+    display: flex;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.center {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.center .content {
+    flex: 0 1 auto;
+}
+
+.info    { background: var(--color-infoBg, #e8f1fe); color: #1d4ed8; border-color: #c7dcfd; }
+.success { background: var(--color-successBg, #e8f7ec); color: #1f7a34; border-color: #bfe6c8; }
+.warning { background: var(--color-warningBg, #fef3dd); color: #93600a; border-color: #f6ddac; }
+.danger  { background: var(--color-dangerBg, #fbe9e9); color: #b3282c; border-color: #f3c6c7; }

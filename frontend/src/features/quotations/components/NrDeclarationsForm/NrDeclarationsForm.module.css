@@ -1,0 +1,25 @@
+.grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1em;
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: var(--radius-md, 10px);
+    background: #fff;
+    font-size: 0.9rem;
+}
+
+.row input {
+    width: 80px;
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: var(--radius-sm, 8px);
+    padding: 0.5em;
+    text-align: center;
+}

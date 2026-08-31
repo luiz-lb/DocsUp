@@ -1,0 +1,18 @@
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25em;
+}
+
+.headerRow {
+    margin-bottom: 0.75em;
+}
+
+.meta {
+    font-size: 0.8rem;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.resultSpacer {
+    margin-top: 1em;
+}

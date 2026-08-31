@@ -2,12 +2,13 @@
 	margin: 0;
 	padding: 0;
 	text-decoration: none;
-	font-family: 'Inter';
+	font-family: 'Inter', system-ui, sans-serif;
+	box-sizing: border-box;
 }
 
 #root {
-	background-color: #faf0ca;
-	color: #004643;
+	background-color: var(--color-cream, #faf0ca);
+	color: var(--color-teal, #004643);
 	min-height: 100vh;
 }
 
@@ -15,19 +16,4 @@ main {
 	max-width: 1280px;
 	margin: 0 auto;
 	min-height: 100vh;
-}
-
-button {
-	display: flex;
-	gap: 0.5em;
-	align-items: center;
-	justify-content: center;
-	width: fit-content;
-	background-color: #004643;
-    color: #faf0ca;
-	border: none;
-	padding: 1em;
-	border-radius: 0.5em;
-	cursor: pointer;
-	font-size: medium;
 }

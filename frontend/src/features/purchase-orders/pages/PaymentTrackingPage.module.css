@@ -1,0 +1,10 @@
+.blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9em;
+    margin-bottom: 1.5em;
+}
+
+.blocksSpacer {
+    margin-bottom: 1.5em;
+}

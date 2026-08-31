@@ -1,0 +1,21 @@
+.page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.topBar {
+    padding: 1em 1.5em;
+}
+
+.logo {
+    width: 10em;
+}
+
+.content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5em;
+}

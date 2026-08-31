@@ -1,0 +1,21 @@
+.titleRow {
+    display: flex;
+    align-items: center;
+    padding: 0 0.5em;
+}
+
+.spacer {
+    visibility: hidden;
+}
+
+.title {
+    flex: 1 1 auto !important;
+    text-align: center;
+    color: var(--color-teal, #004643);
+    font-weight: 700;
+}
+
+.actions {
+    padding: 1em 1.5em;
+    justify-content: center !important;
+}

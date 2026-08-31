@@ -1,0 +1,14 @@
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+}
+
+.roleLabel {
+    font-weight: 700;
+    color: var(--color-teal, #004643);
+}
+
+.sliderRow {
+    padding: 0 0.75em;
+}

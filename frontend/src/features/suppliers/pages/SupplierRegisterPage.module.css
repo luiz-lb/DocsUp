@@ -1,0 +1,33 @@
+.groupLabel {
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-top: 0.25em;
+}
+
+.chipRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+}
+
+.chip {
+    padding: 0.5em 1em;
+    border-radius: var(--radius-pill, 999px);
+    border: 1px solid rgba(255, 250, 228, 0.4);
+    background: transparent;
+    color: var(--color-creamText, #fffae4);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.chipActive {
+    background: var(--color-indigo, #4f46e5);
+    border-color: var(--color-indigo, #4f46e5);
+}
+
+.actionsRow {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5em;
+}

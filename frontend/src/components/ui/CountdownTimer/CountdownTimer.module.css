@@ -1,0 +1,32 @@
+.wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.9em;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--color-infoBg, #e8f1fe);
+    color: var(--color-info, #3b82f6);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.icon {
+    font-size: 1.1em;
+}
+
+.critical {
+    background: var(--color-dangerBg, #fbe9e9);
+    color: var(--color-danger, #e5484d);
+    animation: pulse 1s ease infinite;
+}
+
+.expired {
+    background: var(--color-neutralBg, #eef0f2);
+    color: var(--color-neutral, #6b7280);
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}

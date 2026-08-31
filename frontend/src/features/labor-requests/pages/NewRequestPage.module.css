@@ -1,0 +1,46 @@
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25em;
+}
+
+.fullSpan {
+    grid-column: 1 / -1;
+}
+
+.dateInput {
+    width: 100%;
+}
+
+.checklistSpacer {
+    margin-top: 1.25em;
+}
+
+.review {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25em;
+}
+
+.reviewGrid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.5em 1.5em;
+}
+
+.reviewGrid dt {
+    color: var(--color-textMuted, #6b7280);
+    font-weight: 600;
+}
+
+.reviewGrid dd {
+    margin: 0;
+    font-weight: 600;
+    color: var(--color-teal, #004643);
+}
+
+@media (max-width: 700px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}

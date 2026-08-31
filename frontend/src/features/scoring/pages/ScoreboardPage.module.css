@@ -1,0 +1,5 @@
+.hint {
+    margin-top: 0.75em;
+    font-size: 0.8rem;
+    color: var(--color-textMuted, #6b7280);
+}

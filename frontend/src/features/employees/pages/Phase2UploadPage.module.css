@@ -1,0 +1,82 @@
+.formSection {
+    margin-top: 1.5em;
+    padding-top: 1.5em;
+    border-top: 1px solid rgba(255, 250, 228, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1em;
+}
+
+.groupLabel {
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.chipRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6em;
+}
+
+.chip {
+    padding: 0.5em 1em;
+    border-radius: var(--radius-pill, 999px);
+    border: 1px solid rgba(255, 250, 228, 0.4);
+    background: transparent;
+    color: var(--color-creamText, #fffae4);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.chipActive {
+    background: var(--color-indigo, #4f46e5);
+    border-color: var(--color-indigo, #4f46e5);
+}
+
+.dropzoneSpacer {
+    margin: 0.25em 0;
+}
+
+.employeeList {
+    margin-top: 1.75em;
+    padding-top: 1.5em;
+    border-top: 1px solid rgba(255, 250, 228, 0.2);
+}
+
+.sectionTitle {
+    margin-bottom: 0.9em;
+}
+
+.employeeRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.85em 1em;
+    border-radius: var(--radius-md, 10px);
+    background: rgba(255, 255, 255, 0.06);
+    margin-bottom: 0.6em;
+}
+
+.employeeRole {
+    font-size: 0.78rem;
+    opacity: 0.75;
+}
+
+@media (max-width: 700px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .employeeRow {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

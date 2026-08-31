@@ -1,0 +1,84 @@
+.dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.3em;
+    padding: 2em 1em;
+    border: 2px dashed var(--color-border, #d1d5db);
+    border-radius: var(--radius-md, 10px);
+    background: #f9fafb;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropzone:hover,
+.dragging {
+    border-color: var(--color-indigo, #4f46e5);
+    background: #f4f3ff;
+}
+
+.icon {
+    font-size: 1.8rem;
+    color: var(--color-indigo, #4f46e5);
+    margin-bottom: 0.2em;
+}
+
+.label {
+    font-weight: 700;
+    color: var(--color-teal, #004643);
+}
+
+.hint {
+    font-size: 0.8rem;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.hiddenInput {
+    display: none;
+}
+
+.fileList {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    margin-top: 0.75em;
+}
+
+.fileItem {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0.6em 0.8em;
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: var(--radius-sm, 8px);
+    background: #fff;
+}
+
+.fileIcon {
+    color: var(--color-indigo, #4f46e5);
+    flex-shrink: 0;
+}
+
+.fileName {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.88rem;
+}
+
+.fileSize {
+    font-size: 0.78rem;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.removeButton {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--color-danger, #e5484d);
+    display: flex;
+    padding: 0.2em;
+}
