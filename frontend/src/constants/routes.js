@@ -10,7 +10,6 @@ export const ROUTES = {
     list: '/solicitacoes',
     new: '/solicitacoes/nova',
     detail: (id = ':id') => `/solicitacoes/${id}`,
-    detail: (id = ':id') => `/solicitacoes/documentação/${id}`,
   },
 
   quotations: {

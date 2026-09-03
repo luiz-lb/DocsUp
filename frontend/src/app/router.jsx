@@ -61,6 +61,7 @@ export const router = createBrowserRouter([
               { path: ROUTES.laborRequests.new, element: <NewRequestPage /> },
               { path: ROUTES.laborRequests.detail(), element: <RequestDetailPage /> },
 
+
               { path: ROUTES.quotations.round(), element: <QuotationRoundPage /> },
 
               { path: ROUTES.suppliers.list, element: <SupplierListPage /> },

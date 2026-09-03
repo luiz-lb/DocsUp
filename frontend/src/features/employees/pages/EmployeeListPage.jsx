@@ -5,11 +5,15 @@ import { listEmployees } from '../api/employeesApi.js';
 import NrBadgeList from '../components/NrBadgeList/index.js';
 
 const COLUMNS = [
-  { key: 'fullName', header: 'Colaborador' },
-  { key: 'supplierName', header: 'Fornecedor' },
-  { key: 'roleFunction', header: 'Funcao' },
-  { key: 'nrIds', header: 'NRs', render: (row) => <NrBadgeList nrIds={row.nrIds} /> },
-  { key: 'status', header: 'Status', render: (row) => <StatusBadge enumMap={EMPLOYEE_STATUS} value={row.status} /> },
+  { key: 'full_name', header: 'Colaborador' },
+  { key: 'supplier_name', header: 'Fornecedor' },
+  { key: 'labor_request_title', header: 'Solicitação' },
+  { key: 'role_function', header: 'Função' },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (row) => <StatusBadge enumMap={EMPLOYEE_STATUS} value={row.status} />,
+  },
 ];
 
 export default function EmployeeListPage() {
@@ -18,11 +22,16 @@ export default function EmployeeListPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="RH & Seguranca"
+        eyebrow="RH & Segurança"
         title="Colaboradores"
-        description="Todos os colaboradores enviados pelos fornecedores na Fase 2, com o status de validacao documental."
+        description="Todos os colaboradores enviados pelos fornecedores na Fase 2, com o status de validação documental."
       />
-      <DataTable columns={COLUMNS} rows={employees ?? []} isLoading={isLoading} emptyTitle="Nenhum colaborador enviado ainda" />
+      <DataTable
+        columns={COLUMNS}
+        rows={employees ?? []}
+        isLoading={isLoading}
+        emptyTitle="Nenhum colaborador enviado ainda"
+      />
     </div>
   );
 }

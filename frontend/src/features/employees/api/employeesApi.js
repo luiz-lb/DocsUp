@@ -1,39 +1,72 @@
-import { mockDelay } from '../../../hooks/useMockApi.js';
+import { api } from '../../../utils/api.js';
 
-const phase2Deadlines = [
-  {
-    id: 1,
-    token: 'phase2-demo',
-    quotationId: 5001,
-    supplierName: 'Eletro Instala',
-    laborRequestTitle: 'Equipe de instalacao eletrica - Torre B',
-    deadlineHours: 72,
-    startedAt: '2026-08-05T09:32:00Z',
-    expiresAt: '2026-08-08T09:32:00Z',
-    status: 0,
-  },
-];
+// ─────────────────────────────────────────────
+// Phase 2 — Portal do Fornecedor
+// ─────────────────────────────────────────────
 
-let employeeSeq = 3;
-const employees = [
-  { id: 1, supplierName: 'Eletro Instala', fullName: 'Jose Almeida', roleFunction: 'Eletricista', nrIds: [10, 12], status: 1 },
-  { id: 2, supplierName: 'Eletro Instala', fullName: 'Katia Ferreira', roleFunction: 'Auxiliar Eletrica', nrIds: [10], status: 0 },
-];
-
-export function getPhase2ByToken(token) {
-  const deadline = phase2Deadlines.find((item) => item.token === token) ?? phase2Deadlines[0];
-  const linkedEmployees = employees.filter((employee) => employee.supplierName === deadline.supplierName);
-  return mockDelay({ deadline, employees: linkedEmployees });
+/**
+ * Busca dados da Fase 2 pelo token do link.
+ * GET /phase2/:token  (público)
+ * Retorna { deadline, employees, documents, requiredDocuments }
+ */
+export async function getPhase2ByToken(token) {
+  try {
+    const result = await api.get(`/phase2/${token}`);
+    if (!result.data.success) return null;
+    return result.data.body;
+  } catch (error) {
+    console.error('getPhase2ByToken error:', error);
+    return null;
+  }
 }
 
-export function addEmployee(token, employeeData) {
-  const deadline = phase2Deadlines.find((item) => item.token === token) ?? phase2Deadlines[0];
-  employeeSeq += 1;
-  const record = { id: employeeSeq, supplierName: deadline.supplierName, status: 0, ...employeeData };
-  employees.push(record);
-  return mockDelay(record, 400);
+/**
+ * Cadastra um funcionário com documentos na Fase 2.
+ * POST /phase2/:token/employee  (exige cookie supplier_token)
+ *
+ * @param {string}   token
+ * @param {{ fullName, cpf, rg?, roleFunction, nrTypeIds[] }} employeeData
+ * @param {File[]}   files  — arquivos do FileDropzone
+ */
+export async function addEmployee(token, employeeData, files = []) {
+  try {
+    const formData = new FormData();
+    formData.append('fullName', employeeData.fullName);
+    formData.append('cpf', employeeData.cpf);
+    if (employeeData.rg) formData.append('rg', employeeData.rg);
+    if (employeeData.roleFunction) formData.append('roleFunction', employeeData.roleFunction);
+    formData.append('nrTypeIds', JSON.stringify(employeeData.nrTypeIds ?? []));
+
+    for (const file of files) {
+      formData.append('files', file);
+    }
+
+    const result = await api.post(`/phase2/${token}/employee`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    return result.data;
+  } catch (error) {
+    console.error('addEmployee error:', error);
+    return { success: false, body: { message: 'Erro ao cadastrar funcionário.' } };
+  }
 }
 
-export function listEmployees() {
-  return mockDelay([...employees]);
+// ─────────────────────────────────────────────
+// Painel interno (colaboradores)
+// ─────────────────────────────────────────────
+
+/**
+ * Lista todos os funcionários enviados pelos fornecedores.
+ * GET /phase2/employees/list  (exige JWT colaborador)
+ */
+export async function listEmployees() {
+  try {
+    const result = await api.get('/phase2/employees/list');
+    if (!result.data.success) return [];
+    return result.data.body.employees;
+  } catch (error) {
+    console.error('listEmployees error:', error);
+    return [];
+  }
 }

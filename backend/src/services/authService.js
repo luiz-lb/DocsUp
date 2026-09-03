@@ -24,7 +24,7 @@ export async function login(email, password) {
     }
 }
 
-/*export async function registerNewUser({ name, email, departament, role, password }) {
+export async function registerNewUser({ name, email, departament, role, password }) {
     try {
         const existingUser = await authModel.getUserByEmail(email);
         if (existingUser) {
@@ -47,4 +47,4 @@ export async function login(email, password) {
         console.error('Erro no register service:', error);
         throw error;
     }
-}*/
+}

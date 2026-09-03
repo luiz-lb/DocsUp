@@ -11,6 +11,8 @@ router.get('/list', verificarToken, laborRequest.listLaborRequest);
 // lista uma solicitação especifica detalhada
 router.get('/listById/:id', verificarToken, laborRequest.listLaborRequestById);
 
-router.post('updateDocsToResquest', verificarToken, laborRequest.updateDocsToResquest)
+router.post('/updateDocsRequired', verificarToken, laborRequest.updateDocsRequired)
+router.post('/approveRequest', verificarToken, laborRequest.approveRequest)
+router.get('/listApprovals/:id', verificarToken, laborRequest.listApprovals)
 
 export default router;

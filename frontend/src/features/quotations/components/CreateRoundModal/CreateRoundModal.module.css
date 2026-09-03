@@ -1,0 +1,72 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.dateInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.375rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.dateInput:focus {
+  outline: none;
+  border-color: var(--color-teal, #004643);
+  box-shadow: 0 0 0 2px rgba(0, 70, 67, 0.15);
+}
+
+.inviteLabel {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin: 0 0 0.5rem;
+  color: var(--color-textBase, #111827);
+}
+
+.inviteeRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.emailField {
+  flex: 1;
+}
+
+.removeBtn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.375rem;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  color: var(--color-danger, #dc2626);
+  display: flex;
+  align-items: center;
+}
+
+.removeBtn:hover {
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  color: var(--color-teal, #004643);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.4rem 0;
+}
+
+.addBtn:hover {
+  text-decoration: underline;
+}

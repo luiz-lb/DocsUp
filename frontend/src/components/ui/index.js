@@ -5,6 +5,7 @@ export { default as StatusBadge } from './StatusBadge/index.js';
 export { default as PageHeader } from './PageHeader/index.js';
 export { default as EmptyState } from './EmptyState/index.js';
 export { default as DataTable } from './DataTable/index.js';
+export { default as Pagination } from './Pagination/index.js';
 export { default as Modal } from './Modal/index.js';
 export { default as ConfirmDialog } from './ConfirmDialog/index.js';
 export { default as ErrorDialog } from './ErrorDialog/index.js';

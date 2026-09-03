@@ -1,87 +1,229 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { LuCheck, LuX } from 'react-icons/lu';
-import { Card, PageHeader, StatusBadge, Button, EmptyState } from '../../../components/ui/index.js';
-import { LABOR_REQUEST_STATUS, URGENCY } from '../../../constants/enums.js';
+import { useParams, useNavigate } from 'react-router-dom';
+import { LuFileText, LuShieldCheck, LuPlus } from 'react-icons/lu';
+import {
+  Card,
+  PageHeader,
+  StatusBadge,
+  EmptyState,
+  Banner,
+  Button,
+} from '../../../components/ui/index.js';
+import { LABOR_REQUEST_STATUS, URGENCY, DOCUMENT_SCOPE } from '../../../constants/enums.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
-import { useLaborRequest } from '../hooks/useLaborRequests.js';
-import { decideApproval } from '../api/laborRequestsApi.js';
+import { useLaborRequest, useLaborRequestApprovals } from '../hooks/useLaborRequests.js';
 import { formatDate } from '../../../utils/formatters.js';
 import ApprovalTimeline from '../components/ApprovalTimeline.jsx';
+import ApprovePanel from '../components/ApprovePanel.jsx';
+import CreateRoundModal from '../../quotations/components/CreateRoundModal/index.js';
+import { useDisclosure } from '../../../hooks/useDisclosure.js';
+import { ROUTES } from '../../../constants/routes.js';
 import styles from './RequestDetailPage.module.css';
 
-const DEPARTMENT_BY_CODE = { 0: 'RH', 1: 'Seguranca' };
-
+/**
+ * Página de detalhe de uma solicitação de mão-de-obra.
+ *
+ * - Qualquer colaborador autenticado visualiza os detalhes.
+ * - Segurança do Trabalho (department === 1) vê o painel de aprovação
+ *   enquanto a solicitação estiver pendente (status === 0).
+ */
 export default function RequestDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: response, isLoading, reload } = useLaborRequest(id);
-  const [isDeciding, setIsDeciding] = useState(false);
 
-  if (isLoading) return "Carregando...";
+  const { data: requestResponse, isLoading: isLoadingRequest, reload: reloadRequest } = useLaborRequest(id);
+  const { data: approvalsResponse, isLoading: isLoadingApprovals, reload: reloadApprovals } = useLaborRequestApprovals(id);
 
-  const request = response.body.result;
-  const approvals = request?.approvals ?? [];
+  const [approvalDone, setApprovalDone] = useState(false);
+  const createRoundModal = useDisclosure(false);
 
-  const myDepartment = DEPARTMENT_BY_CODE[user.department];
-  const myApproval = approvals.find((approval) => approval.department === myDepartment);
-  const canDecide = Boolean(myApproval) && myApproval.decision === 0;
+  if (isLoadingRequest) return <p>Carregando solicitação...</p>;
 
-  const handleDecision = async (decision) => {
-    setIsDeciding(true);
-    await decideApproval(request.id, myDepartment, decision, decision === 1 ? 'Reprovado na revisão.' : 'Aprovado.');
-    setIsDeciding(false);
-    reload();
-  };
+  const request = requestResponse?.body?.result;
 
   if (!request) {
-    return <EmptyState title="Solicitação não encontrada" description="Verifique se o link esta correto." />;
+    return <EmptyState title="Solicitação não encontrada" description="Verifique se o link está correto." />;
   }
 
+  const approvals = approvalsResponse?.body?.approvals ?? [];
+
+  // Departamento necessário para aprovar enquanto pendente (status=0)
+  const necessaryAprove = user.department === Number(approvals[0]?.department);
+  const isSuprimentos = user.department === 2;
+  const isPending = request.status === 0;
+  const isEmCotacao = request.status === 3;
+
+  const canApprove = necessaryAprove && isPending && !approvalDone;
+  const canCreateRound = isSuprimentos && isEmCotacao;
+
+  const handleApprovalSuccess = () => {
+    setApprovalDone(true);
+    reloadRequest();
+    reloadApprovals();
+  };
+
+  const handleRoundCreated = (roundId) => {
+    reloadRequest();
+    navigate(ROUTES.quotations.round(roundId));
+  };
+
+  // IDs sugeridos de document_types pela atividade (campo document_type_id de activity_types)
+  const suggestedDocIds = request.activity_doc_type_id
+    ? String(request.activity_doc_type_id).split(',').map(Number).filter(Boolean)
+    : [];
+
+  // IDs sugeridos de nr_types pela atividade (campo nr_type_id de activity_types)
+  const suggestedNrIds = request.activity_nr_type_id
+    ? String(request.activity_nr_type_id).split(',').map(Number).filter(Boolean)
+    : [];
 
   return (
     <div>
       <PageHeader
-        eyebrow={`Solicitacao #${request.request_number}`}
+        eyebrow={`Solicitação #${request.request_number}`}
         title={request.title}
         description={request.location}
-        actions={<StatusBadge enumMap={LABOR_REQUEST_STATUS} value={request.status} />}
+        actions={
+          <>
+            <StatusBadge enumMap={LABOR_REQUEST_STATUS} value={request.status} />
+            {canCreateRound && (
+              <Button icon={LuPlus} size="sm" onClick={createRoundModal.open}>
+                Iniciar cotação
+              </Button>
+            )}
+          </>
+        }
       />
 
-      <div className={styles.layout}>
-        <Card>
-          <Card.Body>
-            <dl className={styles.infoGrid}>
-              <dt>Atividade</dt>
-              <dd>{request.activity_type_name ?? '—'}</dd>
-              <dt>Urgencia</dt>
-              <dd><StatusBadge enumMap={URGENCY} value={request.urgency} /></dd>
-              <dt>Solicitante</dt>
-              <dd>{request.requester_name}</dd>
-              <dt>Data prevista para inicio</dt>
-              <dd>{formatDate(request.start_date)}</dd>
-            </dl>
-          </Card.Body>
-        </Card>
+      {approvalDone && (
+        <div className={styles.bannerWrapper}>
+          <Banner
+            tone="success"
+            title="Decisão registrada com sucesso."
+            description="A solicitação foi atualizada."
+          />
+        </div>
+      )}
 
-        <Card>
-          <Card.Body>
-            <h3 className={styles.sectionTitle}>Aprovacoes </h3>
-            <ApprovalTimeline approvals={approvals} />
+      <div className={`${styles.layout} ${canApprove ? styles.singleColumn : ''}`}>
+        {/* ── Coluna esquerda: detalhes ── */}
+        <div className={styles.leftCol}>
+          <Card>
+            <Card.Body>
+              <dl className={styles.infoGrid}>
+                <dt>Atividade</dt>
+                <dd>{request.activity_type_name ?? '—'}</dd>
 
-            {canDecide && (
-              <div className={styles.decisionActions}>
-                <Button variant="danger" icon={LuX} onClick={() => handleDecision(1)} isLoading={isDeciding}>
-                  Reprovar
-                </Button>
-                <Button icon={LuCheck} onClick={() => handleDecision(2)} isLoading={isDeciding}>
-                  Aprovar como {myDepartment}
-                </Button>
-              </div>
-            )}
-          </Card.Body>
-        </Card>
+                <dt>Urgência</dt>
+                <dd><StatusBadge enumMap={URGENCY} value={request.urgency} /></dd>
+
+                <dt>Solicitante</dt>
+                <dd>{request.requester_name}</dd>
+
+                <dt>Localização</dt>
+                <dd>{request.location}</dd>
+
+                <dt>Data prevista de início</dt>
+                <dd>{formatDate(request.start_date)}</dd>
+
+                {request.end_date && (
+                  <>
+                    <dt>Data prevista de fim</dt>
+                    <dd>{formatDate(request.end_date)}</dd>
+                  </>
+                )}
+
+                {request.description && (
+                  <>
+                    <dt>Descrição</dt>
+                    <dd>{request.description}</dd>
+                  </>
+                )}
+              </dl>
+            </Card.Body>
+          </Card>
+
+          {/* Documentos obrigatórios definidos pela Segurança do Trabalho */}
+          {request.requiredDocuments && request.requiredDocuments.length > 0 && (
+            <Card>
+              <Card.Body>
+                <h3 className={styles.sectionTitle}>
+                  <LuFileText aria-hidden="true" />
+                  Documentos obrigatórios
+                </h3>
+                <ul className={styles.reqList}>
+                  {request.requiredDocuments.map((doc) => (
+                    <li key={doc.id} className={styles.reqItem}>
+                      <span className={styles.reqName}>{doc.document_type_name}</span>
+                      <span className={styles.reqMeta}>
+                        {DOCUMENT_SCOPE[doc.scope]?.label ?? ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </Card.Body>
+            </Card>
+          )}
+
+          {/* NRs obrigatórias definidas pela Segurança do Trabalho */}
+          {request.requiredNrTypes && request.requiredNrTypes.length > 0 && (
+            <Card>
+              <Card.Body>
+                <h3 className={styles.sectionTitle}>
+                  <LuShieldCheck aria-hidden="true" />
+                  NRs obrigatórias para os colaboradores
+                </h3>
+                <ul className={styles.reqList}>
+                  {request.requiredNrTypes.map((nr) => (
+                    <li key={nr.id} className={styles.reqItem}>
+                      <span className={styles.reqCode}>{nr.nr_code}</span>
+                      <span className={styles.reqName}>{nr.nr_name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card.Body>
+            </Card>
+          )}
+        </div>
+
+        {/* ── Coluna direita: aprovações (fica em baixo quando necessita de aprovação) ── */}
+        <div className={styles.rightCol}>
+          <Card>
+            <Card.Body>
+              <h3 className={styles.sectionTitle}>Aprovações</h3>
+
+              {isLoadingApprovals ? (
+                <p>Carregando aprovações...</p>
+              ) : (
+                <ApprovalTimeline approvals={approvals} />
+              )}
+
+              {/* Painel de aprovação — apenas para Segurança do Trabalho com solicitação pendente */}
+              {canApprove && (
+                <>
+                  <hr className={styles.divider} />
+                  <h4 className={styles.subTitle}>Registrar documentos necessários</h4>
+                  <ApprovePanel
+                    laborRequestId={request.id}
+                    activityDocTypeIds={suggestedDocIds}
+                    activityNrTypeIds={suggestedNrIds}
+                    onSuccess={handleApprovalSuccess}
+                  />
+                </>
+              )}
+            </Card.Body>
+          </Card>
+        </div>
       </div>
+
+      {/* Modal de criação de rodada — disponível para Suprimentos quando Em Cotação */}
+      <CreateRoundModal
+        open={createRoundModal.isOpen}
+        onClose={createRoundModal.close}
+        laborRequestId={request.id}
+        onSuccess={handleRoundCreated}
+      />
     </div>
   );
 }

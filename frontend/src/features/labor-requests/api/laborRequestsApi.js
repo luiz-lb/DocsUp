@@ -1,161 +1,143 @@
-import { mockDelay } from '../../../hooks/useMockApi.js';
-import { ACTIVITY_TYPES } from '../../../mocks/catalog.js';
 import { api } from '../../../utils/api.js';
 
-let seq = 104;
-const requests = [
-  {
-    id: 101,
-    title: 'Equipe de instalacao eletrica - Torre B',
-    activityTypeId: 1,
-    location: 'Obra Torre B - Alphaville',
-    headcount: 6,
-    urgency: 2,
-    status: 3,
-    requiredDocumentIds: [1, 2, 3, 5],
-    requesterName: 'Marcelo Dias',
-    createdAt: '2026-07-28T13:20:00Z',
-    approvals: [
-      { department: 'RH', decision: 2, comments: 'Escopo compativel com o efetivo atual.', decidedAt: '2026-07-28T16:40:00Z' },
-      { department: 'Seguranca', decision: 2, comments: 'Checklist de NR-10 e NR-12 anexado.', decidedAt: '2026-07-29T09:10:00Z' },
-    ],
-  },
-  {
-    id: 102,
-    title: 'Solda estrutural - Galpao 4',
-    activityTypeId: 3,
-    location: 'Obra Galpao 4 - Barueri',
-    headcount: 4,
-    urgency: 3,
-    status: 0,
-    requiredDocumentIds: [1, 2, 3, 4, 5, 6],
-    requesterName: 'Marcelo Dias',
-    createdAt: '2026-08-02T10:05:00Z',
-    approvals: [
-      { department: 'RH', decision: 0, comments: null, decidedAt: null },
-      { department: 'Seguranca', decision: 0, comments: null, decidedAt: null },
-    ],
-  },
-  {
-    id: 103,
-    title: 'Limpeza pos-obra - Bloco A',
-    activityTypeId: 2,
-    location: 'Obra Bloco A - Alphaville',
-    headcount: 8,
-    urgency: 1,
-    status: 6,
-    requiredDocumentIds: [1, 2],
-    requesterName: 'Marcelo Dias',
-    createdAt: '2026-06-14T08:00:00Z',
-    approvals: [
-      { department: 'RH', decision: 2, comments: null, decidedAt: '2026-06-14T11:00:00Z' },
-      { department: 'Seguranca', decision: 2, comments: null, decidedAt: '2026-06-14T15:00:00Z' },
-    ],
-  },
-];
+// ---------------------------------------------------------------------------
+// Labor Requests
+// ---------------------------------------------------------------------------
 
-export async function listLaborRequests() {
+/**
+ * Lista solicitações com paginação, busca e filtros.
+ * @param {{page?: number, limit?: number, search?: string, status?: number, urgency?: number}} params
+ */
+export async function listLaborRequests(params = {}) {
   try {
-    const result = await api.get('/laborRequest/list');
-
-    if(!result){
-      throw error;
-    } else{
-      return {success: true, message:"Sucesso ao buscar solicitações.", body: result.data.body.result}
-    }
+    const result = await api.get('/laborRequest/list', { params });
+    return { success: true, body: result.data.body.result, pagination: result.data.body.pagination };
   } catch (error) {
-    console.error("Erro ao buscar solicitações.");
-    return {success: false, message:"Erro ao buscar solicitações.", body:{id: null, name: "", risk_level: null, nr_type_id: null, document_type_id: null}}
+    console.error('Erro ao buscar solicitações:', error);
+    return { success: false, body: [], pagination: null };
   }
 }
 
 export async function getLaborRequestById(id) {
   try {
     const result = await api.get(`/laborRequest/listById/${id}`);
-
     if (!result.data.success) {
       return { success: false, body: { message: result.data.body.message } };
     }
-
     return result.data;
   } catch (error) {
-    return { success: false, body: { message: "Erro ao buscar solicitação." } };
-  }
-}
-
-export async function getActivityTypes(){
-  try {
-    const result = await api.get('/docRequired/activity_types');
-
-    if(!result){
-      throw error;
-    } else{
-      return {success: true, message:"Sucesso ao buscar tipos de atividades.", body: result.data.body.result}
-    }
-  } catch (error) {
-    console.error("Erro ao buscar tipos de atividades.");
-    return {success: true, message:"Erro ao buscar tipos de atividades.", body:{id: null, name: "", risk_level: null, nr_type_id: null, document_type_id: null}}
-  }
-}
-
-export async function getDocumentsTypes(){
-  try {
-    const result = await api.get('/docRequired/document_types');
-
-    if(!result){
-      throw error;
-    } else{
-      return {success: true, message:"Sucesso ao buscar tipos de documentos.", body: result.data.body.result}
-    }
-  } catch (error) {
-    console.error("Erro ao buscar tipos de documentos.");
-    return {success: true, message:"Erro ao buscar tipos de documentos.", body:{id: null, name: "", risk_level: null, nr_type_id: null, document_type_id: null}}
-  }
-}
-
-export async function getNrTypes(){
-  try {
-    const result = await api.get('/docRequired/nr_types');
-
-    if(!result){
-      throw error;
-    } else{
-      return {success: true, message:"Sucesso ao buscar tipos de NRs.", body: result.data.body.result}
-    }
-  } catch (error) {
-    console.error("Erro ao buscar tipos de NRs.");
-    return {success: true, message:"Erro ao buscar tipos de NRs.", body:{id: null, name: "", risk_level: null, nr_type_id: null, document_type_id: null}}
+    console.error('Erro ao buscar solicitação:', error);
+    return { success: false, body: { message: 'Erro ao buscar solicitação.' } };
   }
 }
 
 export async function createLaborRequest(payload) {
   try {
-    const result = await api.post('/laborRequest/create', payload)
-
-    if(!result.data.success){
-      return {success: false, body: {message: "Erro ao criar solicitação."}}
+    const result = await api.post('/laborRequest/create', payload);
+    if (!result.data.success) {
+      return { success: false, body: { message: 'Erro ao criar solicitação.' } };
     }
-
-    return result.data
+    return result.data;
   } catch (error) {
-    return {success: false, body: {message: "Erro ao criar solicitação."}}
+    console.error('Erro ao criar solicitação:', error);
+    return { success: false, body: { message: 'Erro ao criar solicitação.' } };
   }
 }
 
-export function decideApproval(requestId, department, decision, comments) {
-  const request = requests.find((item) => item.id === Number(requestId));
-  if (!request) return mockDelay(null);
+// ---------------------------------------------------------------------------
+// Aprovações
+// ---------------------------------------------------------------------------
 
-  request.approvals = request.approvals.map((approval) =>
-    approval.department === department
-      ? { ...approval, decision, comments, decidedAt: new Date().toISOString() }
-      : approval,
-  );
+/**
+ * Busca aprovações de uma solicitação.
+ * GET /laborRequest/listApprovals/:id
+ */
+export async function getApprovals(laborRequestId) {
+  try {
+    const result = await api.get(`/laborRequest/listApprovals/${laborRequestId}`);
+    if (!result.data.success) {
+      return { success: false, body: { approvals: [] } };
+    }
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    console.error('Erro ao buscar aprovações:', error);
+    return { success: false, body: { approvals: [] } };
+  }
+}
 
-  const allApproved = request.approvals.every((approval) => approval.decision === 2);
-  const anyRejected = request.approvals.some((approval) => approval.decision === 1);
-  if (anyRejected) request.status = 2;
-  else if (allApproved) request.status = 3;
+/**
+ * Registra decisão de aprovação (Segurança do Trabalho).
+ * POST /laborRequest/approveRequest
+ *
+ * @param {number}   laborRequestId
+ * @param {number}   decision        - 1=Reprovado, 2=Aprovado
+ * @param {string}   comments
+ * @param {number[]} documentTypeIds - obrigatório ao aprovar (decision=2)
+ * @param {number[]} nrTypeIds       - NRs exigidas, obrigatório ao aprovar (decision=2)
+ */
+export async function submitApproval(laborRequestId, decision, comments, documentTypeIds, nrTypeIds) {
+  try {
+    const result = await api.post('/laborRequest/approveRequest', {
+      laborRequestId,
+      decision,
+      comments,
+      documentTypeIds,
+      nrTypeIds,
+    });
+    return result.data;
+  } catch (error) {
+    console.error('Erro ao registrar aprovação:', error);
+    return { success: false, body: { message: 'Erro ao registrar aprovação.' } };
+  }
+}
 
-  return mockDelay(request, 400);
+/**
+ * Atualiza os documentos obrigatórios de uma solicitação aprovada.
+ * POST /laborRequest/updateDocsRequired
+ */
+export async function updateDocsRequired(laborRequestId, documentTypeIds) {
+  try {
+    const result = await api.post('/laborRequest/updateDocsRequired', {
+      laborRequestId,
+      documentTypeIds,
+    });
+    return result.data;
+  } catch (error) {
+    console.error('Erro ao atualizar documentos obrigatórios:', error);
+    return { success: false, body: { message: 'Erro ao atualizar documentos.' } };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dados de referência
+// ---------------------------------------------------------------------------
+
+export async function getActivityTypes() {
+  try {
+    const result = await api.get('/docRequired/activity_types');
+    return { success: true, body: result.data.body.result };
+  } catch (error) {
+    console.error('Erro ao buscar tipos de atividades:', error);
+    return { success: false, body: [] };
+  }
+}
+
+export async function getDocumentsTypes() {
+  try {
+    const result = await api.get('/docRequired/document_types');
+    return { success: true, body: result.data.body.result };
+  } catch (error) {
+    console.error('Erro ao buscar tipos de documentos:', error);
+    return { success: false, body: [] };
+  }
+}
+
+export async function getNrTypes() {
+  try {
+    const result = await api.get('/docRequired/nr_types');
+    return { success: true, body: result.data.body.result };
+  } catch (error) {
+    console.error('Erro ao buscar NRs:', error);
+    return { success: false, body: [] };
+  }
 }

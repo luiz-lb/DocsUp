@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.post('/login',  auth.login);
 // rota pendente de finalização
-//router.post('/register', auth.registerNewUser);
+router.post('/register', auth.registerNewUser);
 // rota usada para verificar token quando usuario carregar tel
 router.get('/me', verificarToken, auth.getMe);
 

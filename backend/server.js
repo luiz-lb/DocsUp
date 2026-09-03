@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { fileURLToPath } from 'url';
 import routes from './src/routers/index.js';
 import cors from 'cors';
+import { processExpiredPhase2Deadlines } from './src/services/phase2Service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +56,21 @@ app.use((err, req, res, next) => {
             console.log(`Servidor rodando e acessível na rede na porta: ${port}`);
             console.log(`Ambiente: ${process.env.NODE_ENV || 'production'}`);
         });
+
+        // Job de expiração da Fase 2: roda a cada 5 minutos
+        // Verifica deadlines vencidos e desclassifica fornecedores que não enviaram docs
+        const PHASE2_JOB_INTERVAL_MS = 5 * 60 * 1000;
+        setInterval(async () => {
+            try {
+                const processed = await processExpiredPhase2Deadlines();
+                if (processed > 0) {
+                    console.log(`[Phase2 Job] ${processed} deadline(s) expirado(s) processado(s).`);
+                }
+            } catch (err) {
+                console.error('[Phase2 Job] Erro:', err.message);
+            }
+        }, PHASE2_JOB_INTERVAL_MS);
+
     } catch (err) {
         console.error('Erro ao inicializar servidor:', err.message);
         process.exit(1);

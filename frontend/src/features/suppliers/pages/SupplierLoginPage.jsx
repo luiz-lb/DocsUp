@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { LuLogIn, LuUserPlus } from 'react-icons/lu';
 import { Card, Button, FormField, Banner } from '../../../components/ui/index.js';
 import { ROUTES } from '../../../constants/routes.js';
-import { loginSupplier } from '../api/suppliersApi.js';
+import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
 import CnpjField from '../components/CnpjField.jsx';
 import styles from '../../../styles/authCard.module.css';
 
 export default function SupplierLoginPage() {
   const navigate = useNavigate();
+  const { loginPhase1 } = useSupplierAuth();
+
   const [cnpj, setCnpj] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -16,15 +18,22 @@ export default function SupplierLoginPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setIsLoading(true);
     setError('');
-    const result = await loginSupplier(cnpj);
+    setIsLoading(true);
+
+    const result = await loginPhase1(cnpj, password);
     setIsLoading(false);
 
-    if (result.requiresMfa) {
-      navigate(ROUTES.suppliers.mfa);
-    } else {
-      setError('Nao foi possivel autenticar. Verifique o CNPJ e a senha.');
+    if (!result.success) {
+      setError(result.body?.message ?? 'Não foi possível autenticar. Verifique o CNPJ e a senha.');
+      return;
+    }
+
+    if (result.body?.requiresMfa) {
+      // Passa o devOtp via state para exibir na tela de MFA em ambiente de dev
+      navigate(ROUTES.suppliers.mfa, {
+        state: { devOtp: result.body?.devOtp ?? null },
+      });
     }
   };
 
@@ -33,12 +42,19 @@ export default function SupplierLoginPage() {
       <Card.Body>
         <p className={styles.eyebrow}>Portal do Fornecedor</p>
         <h1 className={styles.title}>Entrar</h1>
-        <p className={styles.subtitle}>Acesse com o CNPJ e a senha cadastrados para responder a cotacao.</p>
+        <p className={styles.subtitle}>Acesse com o CNPJ e a senha cadastrados para responder à cotação.</p>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <CnpjField value={cnpj} onChange={setCnpj} />
+
           <FormField label="Senha" required>
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Sua senha" />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Sua senha"
+              autoComplete="current-password"
+            />
           </FormField>
 
           {error && <Banner tone="danger" description={error} />}
@@ -48,8 +64,12 @@ export default function SupplierLoginPage() {
           </Button>
         </form>
 
-        <button type="button" className={styles.registerLink} onClick={() => navigate(ROUTES.suppliers.register)}>
-          <LuUserPlus /> Ainda nao tenho cadastro
+        <button
+          type="button"
+          className={styles.registerLink}
+          onClick={() => navigate(ROUTES.suppliers.register)}
+        >
+          <LuUserPlus /> Ainda não tenho cadastro
         </button>
       </Card.Body>
     </Card>

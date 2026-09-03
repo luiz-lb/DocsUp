@@ -1,7 +1,101 @@
-import { mockDelay } from '../../../hooks/useMockApi.js';
-import { isValidCnpj } from '../../../utils/validators.js';
+import { api } from '../../../utils/api.js';
 
-let seq = 4;
+// ─────────────────────────────────────────────
+// Auth do Fornecedor
+// ─────────────────────────────────────────────
+
+/**
+ * Valida o CNPJ na API pública via backend.
+ * POST /supplier/auth/validate-cnpj
+ * Retorna { valid, razaoSocial, nomeFantasia, situacao, municipio, uf }
+ */
+export async function validateCnpj(cnpj) {
+  try {
+    const result = await api.post('/supplier/auth/validate-cnpj', { cnpj });
+    return result.data.body;
+  } catch (error) {
+    console.error('validateCnpj error:', error);
+    return { valid: false, razaoSocial: null, situacao: null };
+  }
+}
+
+/**
+ * Registra um novo fornecedor.
+ * POST /supplier/auth/register
+ *
+ * @param {{ cnpj, razaoSocial, nomeFantasia?, password, employeeCount?,
+ *           city?, state?, contacts, categoryIds?, regionIds? }} payload
+ */
+export async function registerSupplier(payload) {
+  try {
+    const result = await api.post('/supplier/auth/register', payload);
+    return result.data;
+  } catch (error) {
+    console.error('registerSupplier error:', error);
+    return { success: false, body: { message: 'Erro ao cadastrar fornecedor.' } };
+  }
+}
+
+/**
+ * Fase 1 do login: CNPJ + senha → backend envia OTP por email.
+ * POST /supplier/auth/login
+ * Retorna { success: true, body: { requiresMfa: true, devOtp? } }
+ */
+export async function loginSupplier(cnpj, password) {
+  try {
+    const result = await api.post('/supplier/auth/login', { cnpj, password });
+    return result.data;
+  } catch (error) {
+    console.error('loginSupplier error:', error);
+    return { success: false, body: { message: 'Erro ao fazer login.' } };
+  }
+}
+
+/**
+ * Fase 2 do login: envia o OTP para validação.
+ * POST /supplier/auth/verify-mfa
+ * Retorna { success, body: { supplier } } e seta o cookie supplier_token.
+ */
+export async function verifyMfaCode(otp) {
+  try {
+    const result = await api.post('/supplier/auth/verify-mfa', { otp });
+    return result.data;
+  } catch (error) {
+    console.error('verifyMfaCode error:', error);
+    return { success: false, body: { message: 'Erro ao verificar código.' } };
+  }
+}
+
+/**
+ * Logout do fornecedor — limpa o cookie supplier_token.
+ * POST /supplier/auth/logout
+ */
+export async function logoutSupplier() {
+  try {
+    await api.post('/supplier/auth/logout');
+  } catch (error) {
+    console.error('logoutSupplier error:', error);
+  }
+}
+
+/**
+ * Retorna os dados do fornecedor autenticado.
+ * GET /supplier/auth/me
+ */
+export async function meSupplier() {
+  try {
+    const result = await api.get('/supplier/auth/me');
+    return result.data;
+  } catch {
+    return { success: false };
+  }
+}
+
+// ─────────────────────────────────────────────
+// Listagem (painel interno — mantém mock por ora)
+// ─────────────────────────────────────────────
+import { mockDelay } from '../../../hooks/useMockApi.js';
+
 const suppliers = [
   {
     id: 1,
@@ -56,33 +150,4 @@ export function listSuppliers() {
 
 export function getSupplier(id) {
   return mockDelay(suppliers.find((supplier) => supplier.id === Number(id)) ?? null);
-}
-
-/** Simula a validacao do CNPJ contra uma API publica durante o cadastro. */
-export function validateCnpj(cnpj) {
-  const valid = isValidCnpj(cnpj);
-  return mockDelay(
-    valid
-      ? { valid: true, razaoSocial: 'Empresa Validada Automaticamente LTDA', situacao: 'ATIVA' }
-      : { valid: false, razaoSocial: null, situacao: null },
-    600,
-  );
-}
-
-/** CNPJ + senha -> sempre exige MFA (contatos legal/operacional recebem o codigo). */
-export function loginSupplier(cnpj) {
-  const supplier = suppliers.find((item) => item.cnpj === cnpj);
-  return mockDelay({ requiresMfa: true, supplierId: supplier?.id ?? null }, 500);
-}
-
-/** Codigo demo fixo: 123456. */
-export function verifyMfaCode(code) {
-  return mockDelay({ success: code === '123456' }, 500);
-}
-
-export function registerSupplier(payload) {
-  seq += 1;
-  const record = { id: seq, status: 0, overallScore: 0, ...payload };
-  suppliers.push(record);
-  return mockDelay(record, 600);
 }

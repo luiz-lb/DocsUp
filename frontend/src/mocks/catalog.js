@@ -4,11 +4,11 @@
 // backend, isso vira uma chamada unica de reference-data cacheada.
 
 export const NR_TYPES = [
-  { id: 10, code: 'NR-10', name: 'Seguranca em Instalacoes Eletricas' },
-  { id: 12, code: 'NR-12', name: 'Seguranca no Trabalho em Maquinas e Equipamentos' },
-  { id: 18, code: 'NR-18', name: 'Condicoes de Seguranca na Industria da Construcao' },
-  { id: 20, code: 'NR-20', name: 'Seguranca com Inflamaveis e Combustiveis' },
-  { id: 35, code: 'NR-35', name: 'Trabalho em Altura' },
+  { id: 11, code: 'NR-10', name: 'Seguranca em Instalacoes Eletricas' },
+  { id: 13, code: 'NR-12', name: 'Seguranca no Trabalho em Maquinas e Equipamentos' },
+  { id: 19, code: 'NR-18', name: 'Condicoes de Seguranca na Industria da Construcao' },
+  { id: 21, code: 'NR-20', name: 'Seguranca com Inflamaveis e Combustiveis' },
+  { id: 36, code: 'NR-35', name: 'Trabalho em Altura' },
 ];
 
 export const DOCUMENT_TYPES = [
@@ -27,7 +27,7 @@ export const ACTIVITY_TYPES = [
     id: 1,
     name: 'Instalacao Eletrica',
     riskLevel: 2,
-    requiredNrIds: [10, 12],
+    requiredNrIds: [11, 13],
     requiredDocumentIds: [1, 2, 3, 5],
   },
   {
@@ -41,32 +41,32 @@ export const ACTIVITY_TYPES = [
     id: 3,
     name: 'Soldagem e Corte a Quente',
     riskLevel: 3,
-    requiredNrIds: [12, 18, 20],
+    requiredNrIds: [13, 19, 21],
     requiredDocumentIds: [1, 2, 3, 4, 5, 6],
   },
   {
     id: 4,
     name: 'Trabalho em Altura',
     riskLevel: 2,
-    requiredNrIds: [35],
+    requiredNrIds: [36],
     requiredDocumentIds: [1, 2, 3, 5],
   },
 ];
 
 export const SERVICE_CATEGORIES = [
-  { id: 1, name: 'Eletrica' },
+  { id: 1, name: 'Locacao de Equipamentos' },
   { id: 2, name: 'Construcao Civil' },
-  { id: 3, name: 'Limpeza' },
+  { id: 3, name: 'Eletrica' },
   { id: 4, name: 'Solda e Caldeiraria' },
-  { id: 5, name: 'Locacao de Equipamentos' },
+  { id: 5, name: 'Limpeza' },
 ];
 
 export const REGIONS = [
-  { id: 1, city: 'Sao Paulo', state: 'SP' },
-  { id: 2, city: 'Campinas', state: 'SP' },
-  { id: 3, city: 'Rio de Janeiro', state: 'RJ' },
-  { id: 4, city: 'Belo Horizonte', state: 'MG' },
-  { id: 5, city: 'Curitiba', state: 'PR' },
+  { id: 3, city: 'Sao Paulo', state: 'SP' },
+  { id: 4, city: 'Campinas', state: 'SP' },
+  { id: 5, city: 'Rio de Janeiro', state: 'RJ' },
+  { id: 6, city: 'Belo Horizonte', state: 'MG' },
+  { id: 7, city: 'Curitiba', state: 'PR' },
 ];
 
 export function findActivityType(id) {
