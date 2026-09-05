@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LuFileText, LuShieldCheck, LuPlus } from 'react-icons/lu';
+import { LuFileText, LuShieldCheck, LuPlus, LuClipboardList } from 'react-icons/lu';
 import {
   Card,
   PageHeader,
@@ -12,10 +12,12 @@ import {
 import { LABOR_REQUEST_STATUS, URGENCY, DOCUMENT_SCOPE } from '../../../constants/enums.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import { useLaborRequest, useLaborRequestApprovals } from '../hooks/useLaborRequests.js';
+import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { formatDate } from '../../../utils/formatters.js';
 import ApprovalTimeline from '../components/ApprovalTimeline.jsx';
 import ApprovePanel from '../components/ApprovePanel.jsx';
 import CreateRoundModal from '../../quotations/components/CreateRoundModal/index.js';
+import { getLatestRoundByLaborRequest } from '../../quotations/api/quotationsApi.js';
 import { useDisclosure } from '../../../hooks/useDisclosure.js';
 import { ROUTES } from '../../../constants/routes.js';
 import styles from './RequestDetailPage.module.css';
@@ -37,6 +39,12 @@ export default function RequestDetailPage() {
 
   const [approvalDone, setApprovalDone] = useState(false);
   const createRoundModal = useDisclosure(false);
+
+  // Busca o round mais recente para saber se existe rodada de cotação ativa
+  const { data: latestRound } = useAsyncData(
+    () => getLatestRoundByLaborRequest(id),
+    [id],
+  );
 
   if (isLoadingRequest) return <p>Carregando solicitação...</p>;
 
@@ -87,7 +95,19 @@ export default function RequestDetailPage() {
         actions={
           <>
             <StatusBadge enumMap={LABOR_REQUEST_STATUS} value={request.status} />
-            {canCreateRound && (
+            {/* Suprimentos: navega para o round mais recente quando existir */}
+            {isSuprimentos && latestRound && (
+              <Button
+                variant="secondary"
+                icon={LuClipboardList}
+                size="sm"
+                onClick={() => navigate(ROUTES.quotations.round(latestRound.id))}
+              >
+                Ver cotações
+              </Button>
+            )}
+            {/* Suprimentos: cria rodada apenas quando Em Cotação E ainda não existe round */}
+            {canCreateRound && !latestRound && (
               <Button icon={LuPlus} size="sm" onClick={createRoundModal.open}>
                 Iniciar cotação
               </Button>

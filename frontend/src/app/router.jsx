@@ -24,6 +24,7 @@ const SupplierProfilePage = lazy(() => import('../features/suppliers/pages/Suppl
 const SupplierLoginPage = lazy(() => import('../features/suppliers/pages/SupplierLoginPage.jsx'));
 const SupplierMfaPage = lazy(() => import('../features/suppliers/pages/SupplierMfaPage.jsx'));
 const SupplierRegisterPage = lazy(() => import('../features/suppliers/pages/SupplierRegisterPage.jsx'));
+const SupplierPortalPage = lazy(() => import('../features/suppliers/pages/SupplierPortalPage.jsx'));
 
 const DocumentCenterPage = lazy(() => import('../features/documents/pages/DocumentCenterPage.jsx'));
 const DocumentReviewPage = lazy(() => import('../features/documents/pages/DocumentReviewPage.jsx'));
@@ -89,6 +90,7 @@ export const router = createBrowserRouter([
           { path: ROUTES.suppliers.login, element: <SupplierLoginPage /> },
           { path: ROUTES.suppliers.mfa, element: <SupplierMfaPage /> },
           { path: ROUTES.suppliers.register, element: <SupplierRegisterPage /> },
+          { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
           { path: ROUTES.employees.phase2(), element: <Phase2UploadPage /> },
         ],
       },

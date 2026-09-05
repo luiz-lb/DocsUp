@@ -1,0 +1,28 @@
+.grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.65rem 1.5rem;
+  margin: 0;
+}
+
+.grid dt {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-textMuted, #6b7280);
+  align-self: center;
+}
+
+.grid dd {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-textBase, #111827);
+  align-self: center;
+}
+
+/* Destaque para o valor proposto */
+.value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-teal, #004643);
+}

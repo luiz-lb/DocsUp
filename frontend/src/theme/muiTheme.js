@@ -35,5 +35,9 @@ export const muiTheme = createTheme({
         paper: { backgroundColor: palette.teal, color: palette.creamText },
       },
     },
+    // Cores do Stepper (ativo/concluído/conector) NÃO ficam aqui: variam
+    // conforme o fundo em que o WizardStepper é usado (card claro vs. teal
+    // escuro), então são controladas pela prop `tone` do próprio componente
+    // (ver components/ui/WizardStepper/WizardStepper.jsx).
   },
 });

@@ -53,3 +53,41 @@ export async function documentTypes() {
         return {success: false, body: { message: "Erro ao buscar os tipos de documento." }}
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regiões — usadas no cadastro de fornecedor (sem autenticação)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Busca regiões com filtro por cidade e/ou estado.
+ */
+export async function searchRegions(filters) {
+    try {
+        const result = await docRequiredModel.searchRegions(filters);
+        return { success: true, body: { result } };
+    } catch (error) {
+        console.error('Erro no searchRegions service:', error);
+        return { success: false, body: { message: 'Erro ao buscar regiões.' } };
+    }
+}
+
+/**
+ * Retorna todos os IDs de regiões de um estado.
+ */
+export async function getRegionIdsByState(state) {
+    try {
+        const ids = await docRequiredModel.getRegionIdsByState(state);
+        return { success: true, body: { ids } };
+    } catch (error) {
+        console.error('Erro no getRegionIdsByState service:', error);
+        return { success: false, body: { message: 'Erro ao buscar regiões do estado.' } };
+    }
+}
+
+/**
+ * Busca activity_types para o portal do fornecedor (sem restrição de autenticação interna).
+ * Reutiliza a mesma função já existente.
+ */
+export async function activityTypesPublic() {
+    return activityTypes();
+}

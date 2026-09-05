@@ -18,11 +18,17 @@ router.get('/rounds/byRequest/:laborRequestId', verificarToken, quotationControl
 // Declara vencedor e inicia Phase 2
 router.post('/rounds/declareWinner', verificarToken, quotationController.declareWinner);
 
+// Adiciona novo convite a uma rodada existente
+router.post('/rounds/addInvite', verificarToken, quotationController.addInviteToRound);
+
 // ─── Portal do Fornecedor ──────────────────────────────────────────────────────
 // Busca dados do convite pelo token (público — para pré-carregar a tela)
 router.get('/invite/:token', quotationController.getInviteByToken);
 
 // Submete cotação (exige JWT de fornecedor)
 router.post('/submit/:token', verificarTokenFornecedor, quotationController.submitQuotation);
+
+// Lista cotações do fornecedor autenticado (portal do fornecedor)
+router.get('/supplier/my-quotations', verificarTokenFornecedor, quotationController.getMyQuotations);
 
 export default router;

@@ -23,6 +23,7 @@ export const ROUTES = {
     login: '/fornecedor/entrar',
     mfa: '/fornecedor/mfa',
     register: '/fornecedor/cadastro',
+    portal: '/fornecedor/painel',
   },
 
   documents: {

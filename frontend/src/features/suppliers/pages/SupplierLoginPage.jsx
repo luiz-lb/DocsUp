@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LuLogIn, LuUserPlus } from 'react-icons/lu';
 import { Card, Button, FormField, Banner } from '../../../components/ui/index.js';
 import { ROUTES } from '../../../constants/routes.js';
@@ -9,6 +9,11 @@ import styles from '../../../styles/authCard.module.css';
 
 export default function SupplierLoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Token de proposta vindo na URL: /fornecedor/entrar?tokenProposta=XXX
+  const tokenProposta = searchParams.get('tokenProposta');
+
   const { loginPhase1 } = useSupplierAuth();
 
   const [cnpj, setCnpj] = useState('');
@@ -30,9 +35,12 @@ export default function SupplierLoginPage() {
     }
 
     if (result.body?.requiresMfa) {
-      // Passa o devOtp via state para exibir na tela de MFA em ambiente de dev
+      // Propaga o devOtp (dev) e o token de proposta para a tela de MFA
       navigate(ROUTES.suppliers.mfa, {
-        state: { devOtp: result.body?.devOtp ?? null },
+        state: {
+          devOtp: result.body?.devOtp ?? null,
+          tokenProposta: tokenProposta ?? null,
+        },
       });
     }
   };
@@ -67,7 +75,13 @@ export default function SupplierLoginPage() {
         <button
           type="button"
           className={styles.registerLink}
-          onClick={() => navigate(ROUTES.suppliers.register)}
+          onClick={() =>
+            navigate(
+              tokenProposta
+                ? `${ROUTES.suppliers.register}?tokenProposta=${tokenProposta}`
+                : ROUTES.suppliers.register,
+            )
+          }
         >
           <LuUserPlus /> Ainda não tenho cadastro
         </button>

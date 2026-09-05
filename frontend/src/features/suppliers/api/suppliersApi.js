@@ -92,8 +92,74 @@ export async function meSupplier() {
 }
 
 // ─────────────────────────────────────────────
-// Listagem (painel interno — mantém mock por ora)
+// Dados de referência públicos (portal do fornecedor)
 // ─────────────────────────────────────────────
+
+/**
+ * Busca activity_types sem autenticação interna.
+ * GET /docRequired/public/activity_types
+ */
+export async function getActivityTypesPublic() {
+  try {
+    const result = await api.get('/docRequired/public/activity_types');
+    return result.data.body?.result ?? [];
+  } catch (error) {
+    console.error('getActivityTypesPublic error:', error);
+    return [];
+  }
+}
+
+/**
+ * Busca regiões com filtro de cidade e/ou estado (autocomplete).
+ * GET /docRequired/public/regions?state=SP&city=Camp
+ * @returns {{ id, city, state }[]}
+ */
+export async function searchRegions({ state, city } = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (state) params.append('state', state);
+    if (city)  params.append('city',  city);
+    const result = await api.get(`/docRequired/public/regions?${params.toString()}`);
+    return result.data.body?.result ?? [];
+  } catch (error) {
+    console.error('searchRegions error:', error);
+    return [];
+  }
+}
+
+/**
+ * Busca todos os IDs de regiões de um estado inteiro.
+ * GET /docRequired/public/regions/state/:state
+ * @returns {number[]} array de IDs
+ */
+export async function getRegionIdsByState(state) {
+  try {
+    const result = await api.get(`/docRequired/public/regions/state/${state}`);
+    return result.data.body?.ids ?? [];
+  } catch (error) {
+    console.error('getRegionIdsByState error:', error);
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────
+// Cotações do fornecedor (portal)
+// ─────────────────────────────────────────────
+
+/**
+ * Lista as cotações do fornecedor autenticado (pendentes, enviadas, aprovadas).
+ * GET /quotations/supplier/my-quotations
+ * Exige cookie supplier_token.
+ */
+export async function getMyQuotations() {
+  try {
+    const result = await api.get('/quotations/supplier/my-quotations');
+    return result.data.body?.quotations ?? [];
+  } catch (error) {
+    console.error('getMyQuotations error:', error);
+    return [];
+  }
+}
 import { mockDelay } from '../../../hooks/useMockApi.js';
 
 const suppliers = [

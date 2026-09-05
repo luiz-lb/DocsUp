@@ -51,6 +51,23 @@ export async function listRoundsByLaborRequest(laborRequestId) {
 }
 
 /**
+ * Retorna o round mais recente de uma solicitação (round_number DESC).
+ * Retorna null se ainda não houver nenhum round.
+ */
+export async function getLatestRoundByLaborRequest(laborRequestId) {
+  try {
+    const result = await api.get(`/quotations/rounds/byRequest/${laborRequestId}`);
+    if (!result.data.success) return null;
+    const rounds = result.data.body?.rounds ?? [];
+    // rounds já vem ordenado por round_number DESC
+    return rounds[0] ?? null;
+  } catch (error) {
+    console.error('getLatestRoundByLaborRequest error:', error);
+    return null;
+  }
+}
+
+/**
  * Declara o vencedor da rodada.
  * POST /quotations/rounds/declareWinner
  */
@@ -65,6 +82,20 @@ export async function declareWinner(roundId, winnerQuotationId, deadlineHours) {
   } catch (error) {
     console.error('declareWinner error:', error);
     return { success: false, body: { message: 'Erro ao declarar vencedor.' } };
+  }
+}
+
+/**
+ * Adiciona um novo convite a uma rodada existente (mesmo prazo do round).
+ * POST /quotations/rounds/addInvite
+ */
+export async function addInviteToRound(roundId, inviteeEmail) {
+  try {
+    const result = await api.post('/quotations/rounds/addInvite', { roundId, inviteeEmail });
+    return result.data;
+  } catch (error) {
+    console.error('addInviteToRound error:', error);
+    return { success: false, body: { message: 'Erro ao adicionar convite.' } };
   }
 }
 

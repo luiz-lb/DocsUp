@@ -148,15 +148,20 @@ export async function markInviteViewed(inviteId) {
 }
 
 /**
- * Marca um convite como respondido (status=2).
+ * Marca um convite como respondido (status=2) e vincula o fornecedor.
+ * Quando o convite foi criado só com email, o supplier_id fica NULL até
+ * a resposta — aqui garantimos o vínculo para consultas futuras.
  */
-export async function markInviteResponded(transaction, inviteId) {
+export async function markInviteResponded(transaction, inviteId, supplierId = null) {
     const request = new sql.Request(transaction);
     await request
         .input('id', sql.Int, inviteId)
+        .input('supplier_id', sql.Int, supplierId)
         .query(`
             UPDATE quotation_invites
-            SET [status] = 2, responded_at = GETDATE()
+            SET [status] = 2,
+                responded_at = GETDATE(),
+                supplier_id = COALESCE(supplier_id, @supplier_id)
             WHERE id = @id
         `);
 }
@@ -270,6 +275,80 @@ export async function getQuotationsByRoundId(roundId) {
             INNER JOIN suppliers AS s ON s.id = q.supplier_id
             WHERE q.round_id = @round_id
             ORDER BY q.total_value ASC
+        `);
+    return result.recordset;
+}
+
+/**
+ * Lista todos os CONVITES de uma rodada com o status do convite e,
+ * quando o fornecedor já enviou, os dados da cotação.
+ *
+ * Regras:
+ *  - Sempre retorna uma linha por convite (quotation_invites).
+ *  - Se a cotação existir (quotations), seus dados aparecem nas colunas q_*.
+ *  - Ordenação: cotações com valor ASC no topo, depois convites sem resposta.
+ *
+ * Colunas do invite (prefixo i_):
+ *   i_id, i_uid, i_invite_email, i_status,
+ *   i_sent_at, i_viewed_at, i_responded_at
+ *
+ * Colunas da cotação (prefixo q_, nullable):
+ *   q_id, q_total_value, q_currency, q_status,
+ *   q_ranking, q_submitted_at, q_acceptance_ip, q_acceptance_at
+ *
+ * Colunas do fornecedor (quando vinculado ao convite ou à cotação):
+ *   supplier_name, nome_fantasia
+ */
+export async function getInvitesWithQuotationsByRoundId(roundId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('round_id', sql.Int, roundId)
+        .query(`
+            SELECT
+                -- Convite
+                i.id            AS i_id,
+                i.uid           AS i_uid,
+                i.invite_email  AS i_invite_email,
+                i.[status]      AS i_status,
+                i.sent_at       AS i_sent_at,
+                i.viewed_at     AS i_viewed_at,
+                i.responded_at  AS i_responded_at,
+
+                -- Fornecedor (vem do invite ou da cotação)
+                COALESCE(si.razao_social, sq.razao_social) AS supplier_name,
+                COALESCE(si.nome_fantasia, sq.nome_fantasia) AS nome_fantasia,
+
+                -- Cotação (NULL se ainda não respondeu)
+                q.id            AS q_id,
+                q.total_value   AS q_total_value,
+                q.currency      AS q_currency,
+                q.[status]      AS q_status,
+                q.ranking       AS q_ranking,
+                q.submitted_at  AS q_submitted_at,
+                q.acceptance_ip AS q_acceptance_ip,
+                q.acceptance_at AS q_acceptance_at
+
+            FROM quotation_invites AS i
+
+            -- Cotação vinculada ao convite (LEFT: pode não ter respondido)
+            LEFT JOIN quotations AS q
+                ON q.invite_id = i.id
+
+            -- Fornecedor do convite (quando supplierId já estava no convite)
+            LEFT JOIN suppliers AS si
+                ON si.id = i.supplier_id
+
+            -- Fornecedor da cotação (quando o fornecedor se identificou ao cotar)
+            LEFT JOIN suppliers AS sq
+                ON sq.id = q.supplier_id
+
+            WHERE i.round_id = @round_id
+
+            ORDER BY
+                -- Cotações enviadas primeiro, ranqueadas pelo valor
+                CASE WHEN q.id IS NOT NULL THEN 0 ELSE 1 END ASC,
+                q.total_value ASC,
+                i.sent_at ASC
         `);
     return result.recordset;
 }
@@ -398,6 +477,73 @@ export async function updatePhase2DeadlineStatus(transaction, deadlineId, status
                 completed_at = @completed_at
             WHERE id = @id
         `);
+}
+
+/**
+ * Lista as cotações e convites de um fornecedor (portal do fornecedor).
+ *
+ * Um convite pode ter sido criado de 3 formas:
+ *   1. Já vinculado ao supplier_id (quando Suprimentos escolhe um fornecedor existente).
+ *   2. Apenas com o invite_email (quando Suprimentos convida por email — caso mais comum).
+ *   3. Vinculado depois, quando o fornecedor responde (q.supplier_id).
+ *
+ * Para o caso 2, casamos o invite_email com QUALQUER email de contato
+ * (legal/operacional) cadastrado do fornecedor — assim o convite aparece no
+ * portal mesmo que tenha sido enviado ao email do dono OU do operador.
+ *
+ * Ordenado por data de envio do convite DESC.
+ */
+export async function getQuotationsBySupplierId(supplierId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('supplier_id', sql.Int, supplierId)
+        .query(`
+            SELECT
+                i.id            AS i_id,
+                i.invite_token  AS i_invite_token,
+                i.invite_email  AS i_invite_email,
+                i.[status]      AS i_status,
+                i.sent_at       AS i_sent_at,
+                i.responded_at  AS i_responded_at,
+
+                r.id            AS round_id,
+                r.deadline      AS round_deadline,
+                r.[status]      AS round_status,
+
+                lr.id           AS labor_request_id,
+                lr.title        AS labor_request_title,
+                lr.[location]   AS labor_request_location,
+
+                q.id            AS q_id,
+                q.total_value   AS q_total_value,
+                q.[status]      AS q_status,
+                q.submitted_at  AS q_submitted_at,
+                q.acceptance_at AS q_acceptance_at
+
+            FROM quotation_invites AS i
+            INNER JOIN quotation_rounds AS r
+                ON r.id = i.round_id
+            INNER JOIN labor_requests AS lr
+                ON lr.id = r.labor_request_id
+            LEFT JOIN quotations AS q
+                ON q.invite_id = i.id
+
+            WHERE
+                -- 1. convite já vinculado ao fornecedor
+                i.supplier_id = @supplier_id
+                -- 3. fornecedor respondeu (cotação vinculada)
+                OR q.supplier_id = @supplier_id
+                -- 2. convite por email: casa com email de contato do fornecedor
+                OR EXISTS (
+                    SELECT 1
+                    FROM supplier_contacts AS sc
+                    WHERE sc.supplier_id = @supplier_id
+                      AND LOWER(sc.email) = LOWER(i.invite_email)
+                )
+
+            ORDER BY i.sent_at DESC
+        `);
+    return result.recordset;
 }
 
 /**

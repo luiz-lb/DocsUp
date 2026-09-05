@@ -145,8 +145,9 @@ export async function getRound(roundId) {
         if (!round) {
             return { success: false, message: 'Rodada não encontrada.' };
         }
-        const quotations = await quotationModel.getQuotationsByRoundId(roundId);
-        return { success: true, body: { round: { ...round, quotations } } };
+        // Retorna convites + cotação (quando existir) via JOIN
+        const invites = await quotationModel.getInvitesWithQuotationsByRoundId(roundId);
+        return { success: true, body: { round: { ...round, invites } } };
     } catch (error) {
         console.error('getRound error:', error);
         return { success: false, message: 'Erro ao buscar rodada.' };
@@ -302,8 +303,8 @@ export async function submitQuotation(token, payload, supplierId, clientIp, user
             await quotationModel.insertCompanyChecklist(transaction, quotationId, item.documentTypeId, item.hasDocument);
         }
 
-        // Marca o convite como respondido
-        await quotationModel.markInviteResponded(transaction, invite.id);
+        // Marca o convite como respondido e vincula o fornecedor (caso convite por email)
+        await quotationModel.markInviteResponded(transaction, invite.id, effectiveSupplierId);
 
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
@@ -453,6 +454,20 @@ export async function declareWinner(payload) {
 }
 
 /**
+ * Lista as cotações do fornecedor autenticado (portal do fornecedor).
+ * Retorna cada convite com status e, quando enviada, os dados da cotação.
+ */
+export async function getQuotationsBySupplier(supplierId) {
+    try {
+        const rows = await quotationModel.getQuotationsBySupplierId(supplierId);
+        return { success: true, body: { quotations: rows } };
+    } catch (error) {
+        console.error('getQuotationsBySupplier error:', error);
+        return { success: false, message: 'Erro ao buscar cotações do fornecedor.' };
+    }
+}
+
+/**
  * Lista os rounds de uma solicitação (painel interno).
  */
 export async function listRoundsByLaborRequest(laborRequestId) {
@@ -462,5 +477,97 @@ export async function listRoundsByLaborRequest(laborRequestId) {
     } catch (error) {
         console.error('listRoundsByLaborRequest error:', error);
         return { success: false, message: 'Erro ao listar rodadas.' };
+    }
+}
+
+/**
+ * Adiciona um novo convite a uma rodada já existente.
+ * O prazo (deadline) é herdado do round — não é possível alterar.
+ * Envia o email de convite ao fornecedor com o mesmo link de cotação.
+ *
+ * @param {{ roundId, inviteeEmail, createdBy }} payload
+ */
+export async function addInviteToRound(payload) {
+    const { roundId, inviteeEmail, createdBy } = payload;
+
+    if (!roundId || !inviteeEmail) {
+        return { success: false, message: 'roundId e email do fornecedor são obrigatórios.' };
+    }
+
+    // Carrega o round para herdar o deadline e validar o status
+    const round = await quotationModel.getQuotationRoundById(roundId);
+    if (!round) {
+        return { success: false, message: 'Rodada não encontrada.' };
+    }
+    if (round.status !== 0) {
+        return { success: false, message: 'Não é possível convidar para uma rodada encerrada.' };
+    }
+
+    // Verifica se o prazo já expirou
+    if (new Date() > new Date(round.deadline)) {
+        return { success: false, message: 'O prazo desta rodada já expirou. Não é possível adicionar novos convites.' };
+    }
+
+    let transaction;
+    let transactionDone = false;
+
+    try {
+        transaction = await trasaction.iniciarTransacao();
+
+        const token = generateToken();
+        const inviteId = await quotationModel.insertQuotationInvite(transaction, {
+            roundId,
+            supplierId: null,
+            inviteEmail: inviteeEmail,
+            inviteToken: token,
+        });
+
+        await trasaction.finalizarTransacao(transaction, true);
+        transactionDone = true;
+
+        // Envia email com o mesmo prazo do round
+        const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+        const link = `${frontendUrl}/cotacoes/responder/${token}`;
+
+        try {
+            const transporter = createMailTransport();
+            await transporter.sendMail({
+                from: `"DocsUp Suprimentos" <${process.env.SMTP_USER}>`,
+                to: inviteeEmail,
+                subject: `Convite para cotação: ${round.labor_request_title}`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 560px; margin: auto;">
+                        <h2 style="color: #004643;">Convite para cotação</h2>
+                        <p>Você foi convidado para apresentar uma proposta para o serviço:</p>
+                        <p style="font-size: 1.1rem; font-weight: bold;">${round.labor_request_title}</p>
+                        <p><strong>Prazo para resposta:</strong> ${new Date(round.deadline).toLocaleString('pt-BR')}</p>
+                        <p style="margin-top: 1.5rem;">
+                            <a href="${link}"
+                               style="background:#004643; color:#fff; padding:12px 24px;
+                                      border-radius:6px; text-decoration:none; font-weight:bold;">
+                                Responder cotação
+                            </a>
+                        </p>
+                        <p style="color:#6b7280; font-size:0.8rem; margin-top:1rem;">
+                            Este link é único e intransferível.
+                        </p>
+                    </div>
+                `,
+            });
+        } catch (emailError) {
+            console.error('Erro ao enviar email de convite adicional:', emailError.message);
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`[DEV] Link convite: ${link}`);
+            }
+        }
+
+        console.log(`Convite adicionado ao round ${roundId} para ${inviteeEmail}.`);
+        return { success: true, inviteId };
+    } catch (error) {
+        if (transaction && !transactionDone) {
+            await trasaction.finalizarTransacao(transaction, false);
+        }
+        console.error('addInviteToRound error:', error);
+        return { success: false, message: 'Erro interno ao adicionar convite.' };
     }
 }

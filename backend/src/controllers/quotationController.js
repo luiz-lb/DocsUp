@@ -121,9 +121,39 @@ export async function declareWinner(req, res) {
     }
 }
 
-// ─────────────────────────────────────────────
-// Portal do Fornecedor (token público)
-// ─────────────────────────────────────────────
+/**
+ * Adiciona um novo convite a uma rodada existente.
+ * POST /quotations/rounds/addInvite
+ * Body: { roundId, inviteeEmail }
+ */
+export async function addInviteToRound(req, res) {
+    try {
+        const { roundId, inviteeEmail } = req.body;
+        const createdBy = req.usuario.id;
+
+        if (!roundId || !inviteeEmail) {
+            return res.status(400).json({
+                success: false,
+                body: { message: 'roundId e inviteeEmail são obrigatórios.' },
+            });
+        }
+
+        const result = await quotationService.addInviteToRound({
+            roundId: Number(roundId),
+            inviteeEmail,
+            createdBy,
+        });
+
+        if (!result.success) {
+            return res.status(400).json({ success: false, body: { message: result.message } });
+        }
+
+        return res.status(201).json({ success: true, body: { inviteId: result.inviteId } });
+    } catch (error) {
+        console.error('addInviteToRound controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
 
 /**
  * Retorna os dados do convite para o fornecedor preencher a cotação.
@@ -145,6 +175,29 @@ export async function getInviteByToken(req, res) {
         return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
         console.error('getInviteByToken controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
+ * Lista as cotações do fornecedor autenticado.
+ * GET /quotations/supplier/my-quotations  (requer JWT de fornecedor)
+ */
+export async function getMyQuotations(req, res) {
+    try {
+        const supplierId = req.fornecedor?.supplierId;
+        if (!supplierId) {
+            return res.status(401).json({ success: false, body: { message: 'Fornecedor não identificado.' } });
+        }
+
+        const result = await quotationService.getQuotationsBySupplier(supplierId);
+        if (!result.success) {
+            return res.status(500).json({ success: false, body: { message: result.message } });
+        }
+
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('getMyQuotations controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }
