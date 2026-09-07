@@ -27,7 +27,7 @@ export default function SearchSelectList({
   onAdd,
   onRemove,
   fetchOptions,
-  minChars = 2,
+  minChars = 0,
   extraAction = null,
   emptyHint = 'Nenhum item adicionado ainda.',
 }) {

@@ -21,8 +21,8 @@
 
 .searchIcon {
   position: absolute;
-  left: 0.6rem;
-  color: rgba(255, 250, 228, 0.6);
+  right: 0.8rem;
+  color: rgba(148, 148, 144, 0.6);
   pointer-events: none;
 }
 
@@ -38,7 +38,7 @@
 }
 
 .input::placeholder {
-  color: rgba(255, 250, 228, 0.5);
+  color: rgba(148, 148, 144, 0.6);
 }
 
 .input:focus {

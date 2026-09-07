@@ -154,11 +154,11 @@ export async function addEmployee(token, supplierId, data, files = []) {
             fs.writeFileSync(savedFilePath, file.buffer);
             savedPaths.push(savedFilePath);
 
-            // Registra no banco (document_type_id=8 = ASO/Cert NR — genérico aqui)
+            // Registrado no banco (document_type_id=7 = ASO/Cert NR — genérico aqui)
             // O tipo exato será definido na validação de documentos (Módulo 5)
             const docId = await employeeModel.insertDocument(transaction, {
                 supplierId,
-                documentTypeId: 8, // Certificado de NR/ASO — ajustado na validação
+                documentTypeId: 7, // Certificado de NR/ASO — ajustado na validação
                 laborRequestId: deadline.labor_request_id,
                 employeeId,
                 fileName: file.originalname,
@@ -170,6 +170,7 @@ export async function addEmployee(token, supplierId, data, files = []) {
 
             documentIds.push(docId);
         }
+
 
         // 3. Registra as NRs do funcionário
         for (const nrTypeId of nrTypeIds) {

@@ -319,6 +319,7 @@ export default function SupplierRegisterPage() {
               onAdd={addRegion}
               onRemove={removeRegion}
               fetchOptions={fetchRegions}
+              minChars={2}
               emptyHint="Nenhuma cidade adicionada ainda."
               extraAction={
                 <div className={styles.wholeStateWrap}>

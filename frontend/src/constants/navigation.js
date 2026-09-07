@@ -16,7 +16,6 @@ import { ROUTES } from './routes.js';
 export const NAV_ITEMS = [
   { label: 'Painel', to: ROUTES.home, icon: LuLayoutDashboard, department: null },
   { label: 'Solicitacoes de Serviços', to: ROUTES.laborRequests.list, icon: LuClipboardList, department: null },
-  { label: 'Cotacões', to: ROUTES.quotations.round(501), icon: LuFileStack, department: [2] },
   { label: 'Fornecedores', to: ROUTES.suppliers.list, icon: LuTruck, department: [2, 6] },
   { label: 'Documentos', to: ROUTES.documents.review, icon: LuFolderCheck, department: [0, 1] },
   { label: 'Colaboradores', to: ROUTES.employees.list, icon: LuUsers, department: [0, 1, 5] },

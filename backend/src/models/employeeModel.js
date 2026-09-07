@@ -163,6 +163,8 @@ export async function insertDocument(transaction, {
     return result.recordset[0]?.id ?? null;
 }
 
+
+
 /**
  * Lista os documentos de um fornecedor em uma solicitação.
  */

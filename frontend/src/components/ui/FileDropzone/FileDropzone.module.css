@@ -67,6 +67,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.88rem;
+    color: var(--color-textMuted, #6b7280);
 }
 
 .fileSize {
