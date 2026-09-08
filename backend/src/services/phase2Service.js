@@ -34,6 +34,71 @@ function ensureUploadDir(dirPath) {
     }
 }
 
+/** Diretório raiz de uploads (absoluto). */
+function getUploadBaseDir() {
+    const configured = process.env.UPLOAD_DIR ?? 'uploads';
+    return path.isAbsolute(configured) ? configured : path.join(process.cwd(), configured);
+}
+
+/** Data de hoje no formato YYYY-MM-DD para organizar pastas por dia de upload. */
+function todayFolder() {
+    return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+/**
+ * Monta o diretório destino organizado por escopo, fornecedor e data de upload.
+ *   uploads/<scope>/<supplierId>/<YYYY-MM-DD>/
+ *
+ * @param {'employees'|'company'} scope
+ * @param {number} supplierId
+ * @returns {{ absDir: string, baseDir: string }}
+ */
+function buildUploadDir(scope, supplierId) {
+    const baseDir = getUploadBaseDir();
+    const absDir = path.join(baseDir, scope, String(supplierId), todayFolder());
+    ensureUploadDir(absDir);
+    return { absDir, baseDir };
+}
+
+/**
+ * Persiste um arquivo enviado no disco de forma organizada e registra no banco.
+ * Retorna o document_id gerado.
+ *
+ * @param {object}   transaction
+ * @param {string}   scope         — 'employees' | 'company'
+ * @param {object}   file          — item de req.files (multer memoryStorage)
+ * @param {object}   docData       — { supplierId, documentTypeId, laborRequestId, employeeId }
+ * @param {string[]} savedPaths    — acumulador para rollback de arquivos
+ */
+async function persistFile(transaction, scope, file, docData, savedPaths) {
+    const { supplierId, documentTypeId, laborRequestId, employeeId = null } = docData;
+
+    const { absDir, baseDir } = buildUploadDir(scope, supplierId);
+
+    const fileHash = hashBuffer(file.buffer);
+    const ext = path.extname(file.originalname).toLowerCase();
+    const savedFileName = `${fileHash}${ext}`;
+    const savedFilePath = path.join(absDir, savedFileName);
+    const relPath = path.relative(baseDir, savedFilePath);
+
+    fs.writeFileSync(savedFilePath, file.buffer);
+    savedPaths.push(savedFilePath);
+
+    const docId = await employeeModel.insertDocument(transaction, {
+        supplierId,
+        documentTypeId,
+        laborRequestId,
+        employeeId,
+        fileName: file.originalname,
+        filePath: relPath,
+        fileSizeBytes: file.size,
+        mimeType: file.mimetype,
+        fileHash,
+    });
+
+    return docId;
+}
+
 // ─────────────────────────────────────────────
 // Buscar dados da Fase 2 pelo token
 // ─────────────────────────────────────────────
@@ -61,6 +126,9 @@ export async function getPhase2ByToken(token) {
         // Documentos obrigatórios definidos por Segurança do Trabalho
         const requiredDocs = await laborRequestModel.getLaborRequestDocuments(deadline.labor_request_id);
 
+        // NRs obrigatórias definidas por Segurança do Trabalho para a atividade
+        const requiredNrTypes = await laborRequestModel.getLaborRequestNrs(deadline.labor_request_id);
+
         const now = new Date();
         const expiresAt = new Date(deadline.expires_at);
         const isExpired = now > expiresAt;
@@ -72,6 +140,7 @@ export async function getPhase2ByToken(token) {
                 employees,
                 documents,
                 requiredDocuments: requiredDocs,
+                requiredNrTypes,
             },
         };
     } catch (error) {
@@ -137,37 +206,23 @@ export async function addEmployee(token, supplierId, data, files = []) {
             return { success: false, message: 'Erro ao cadastrar funcionário.' };
         }
 
-        // 2. Processa e salva os arquivos
-        const uploadBaseDir = process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads');
-        const uploadDir = path.join(uploadBaseDir, 'employees', String(supplierId));
-        ensureUploadDir(uploadDir);
-
+        // 2. Processa e salva os arquivos — organizados por fornecedor e data de upload
+        //    uploads/employees/<supplierId>/<YYYY-MM-DD>/<hash>.<ext>
         const documentIds = [];
         for (const file of files) {
-            const fileHash = hashBuffer(file.buffer);
-            const ext = path.extname(file.originalname).toLowerCase();
-            const savedFileName = `${fileHash}${ext}`;
-            const savedFilePath = path.join(uploadDir, savedFileName);
-            const relPath = path.relative(uploadBaseDir, savedFilePath);
-
-            // Persiste arquivo no disco
-            fs.writeFileSync(savedFilePath, file.buffer);
-            savedPaths.push(savedFilePath);
-
-            // Registrado no banco (document_type_id=7 = ASO/Cert NR — genérico aqui)
-            // O tipo exato será definido na validação de documentos (Módulo 5)
-            const docId = await employeeModel.insertDocument(transaction, {
-                supplierId,
-                documentTypeId: 7, // Certificado de NR/ASO — ajustado na validação
-                laborRequestId: deadline.labor_request_id,
-                employeeId,
-                fileName: file.originalname,
-                filePath: relPath,
-                fileSizeBytes: file.size,
-                mimeType: file.mimetype,
-                fileHash,
-            });
-
+            // document_type_id=7 (ASO/Cert NR) — o tipo exato é refinado na validação (Módulo 5)
+            const docId = await persistFile(
+                transaction,
+                'employees',
+                file,
+                {
+                    supplierId,
+                    documentTypeId: 7,
+                    laborRequestId: deadline.labor_request_id,
+                    employeeId,
+                },
+                savedPaths,
+            );
             documentIds.push(docId);
         }
 
@@ -203,6 +258,91 @@ export async function addEmployee(token, supplierId, data, files = []) {
         }
         console.error('addEmployee Phase2 error:', error);
         return { success: false, message: 'Erro ao cadastrar funcionário.' };
+    }
+}
+
+// ─────────────────────────────────────────────
+// Upload de documentos da EMPRESA (fornecedor) na Fase 2
+// ─────────────────────────────────────────────
+
+/**
+ * Processa o upload de documentos da empresa (escopo 0 — não vinculados a colaborador).
+ * Os arquivos são organizados em uploads/company/<supplierId>/<YYYY-MM-DD>/.
+ *
+ * @param {string} token       — link_token do phase2_deadline
+ * @param {number} supplierId  — extraído do JWT do fornecedor
+ * @param {object} data        — { documentTypeIds: number[] } paralelo a files (opcional)
+ * @param {File[]} files       — arquivos enviados via multer (req.files)
+ */
+export async function addCompanyDocuments(token, supplierId, data, files = []) {
+    if (!files || files.length === 0) {
+        return { success: false, message: 'Envie ao menos um documento da empresa.' };
+    }
+
+    const { documentTypeIds = [] } = data;
+
+    // Valida deadline
+    const deadline = await quotationModel.getPhase2DeadlineByToken(token);
+    if (!deadline) {
+        return { success: false, message: 'Token da Fase 2 inválido.' };
+    }
+    if (deadline.status === 2) {
+        return { success: false, message: 'O prazo da Fase 2 expirou.' };
+    }
+    if (new Date() > new Date(deadline.expires_at)) {
+        return { success: false, message: 'O prazo da Fase 2 encerrou.' };
+    }
+    if (deadline.supplier_id !== supplierId) {
+        return { success: false, message: 'Sem permissão para este deadline.' };
+    }
+
+    let transaction;
+    let transactionDone = false;
+    const savedPaths = [];
+
+    try {
+        transaction = await trasaction.iniciarTransacao();
+
+        const documentIds = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            // documentTypeIds pode mapear 1:1 com os arquivos; fallback = 1 (Contrato Social)
+            const documentTypeId = Number(documentTypeIds[i]) || 1;
+
+            const docId = await persistFile(
+                transaction,
+                'company',
+                file,
+                {
+                    supplierId,
+                    documentTypeId,
+                    laborRequestId: deadline.labor_request_id,
+                    employeeId: null, // documento da empresa não tem colaborador
+                },
+                savedPaths,
+            );
+            documentIds.push(docId);
+        }
+
+        await trasaction.finalizarTransacao(transaction, true);
+        transactionDone = true;
+
+        // Dispara validação assíncrona para cada documento salvo (fora da transação)
+        for (const docId of documentIds) {
+            setImmediate(() => triggerDocumentValidation(docId, supplierId));
+        }
+
+        console.log(`${documentIds.length} documento(s) da empresa enviado(s) na Fase 2 (supplier ${supplierId}).`);
+        return { success: true, body: { documentIds } };
+    } catch (error) {
+        if (transaction && !transactionDone) {
+            await trasaction.finalizarTransacao(transaction, false);
+        }
+        for (const fp of savedPaths) {
+            try { fs.unlinkSync(fp); } catch (_) { /* ignore */ }
+        }
+        console.error('addCompanyDocuments Phase2 error:', error);
+        return { success: false, message: 'Erro ao enviar documentos da empresa.' };
     }
 }
 

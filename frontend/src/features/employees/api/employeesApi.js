@@ -52,6 +52,34 @@ export async function addEmployee(token, employeeData, files = []) {
   }
 }
 
+/**
+ * Envia documentos da EMPRESA (escopo empresa) na Fase 2.
+ * POST /phase2/:token/company-documents  (exige cookie supplier_token)
+ *
+ * @param {string}   token
+ * @param {File[]}   files            — arquivos do FileDropzone
+ * @param {number[]} documentTypeIds  — tipo de cada arquivo, paralelo a files (opcional)
+ */
+export async function uploadCompanyDocuments(token, files = [], documentTypeIds = []) {
+  try {
+    const formData = new FormData();
+    formData.append('documentTypeIds', JSON.stringify(documentTypeIds ?? []));
+
+    for (const file of files) {
+      formData.append('files', file);
+    }
+
+    const result = await api.post(`/phase2/${token}/company-documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    return result.data;
+  } catch (error) {
+    console.error('uploadCompanyDocuments error:', error);
+    return { success: false, body: { message: 'Erro ao enviar documentos da empresa.' } };
+  }
+}
+
 // ─────────────────────────────────────────────
 // Painel interno (colaboradores)
 // ─────────────────────────────────────────────

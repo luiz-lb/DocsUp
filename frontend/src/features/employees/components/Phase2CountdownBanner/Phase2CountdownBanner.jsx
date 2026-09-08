@@ -9,7 +9,12 @@ import styles from './Phase2CountdownBanner.module.css';
  * 2o colocado - a mesma consequencia descrita no fluxo de SLA da cotacao.
  */
 export default function Phase2CountdownBanner({ deadline }) {
-  const { isExpired } = useCountdown(deadline.expiresAt);
+  // O backend retorna os campos em snake_case (expires_at / started_at).
+  // Mantemos fallback para camelCase caso a origem dos dados mude.
+  const expiresAt = deadline.expires_at ?? deadline.expiresAt;
+  const startedAt = deadline.started_at ?? deadline.startedAt;
+
+  const { isExpired } = useCountdown(expiresAt);
 
   return (
     <Banner
@@ -22,7 +27,7 @@ export default function Phase2CountdownBanner({ deadline }) {
       }
       actions={
         <div className={styles.timer}>
-          <CountdownTimer deadline={deadline.expiresAt} startedAt={deadline.startedAt} expiredLabel="Expirado" />
+          <CountdownTimer deadline={expiresAt} startedAt={startedAt} expiredLabel="Expirado" />
         </div>
       }
     />

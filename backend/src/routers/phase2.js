@@ -16,6 +16,14 @@ router.post(
     phase2Controller.addEmployee,
 );
 
+// Portal do fornecedor — envia documentos da EMPRESA (exige JWT fornecedor)
+router.post(
+    '/:token/company-documents',
+    verificarTokenFornecedor,
+    phase2Controller.uploadMiddleware,
+    phase2Controller.addCompanyDocuments,
+);
+
 // Painel interno — lista todos os funcionários enviados (exige JWT colaborador)
 router.get('/employees/list', verificarToken, phase2Controller.listEmployees);
 

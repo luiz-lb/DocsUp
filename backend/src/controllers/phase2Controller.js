@@ -79,6 +79,43 @@ export async function addEmployee(req, res) {
 }
 
 // ─────────────────────────────────────────────
+// POST /phase2/:token/company-documents  (requer JWT de fornecedor)
+// Body: multipart/form-data
+//   fields: documentTypeIds (JSON array string, paralelo a files — opcional)
+//   files:  files[]
+// ─────────────────────────────────────────────
+export async function addCompanyDocuments(req, res) {
+    try {
+        const { token } = req.params;
+        const supplierId = req.fornecedor.supplierId;
+
+        // documentTypeIds pode vir como string JSON ou array (1:1 com os arquivos)
+        let documentTypeIds = [];
+        try {
+            documentTypeIds = JSON.parse(req.body.documentTypeIds ?? '[]');
+        } catch {
+            documentTypeIds = [];
+        }
+
+        const result = await phase2Service.addCompanyDocuments(
+            token,
+            supplierId,
+            { documentTypeIds },
+            req.files ?? [],
+        );
+
+        if (!result.success) {
+            return res.status(400).json({ success: false, body: { message: result.message } });
+        }
+
+        return res.status(201).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('addCompanyDocuments controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
 // GET /phase2/employees  (painel interno)
 // ─────────────────────────────────────────────
 export async function listEmployees(req, res) {
