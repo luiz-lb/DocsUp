@@ -14,7 +14,7 @@ import { cn } from '../../../utils/cn.js';
 import authStyles from '../../../styles/authCard.module.css';
 import styles from './Phase2UploadPage.module.css';
 
-const EMPTY_EMPLOYEE = { fullName: '', cpf: '', rg: '', roleFunction: '', nrTypeIds: [] };
+const EMPTY_EMPLOYEE = { fullName: '', cpf: '', rg: '', roleFunction: '', nrTypeId: null };
 
 const TABS = {
   COMPANY: 'company',
@@ -30,15 +30,15 @@ export default function Phase2UploadPage() {
 
   const [tab, setTab] = useState(TABS.COMPANY);
 
-  // Documentos da empresa
-  const [companyFiles, setCompanyFiles] = useState([]);
+  // Documentos da empresa: cada item = { file, documentTypeId }
+  const [companyItems, setCompanyItems] = useState([]);
   const [isSavingCompany, setIsSavingCompany] = useState(false);
   const [companyError, setCompanyError] = useState('');
   const [companySuccess, setCompanySuccess] = useState('');
 
-  // Colaboradores
+  // Colaboradores (uma NR + um arquivo por vez)
   const [form, setForm] = useState(EMPTY_EMPLOYEE);
-  const [files, setFiles] = useState([]);
+  const [file, setFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -89,6 +89,12 @@ export default function Phase2UploadPage() {
   const companyRequiredDocs = (requiredDocuments ?? []).filter((doc) => doc.scope === 0);
   const employeeRequiredDocs = (requiredDocuments ?? []).filter((doc) => doc.scope === 1);
 
+  // Opções de tipo de documento da empresa (o técnico de segurança já definiu quais são exigidos)
+  const companyDocTypeOptions = companyRequiredDocs.map((doc) => ({
+    id: doc.document_type_id,
+    name: doc.document_type_name,
+  }));
+
   // NRs exigidas para a atividade (definidas por Segurança do Trabalho) → select pesquisável
   const nrOptions = (requiredNrTypes ?? []).map((nr) => ({
     id: nr.nr_type_id,
@@ -99,12 +105,36 @@ export default function Phase2UploadPage() {
 
   const companyDocuments = (documents ?? []).filter((doc) => !doc.employee_id);
 
+  // ── Documentos da empresa ────────────────────────────────────────────────
+  const handleCompanyFilesChange = (nextFiles) => {
+    // mantém o tipo já escolhido para arquivos que continuam na lista
+    setCompanyItems((prev) => {
+      const byName = new Map(prev.map((item) => [item.file, item]));
+      return nextFiles.map((f) => byName.get(f) ?? { file: f, documentTypeId: '' });
+    });
+  };
+
+  const setCompanyItemType = (index, documentTypeId) => {
+    setCompanyItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, documentTypeId } : item)),
+    );
+  };
+
+  const companyFiles = companyItems.map((item) => item.file);
+  const allCompanyTyped = companyItems.length > 0 && companyItems.every((item) => item.documentTypeId);
+
   const handleUploadCompany = async () => {
     setCompanyError('');
     setCompanySuccess('');
-    setIsSavingCompany(true);
 
-    const result = await uploadCompanyDocuments(token, companyFiles);
+    if (!allCompanyTyped) {
+      setCompanyError('Selecione o tipo de cada documento antes de enviar.');
+      return;
+    }
+
+    setIsSavingCompany(true);
+    const documentTypeIds = companyItems.map((item) => Number(item.documentTypeId));
+    const result = await uploadCompanyDocuments(token, companyFiles, documentTypeIds);
     setIsSavingCompany(false);
 
     if (!result.success) {
@@ -112,16 +142,26 @@ export default function Phase2UploadPage() {
       return;
     }
 
-    setCompanyFiles([]);
+    setCompanyItems([]);
     setCompanySuccess('Documentos da empresa enviados com sucesso.');
     reload();
   };
 
+  // ── Colaboradores ─────────────────────────────────────────────────────────
   const handleAddEmployee = async () => {
     setSaveError('');
-    setIsSaving(true);
 
-    const result = await addEmployee(token, form, files);
+    if (!form.nrTypeId) {
+      setSaveError('Selecione a NR deste certificado.');
+      return;
+    }
+    if (!file) {
+      setSaveError('Envie o certificado (um arquivo) desta NR.');
+      return;
+    }
+
+    setIsSaving(true);
+    const result = await addEmployee(token, form, file);
     setIsSaving(false);
 
     if (!result.success) {
@@ -129,8 +169,10 @@ export default function Phase2UploadPage() {
       return;
     }
 
-    setForm(EMPTY_EMPLOYEE);
-    setFiles([]);
+    // Mantém os dados do colaborador para facilitar adicionar outra NR do mesmo,
+    // mas limpa a NR e o arquivo (um por vez).
+    setForm((prev) => ({ ...prev, nrTypeId: null }));
+    setFile(null);
     reload();
   };
 
@@ -140,8 +182,8 @@ export default function Phase2UploadPage() {
         <p className={authStyles.eyebrow}>{deadline.labor_request_title}</p>
         <h1 className={authStyles.title}>Envio de documentação — Fase 2</h1>
         <p className={authStyles.subtitle}>
-          Envie os documentos da empresa e cadastre os colaboradores que atuarão nesta obra,
-          com as NRs de cada um e os documentos comprobatórios (ASO, certificados de NR, etc.).
+          Envie os documentos da empresa e cadastre os colaboradores que atuarão nesta obra.
+          Para cada colaborador, envie uma NR por vez com o certificado correspondente.
         </p>
 
         {/* Banner de countdown com expiração automática */}
@@ -190,10 +232,32 @@ export default function Phase2UploadPage() {
                 <div className={styles.dropzoneSpacer}>
                   <FileDropzone
                     files={companyFiles}
-                    onFilesChange={setCompanyFiles}
+                    onFilesChange={handleCompanyFilesChange}
                     hint="Contrato social, CNDs, PGR, APR, etc. (PDF, JPG ou PNG)"
                   />
                 </div>
+
+                {/* Para cada arquivo, selecionar o tipo de documento */}
+                {companyItems.length > 0 && (
+                  <div className={styles.typedList}>
+                    <p className={styles.groupLabel}>Classifique cada arquivo:</p>
+                    {companyItems.map((item, index) => (
+                      <div key={`${item.file.name}-${index}`} className={styles.typedRow}>
+                        <span className={styles.typedFileName}>{item.file.name}</span>
+                        <select
+                          className={styles.typeSelect}
+                          value={item.documentTypeId}
+                          onChange={(e) => setCompanyItemType(index, e.target.value)}
+                        >
+                          <option value="">Selecione o tipo…</option>
+                          {companyDocTypeOptions.map((opt) => (
+                            <option key={opt.id} value={opt.id}>{opt.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {companyError && <Banner tone="danger" description={companyError} />}
                 {companySuccess && <Banner tone="success" description={companySuccess} />}
@@ -202,7 +266,7 @@ export default function Phase2UploadPage() {
                   icon={LuUpload}
                   onClick={handleUploadCompany}
                   isLoading={isSavingCompany}
-                  disabled={companyFiles.length === 0}
+                  disabled={companyItems.length === 0}
                 >
                   Enviar documentos da empresa
                 </Button>
@@ -247,7 +311,7 @@ export default function Phase2UploadPage() {
               </div>
             )}
 
-            {/* Formulário de novo colaborador */}
+            {/* Formulário de colaborador — uma NR + um certificado por vez */}
             {!deadline.isExpired && (
               <div className={styles.formSection}>
                 <div className={styles.grid}>
@@ -273,18 +337,24 @@ export default function Phase2UploadPage() {
                   </FormField>
                 </div>
 
-                {/* Select pesquisável das NRs exigidas para a atividade (vem do banco) */}
+                {/* Select pesquisável — UMA NR por vez (vem do banco) */}
                 <NrSearchSelect
+                  label="NR deste certificado"
+                  single
                   options={nrOptions}
-                  selectedIds={form.nrTypeIds}
-                  onChange={(ids) => setForm((prev) => ({ ...prev, nrTypeIds: ids }))}
+                  value={form.nrTypeId}
+                  onChange={(id) => setForm((prev) => ({ ...prev, nrTypeId: id }))}
+                  placeholder="Pesquisar a NR deste certificado…"
                 />
 
+                {/* Um único arquivo — o certificado da NR selecionada */}
                 <div className={styles.dropzoneSpacer}>
                   <FileDropzone
-                    files={files}
-                    onFilesChange={setFiles}
-                    hint="ASO e certificados de NR (PDF, JPG ou PNG)"
+                    files={file ? [file] : []}
+                    onFilesChange={(fs) => setFile(fs[fs.length - 1] ?? null)}
+                    multiple={false}
+                    label="Envie o certificado desta NR (um arquivo)"
+                    hint="Certificado de NR / ASO (PDF, JPG ou PNG)"
                   />
                 </div>
 
@@ -294,9 +364,9 @@ export default function Phase2UploadPage() {
                   icon={LuUserPlus}
                   onClick={handleAddEmployee}
                   isLoading={isSaving}
-                  disabled={!form.fullName || !form.cpf}
+                  disabled={!form.fullName || !form.cpf || !form.nrTypeId || !file}
                 >
-                  Adicionar colaborador
+                  Adicionar NR do colaborador
                 </Button>
               </div>
             )}

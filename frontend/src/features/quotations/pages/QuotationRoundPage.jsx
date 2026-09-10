@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { LuTrophy, LuExternalLink, LuUserPlus } from 'react-icons/lu';
+import { useParams } from 'react-router-dom';
+import { LuTrophy, LuExternalLink, LuUserPlus, LuChartColumn, LuX } from 'react-icons/lu';
 import {
   PageHeader,
   DataTable,
@@ -22,6 +22,7 @@ import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { useDisclosure } from '../../../hooks/useDisclosure.js';
 import { getQuotationRound, declareWinner, addInviteToRound } from '../api/quotationsApi.js';
 import QuotationDetailModal from '../components/QuotationDetailModal/index.js';
+import QuotationCompareModal from '../components/QuotationCompareModal/index.js';
 
 export default function QuotationRoundPage() {
   const { roundId } = useParams();
@@ -33,11 +34,16 @@ export default function QuotationRoundPage() {
   const confirmDialog    = useDisclosure(false);
   const detailModal      = useDisclosure(false);
   const inviteModal      = useDisclosure(false);
+  const compareModal     = useDisclosure(false);
 
   const [candidate,    setCandidate]    = useState(null);
   const [selectedRow,  setSelectedRow]  = useState(null);
   const [isDeciding,   setIsDeciding]   = useState(false);
   const [phase2Notice, setPhase2Notice] = useState(null);
+
+  // Modo de comparação: seleção de cotações enviadas
+  const [compareMode,     setCompareMode]     = useState(false);
+  const [selectedQuotIds, setSelectedQuotIds] = useState([]);
 
   // Estado do modal "Convidar novo fornecedor"
   const [newInviteEmail,    setNewInviteEmail]    = useState('');
@@ -50,6 +56,9 @@ export default function QuotationRoundPage() {
 
   // Linhas da tabela: cada convite (i_*) com cotação opcional (q_*)
   const rows = round.invites ?? [];
+
+  // Nº de cotações efetivamente enviadas (têm q_id) — habilita comparação
+  const submittedCount = rows.filter((r) => r.q_id != null).length;
 
   const openConfirm = (row) => {
     setCandidate(row);
@@ -103,7 +112,38 @@ export default function QuotationRoundPage() {
     setInviteSuccess(false);
   };
 
+  // ── Comparação ──────────────────────────────────────────────────────────
+  const toggleCompareMode = () => {
+    setCompareMode((prev) => !prev);
+    setSelectedQuotIds([]);
+  };
+
+  const toggleQuotSelection = (quotationId) => {
+    setSelectedQuotIds((prev) =>
+      prev.includes(quotationId)
+        ? prev.filter((id) => id !== quotationId)
+        : [...prev, quotationId],
+    );
+  };
+
   const columns = [
+    // Coluna de seleção (apenas no modo comparação, para cotações enviadas)
+    ...(compareMode
+      ? [{
+          key: 'compare_select',
+          header: '',
+          render: (row) =>
+            row.q_id != null ? (
+              <input
+                type="checkbox"
+                checked={selectedQuotIds.includes(row.q_id)}
+                onChange={(e) => { e.stopPropagation(); toggleQuotSelection(row.q_id); }}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Selecionar ${row.supplier_name ?? row.i_invite_email} para comparar`}
+              />
+            ) : null,
+        }]
+      : []),
     {
       key: 'supplier_name',
       header: 'Fornecedor',
@@ -187,6 +227,17 @@ export default function QuotationRoundPage() {
                 Convidar novo fornecedor
               </Button>
             )}
+            {/* Comparação: disponível quando há ao menos 2 cotações enviadas */}
+            {submittedCount >= 2 && (
+              <Button
+                variant={compareMode ? 'primary' : 'secondary'}
+                icon={compareMode ? LuX : LuChartColumn}
+                size="sm"
+                onClick={toggleCompareMode}
+              >
+                {compareMode ? 'Cancelar comparação' : 'Comparar cotações'}
+              </Button>
+            )}
           </>
         }
       />
@@ -209,13 +260,31 @@ export default function QuotationRoundPage() {
         />
       )}
 
+      {compareMode && (
+        <Banner
+          tone="info"
+          title="Modo comparação"
+          description={`Selecione as cotações que deseja comparar (${selectedQuotIds.length} selecionada(s)).`}
+          actions={
+            <Button
+              size="sm"
+              icon={LuChartColumn}
+              disabled={selectedQuotIds.length < 2}
+              onClick={compareModal.open}
+            >
+              Comparar selecionados
+            </Button>
+          }
+        />
+      )}
+
       <DataTable
         columns={columns}
         rows={rows}
         getRowKey={(row) => row.i_id}
         emptyTitle="Nenhum convite enviado ainda"
-        /* Linha clicável apenas quando há cotação (q_id preenchido) */
-        onRowClick={(row) => row.q_id != null && handleRowClick(row)}
+        /* Em modo comparação, o clique na linha não abre o detalhe */
+        onRowClick={(row) => !compareMode && row.q_id != null && handleRowClick(row)}
       />
 
       {/* Modal de detalhes da cotação */}
@@ -223,6 +292,14 @@ export default function QuotationRoundPage() {
         open={detailModal.isOpen}
         onClose={detailModal.close}
         row={selectedRow}
+      />
+
+      {/* Modal de comparação de cotações */}
+      <QuotationCompareModal
+        open={compareModal.isOpen}
+        onClose={compareModal.close}
+        roundId={round.id}
+        quotationIds={selectedQuotIds}
       />
 
       {/* Confirmação de vencedor */}

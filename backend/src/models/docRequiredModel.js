@@ -20,7 +20,7 @@ export async function getNrTypes() {
 export async function getDocumentTypes() {
     const pool = await poolPromise;
     const result = await pool.request()
-        .query('SELECT id, [name], scope, validation_method, api_endpoint, required_fields, validity_days, [description] FROM document_types WHERE is_active = 1');
+        .query('SELECT id, [name], scope, validation_method, api_endpoint, required_fields, validity_days, [description] FROM document_types WHERE is_active = 1 and scope = 0');
 
     return result.recordset;
 }

@@ -468,6 +468,104 @@ export async function getQuotationsBySupplier(supplierId) {
 }
 
 /**
+ * Compara várias cotações de uma mesma rodada.
+ *
+ * Retorna, para cada cotação: valor total, colaboradores declarados por NR e
+ * o checklist de documentos da empresa (o que o fornecedor declarou ter).
+ * Também retorna os "eixos" agregados (todas as NRs e todos os documentos
+ * presentes no conjunto) para o front montar os gráficos comparativos.
+ *
+ * @param {number}   roundId
+ * @param {number[]} quotationIds
+ */
+export async function compareQuotations(roundId, quotationIds) {
+    try {
+        if (!Array.isArray(quotationIds) || quotationIds.length < 2) {
+            return { success: false, message: 'Selecione ao menos duas cotações para comparar.' };
+        }
+
+        const round = await quotationModel.getQuotationRoundById(roundId);
+        if (!round) {
+            return { success: false, message: 'Rodada não encontrada.' };
+        }
+
+        // Carrega cada cotação com detalhes (NR declarations + checklist)
+        const details = [];
+        for (const qid of quotationIds) {
+            const q = await quotationModel.getQuotationById(Number(qid));
+            // Garante que a cotação pertence à rodada informada
+            if (q && q.round_id === round.id) {
+                details.push(q);
+            }
+        }
+
+        if (details.length < 2) {
+            return { success: false, message: 'Cotações inválidas para esta rodada.' };
+        }
+
+        // Eixos agregados: NR types e document types presentes no conjunto
+        const nrTypeIds = [...new Set(details.flatMap((q) => (q.nrDeclarations ?? []).map((n) => n.nr_type_id)))];
+        const docTypeIds = [...new Set(details.flatMap((q) => (q.checklist ?? []).map((c) => c.document_type_id)))];
+
+        const nrTypes = await quotationModel.getNrTypesByIds(nrTypeIds);
+        const docTypes = await quotationModel.getDocumentTypesByIds(docTypeIds);
+
+        // Monta a resposta normalizada por cotação
+        const quotations = details.map((q) => {
+            const nrMap = new Map((q.nrDeclarations ?? []).map((n) => [n.nr_type_id, n.employee_count]));
+            const docSet = new Set(
+                (q.checklist ?? []).filter((c) => c.has_document).map((c) => c.document_type_id),
+            );
+
+            const totalEmployees = (q.nrDeclarations ?? []).reduce(
+                (sum, n) => sum + (n.employee_count ?? 0), 0,
+            );
+
+            return {
+                id: q.id,
+                supplierId: q.supplier_id,
+                supplierName: q.supplier_name,
+                totalValue: q.total_value,
+                currency: q.currency,
+                status: q.status,
+                ranking: q.ranking,
+                submittedAt: q.submitted_at,
+                totalDeclaredEmployees: totalEmployees,
+                declaredDocumentsCount: docSet.size,
+                // vetores alinhados aos eixos para facilitar os gráficos
+                employeesByNr: nrTypeIds.map((id) => nrMap.get(id) ?? 0),
+                documentsPresence: docTypeIds.map((id) => (docSet.has(id) ? 1 : 0)),
+            };
+        });
+
+        return {
+            success: true,
+            body: {
+                round: {
+                    id: round.id,
+                    round_number: round.round_number,
+                    labor_request_title: round.labor_request_title,
+                },
+                axes: {
+                    nrTypes: nrTypeIds.map((id) => {
+                        const nr = nrTypes.find((t) => t.id === id);
+                        return { id, code: nr?.code ?? `NR#${id}`, name: nr?.name ?? '' };
+                    }),
+                    documentTypes: docTypeIds.map((id) => {
+                        const dt = docTypes.find((t) => t.id === id);
+                        return { id, name: dt?.name ?? `Doc#${id}` };
+                    }),
+                },
+                quotations,
+            },
+        };
+    } catch (error) {
+        console.error('compareQuotations error:', error);
+        return { success: false, message: 'Erro ao comparar cotações.' };
+    }
+}
+
+/**
  * Lista os rounds de uma solicitação (painel interno).
  */
 export async function listRoundsByLaborRequest(laborRequestId) {

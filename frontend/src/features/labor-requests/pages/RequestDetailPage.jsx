@@ -188,6 +188,7 @@ export default function RequestDetailPage() {
 
           {/* NRs obrigatórias definidas pela Segurança do Trabalho */}
           {request.requiredNrTypes && request.requiredNrTypes.length > 0 && (
+            
             <Card>
               <Card.Body>
                 <h3 className={styles.sectionTitle}>
@@ -195,7 +196,7 @@ export default function RequestDetailPage() {
                   NRs obrigatórias para os colaboradores
                 </h3>
                 <ul className={styles.reqList}>
-                  {request.requiredNrTypes.map((nr) => (
+                  {request.requiredNrTypes.sort((a, b) => a.nr_type_id - b.nr_type_id).map((nr) => (
                     <li key={nr.id} className={styles.reqItem}>
                       <span className={styles.reqCode}>{nr.nr_code}</span>
                       <span className={styles.reqName}>{nr.nr_name}</span>

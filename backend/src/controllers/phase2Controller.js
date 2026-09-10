@@ -50,20 +50,12 @@ export async function addEmployee(req, res) {
         const { token } = req.params;
         const supplierId = req.fornecedor.supplierId;
 
-        const { fullName, cpf, rg, roleFunction } = req.body;
-
-        // nrTypeIds pode vir como string JSON ou array
-        let nrTypeIds = [];
-        try {
-            nrTypeIds = JSON.parse(req.body.nrTypeIds ?? '[]');
-        } catch {
-            nrTypeIds = [];
-        }
+        const { fullName, cpf, rg, roleFunction, nrTypeId } = req.body;
 
         const result = await phase2Service.addEmployee(
             token,
             supplierId,
-            { fullName, cpf, rg, roleFunction, nrTypeIds },
+            { fullName, cpf, rg, roleFunction, nrTypeId: nrTypeId ? Number(nrTypeId) : null },
             req.files ?? [],
         );
 

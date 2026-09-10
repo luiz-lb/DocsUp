@@ -46,16 +46,34 @@ function todayFolder() {
 }
 
 /**
+ * Sanitiza a razão social para uso seguro em nome de pasta:
+ * remove acentos, troca caracteres inválidos por '_' e limita o tamanho.
+ */
+function sanitizeForFolder(value) {
+    return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')       // remove acentos
+        .replace(/[^a-zA-Z0-9-_ ]/g, '')       // remove caracteres inválidos
+        .trim()
+        .replace(/\s+/g, '_')                  // espaços → _
+        .slice(0, 60);
+}
+
+/**
  * Monta o diretório destino organizado por escopo, fornecedor e data de upload.
- *   uploads/<scope>/<supplierId>/<YYYY-MM-DD>/
+ *   uploads/<scope>/<supplierId>-<razaoSocial>/<YYYY-MM-DD>/
  *
  * @param {'employees'|'company'} scope
  * @param {number} supplierId
+ * @param {string} supplierName  — razão social (usada no nome da pasta)
  * @returns {{ absDir: string, baseDir: string }}
  */
-function buildUploadDir(scope, supplierId) {
+function buildUploadDir(scope, supplierId, supplierName) {
     const baseDir = getUploadBaseDir();
-    const absDir = path.join(baseDir, scope, String(supplierId), todayFolder());
+    const folderName = supplierName
+        ? `${supplierId}-${sanitizeForFolder(supplierName)}`
+        : String(supplierId);
+    const absDir = path.join(baseDir, scope, folderName, todayFolder());
     ensureUploadDir(absDir);
     return { absDir, baseDir };
 }
@@ -67,13 +85,13 @@ function buildUploadDir(scope, supplierId) {
  * @param {object}   transaction
  * @param {string}   scope         — 'employees' | 'company'
  * @param {object}   file          — item de req.files (multer memoryStorage)
- * @param {object}   docData       — { supplierId, documentTypeId, laborRequestId, employeeId }
+ * @param {object}   docData       — { supplierId, supplierName, documentTypeId, laborRequestId, employeeId }
  * @param {string[]} savedPaths    — acumulador para rollback de arquivos
  */
 async function persistFile(transaction, scope, file, docData, savedPaths) {
-    const { supplierId, documentTypeId, laborRequestId, employeeId = null } = docData;
+    const { supplierId, supplierName, documentTypeId, laborRequestId, employeeId = null } = docData;
 
-    const { absDir, baseDir } = buildUploadDir(scope, supplierId);
+    const { absDir, baseDir } = buildUploadDir(scope, supplierId, supplierName);
 
     const fileHash = hashBuffer(file.buffer);
     const ext = path.extname(file.originalname).toLowerCase();
@@ -154,18 +172,34 @@ export async function getPhase2ByToken(token) {
 // ─────────────────────────────────────────────
 
 /**
- * Cadastra um funcionário e processa os arquivos enviados.
+ * Cadastra um funcionário com UMA NR e o respectivo certificado (um PDF).
+ *
+ * Modelo "uma NR por vez": cada envio associa um colaborador a uma única NR e
+ * ao documento comprobatório daquela NR — assim conseguimos saber exatamente
+ * qual PDF pertence a qual NR (employee_nrs.certificate_doc_id) e, mais tarde,
+ * descobrir qual NR está faltando.
+ *
+ * Se o colaborador já existir (mesmo CPF no mesmo fornecedor/solicitação),
+ * reaproveitamos o registro e apenas adicionamos a nova NR + certificado.
  *
  * @param {string}   token      — link_token do phase2_deadline
  * @param {number}   supplierId — extraído do JWT do fornecedor
- * @param {object}   data       — { fullName, cpf, rg, roleFunction, nrTypeIds[] }
- * @param {File[]}   files      — arquivos enviados via multer (req.files)
+ * @param {object}   data       — { fullName, cpf, rg, roleFunction, nrTypeId }
+ * @param {File[]}   files      — arquivos enviados via multer (espera-se exatamente 1)
  */
 export async function addEmployee(token, supplierId, data, files = []) {
-    const { fullName, cpf, rg, roleFunction, nrTypeIds = [] } = data;
+    const { fullName, cpf, rg, roleFunction, nrTypeId } = data;
 
     if (!fullName || !cpf) {
         return { success: false, message: 'Nome completo e CPF são obrigatórios.' };
+    }
+
+    if (!nrTypeId) {
+        return { success: false, message: 'Selecione a NR deste certificado.' };
+    }
+
+    if (!files || files.length !== 1) {
+        return { success: false, message: 'Envie exatamente um arquivo (o certificado desta NR).' };
     }
 
     // Valida deadline
@@ -190,15 +224,25 @@ export async function addEmployee(token, supplierId, data, files = []) {
     try {
         transaction = await trasaction.iniciarTransacao();
 
-        // 1. Insere o funcionário
-        const employeeId = await employeeModel.insertEmployee(transaction, {
+        // 1. Reaproveita o colaborador se já existir (mesmo CPF neste fornecedor/solicitação);
+        //    caso contrário, insere um novo.
+        let employeeId = await employeeModel.getEmployeeIdByCpf(
+            transaction,
             supplierId,
-            laborRequestId: deadline.labor_request_id,
-            fullName,
+            deadline.labor_request_id,
             cpf,
-            rg,
-            roleFunction,
-        });
+        );
+
+        if (!employeeId) {
+            employeeId = await employeeModel.insertEmployee(transaction, {
+                supplierId,
+                laborRequestId: deadline.labor_request_id,
+                fullName,
+                cpf,
+                rg,
+                roleFunction,
+            });
+        }
 
         if (!employeeId) {
             await trasaction.finalizarTransacao(transaction, false);
@@ -206,48 +250,40 @@ export async function addEmployee(token, supplierId, data, files = []) {
             return { success: false, message: 'Erro ao cadastrar funcionário.' };
         }
 
-        // 2. Processa e salva os arquivos — organizados por fornecedor e data de upload
-        //    uploads/employees/<supplierId>/<YYYY-MM-DD>/<hash>.<ext>
-        const documentIds = [];
-        for (const file of files) {
-            // document_type_id=7 (ASO/Cert NR) — o tipo exato é refinado na validação (Módulo 5)
-            const docId = await persistFile(
-                transaction,
-                'employees',
-                file,
-                {
-                    supplierId,
-                    documentTypeId: 7,
-                    laborRequestId: deadline.labor_request_id,
-                    employeeId,
-                },
-                savedPaths,
-            );
-            documentIds.push(docId);
-        }
-
-
-        // 3. Registra as NRs do funcionário
-        for (const nrTypeId of nrTypeIds) {
-            await employeeModel.insertEmployeeNr(
-                transaction,
+        // 2. Salva o único arquivo (certificado da NR) organizado por fornecedor e data
+        //    uploads/employees/<supplierId>-<razaoSocial>/<YYYY-MM-DD>/<hash>.<ext>
+        //    document_type_id=8 (Certificado de Treinamento de NR)
+        const certDocId = await persistFile(
+            transaction,
+            'employees',
+            files[0],
+            {
+                supplierId,
+                supplierName: deadline.supplier_name,
+                documentTypeId: 8,
+                laborRequestId: deadline.labor_request_id,
                 employeeId,
-                Number(nrTypeId),
-                null,
-                null,
-            );
-        }
+            },
+            savedPaths,
+        );
+
+        // 3. Vincula a NR ao colaborador COM o certificado (mapeia qual PDF é de qual NR)
+        await employeeModel.insertEmployeeNr(
+            transaction,
+            employeeId,
+            Number(nrTypeId),
+            certDocId,
+            null,
+        );
 
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
 
-        // Dispara validação assíncrona para cada documento salvo (fora da transação)
-        for (const docId of documentIds) {
-            setImmediate(() => triggerDocumentValidation(docId, supplierId));
-        }
+        // Dispara validação assíncrona do certificado (fora da transação)
+        setImmediate(() => triggerDocumentValidation(certDocId, supplierId));
 
-        console.log(`Funcionário ${employeeId} cadastrado na Fase 2 (supplier ${supplierId}).`);
-        return { success: true, body: { employeeId } };
+        console.log(`Colaborador ${employeeId} + NR ${nrTypeId} (doc ${certDocId}) na Fase 2 (supplier ${supplierId}).`);
+        return { success: true, body: { employeeId, nrTypeId: Number(nrTypeId), documentId: certDocId } };
     } catch (error) {
         if (transaction && !transactionDone) {
             await trasaction.finalizarTransacao(transaction, false);
@@ -267,7 +303,7 @@ export async function addEmployee(token, supplierId, data, files = []) {
 
 /**
  * Processa o upload de documentos da empresa (escopo 0 — não vinculados a colaborador).
- * Os arquivos são organizados em uploads/company/<supplierId>/<YYYY-MM-DD>/.
+ * Os arquivos são organizados em uploads/company/<supplierId>-<razaoSocial>/<YYYY-MM-DD>/.
  *
  * @param {string} token       — link_token do phase2_deadline
  * @param {number} supplierId  — extraído do JWT do fornecedor
@@ -315,6 +351,7 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
                 file,
                 {
                     supplierId,
+                    supplierName: deadline.supplier_name,
                     documentTypeId,
                     laborRequestId: deadline.labor_request_id,
                     employeeId: null, // documento da empresa não tem colaborador

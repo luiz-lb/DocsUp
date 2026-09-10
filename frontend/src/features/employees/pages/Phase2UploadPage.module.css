@@ -139,3 +139,55 @@
 .tabPanel {
     margin-top: 0.5em;
 }
+
+.typedList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+}
+
+.typedRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.6em 0.85em;
+    border-radius: var(--radius-md, 10px);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.typedFileName {
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.typeSelect {
+    flex-shrink: 0;
+    min-width: 220px;
+    padding: 0.45em 0.6em;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(255, 250, 228, 0.35);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-creamText, #fffae4);
+    font-size: 0.85rem;
+}
+
+.typeSelect option {
+    color: #12312e;
+}
+
+@media (max-width: 700px) {
+    .typedRow {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .typeSelect {
+        min-width: 0;
+        width: 100%;
+    }
+}

@@ -518,7 +518,12 @@ export async function getQuotationsBySupplierId(supplierId) {
                 q.total_value   AS q_total_value,
                 q.[status]      AS q_status,
                 q.submitted_at  AS q_submitted_at,
-                q.acceptance_at AS q_acceptance_at
+                q.acceptance_at AS q_acceptance_at,
+
+                -- Fase 2 (preenchido quando a cotação venceu): link direto sem email
+                pd.link_token   AS phase2_token,
+                pd.[status]     AS phase2_status,
+                pd.expires_at   AS phase2_expires_at
 
             FROM quotation_invites AS i
             INNER JOIN quotation_rounds AS r
@@ -527,6 +532,8 @@ export async function getQuotationsBySupplierId(supplierId) {
                 ON lr.id = r.labor_request_id
             LEFT JOIN quotations AS q
                 ON q.invite_id = i.id
+            LEFT JOIN phase2_deadlines AS pd
+                ON pd.quotation_id = q.id
 
             WHERE
                 -- 1. convite já vinculado ao fornecedor
@@ -543,6 +550,44 @@ export async function getQuotationsBySupplierId(supplierId) {
 
             ORDER BY i.sent_at DESC
         `);
+    return result.recordset;
+}
+
+// ─────────────────────────────────────────────
+// Catálogos auxiliares (para comparação de cotações)
+// ─────────────────────────────────────────────
+
+/**
+ * Busca nr_types (id, code, name) por uma lista de IDs.
+ */
+export async function getNrTypesByIds(ids = []) {
+    if (!ids || ids.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+    const params = ids.map((id, i) => {
+        request.input(`id${i}`, sql.Int, id);
+        return `@id${i}`;
+    });
+    const result = await request.query(
+        `SELECT id, code, [name] FROM nr_types WHERE id IN (${params.join(',')})`,
+    );
+    return result.recordset;
+}
+
+/**
+ * Busca document_types (id, name, scope) por uma lista de IDs.
+ */
+export async function getDocumentTypesByIds(ids = []) {
+    if (!ids || ids.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+    const params = ids.map((id, i) => {
+        request.input(`id${i}`, sql.Int, id);
+        return `@id${i}`;
+    });
+    const result = await request.query(
+        `SELECT id, [name], scope FROM document_types WHERE id IN (${params.join(',')})`,
+    );
     return result.recordset;
 }
 

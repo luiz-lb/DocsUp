@@ -4,22 +4,29 @@ import FormField from '../../../../components/ui/FormField/index.js';
 import styles from './NrSearchSelect.module.css';
 
 /**
- * Select pesquisável (multi-seleção) das NRs exigidas para a atividade.
+ * Select pesquisável das NRs exigidas para a atividade.
  *
- * Diferente do antigo painel de "chips" com todas as NRs mockadas, aqui as
- * opções vêm do backend (labor_request_NRs — definidas por Segurança do
+ * As opções vêm do backend (labor_request_NRs — definidas por Segurança do
  * Trabalho para a atividade) e o usuário pesquisa por código, nome ou descrição.
+ *
+ * Modos:
+ *  - multi (padrão): `selectedIds` (number[]) + `onChange(ids)`
+ *  - single:         `value` (number|null) + `onChange(id|null)`  (uma NR por vez)
  *
  * Props:
  *  - label        : string
- *  - options      : Array<{ id, code, name }>   NRs disponíveis (exigidas na atividade)
- *  - selectedIds  : number[]                     ids atualmente selecionados
- *  - onChange     : (ids: number[]) => void
+ *  - options      : Array<{ id, code, name, description? }>
+ *  - single       : boolean — quando true, seleciona apenas UMA NR
+ *  - value        : number|null   (modo single)
+ *  - selectedIds  : number[]      (modo multi)
+ *  - onChange     : (idsOrId) => void
  *  - placeholder  : string
  */
 export default function NrSearchSelect({
   label = 'NRs deste colaborador',
   options = [],
+  single = false,
+  value = null,
   selectedIds = [],
   onChange,
   placeholder = 'Pesquisar NR por código ou nome…',
@@ -39,7 +46,11 @@ export default function NrSearchSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  // Normaliza a seleção atual num Set de ids (funciona nos dois modos)
+  const selectedSet = useMemo(() => {
+    if (single) return new Set(value != null ? [value] : []);
+    return new Set(selectedIds);
+  }, [single, value, selectedIds]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -54,7 +65,9 @@ export default function NrSearchSelect({
   const selectedOptions = options.filter((opt) => selectedSet.has(opt.id));
 
   const handleAdd = (id) => {
-    if (!selectedSet.has(id)) {
+    if (single) {
+      onChange?.(id);
+    } else if (!selectedSet.has(id)) {
       onChange?.([...selectedIds, id]);
     }
     setQuery('');
@@ -62,7 +75,11 @@ export default function NrSearchSelect({
   };
 
   const handleRemove = (id) => {
-    onChange?.(selectedIds.filter((item) => item !== id));
+    if (single) {
+      onChange?.(null);
+    } else {
+      onChange?.(selectedIds.filter((item) => item !== id));
+    }
   };
 
   return (
@@ -106,7 +123,7 @@ export default function NrSearchSelect({
                     {opt.name && <span className={styles.optionSub}> · {opt.name}</span>}
                   </span>
                   {already ? (
-                    <span className={styles.optionAdded}>Adicionado</span>
+                    <span className={styles.optionAdded}>Selecionada</span>
                   ) : (
                     <LuPlus className={styles.optionIcon} aria-hidden="true" />
                   )}
@@ -119,7 +136,9 @@ export default function NrSearchSelect({
 
       <div className={styles.selectedList}>
         {selectedOptions.length === 0 ? (
-          <p className={styles.emptyHint}>Nenhuma NR selecionada.</p>
+          <p className={styles.emptyHint}>
+            {single ? 'Nenhuma NR selecionada.' : 'Nenhuma NR selecionada.'}
+          </p>
         ) : (
           selectedOptions.map((item) => (
             <span key={item.id} className={styles.tag}>

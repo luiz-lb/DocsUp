@@ -27,6 +27,28 @@ export async function insertEmployee(transaction, {
 }
 
 /**
+ * Busca o id de um colaborador pelo CPF dentro de um fornecedor + solicitação.
+ * Usado no fluxo "uma NR por vez" para reaproveitar o mesmo colaborador.
+ * Retorna o id ou null.
+ */
+export async function getEmployeeIdByCpf(transaction, supplierId, laborRequestId, cpf) {
+    const request = new sql.Request(transaction);
+    const result = await request
+        .input('supplier_id', sql.Int, supplierId)
+        .input('labor_request_id', sql.Int, laborRequestId)
+        .input('cpf', sql.VarChar(14), cpf ?? null)
+        .query(`
+            SELECT TOP 1 id
+            FROM employees
+            WHERE supplier_id = @supplier_id
+              AND labor_request_id = @labor_request_id
+              AND cpf = @cpf
+            ORDER BY id ASC
+        `);
+    return result.recordset[0]?.id ?? null;
+}
+
+/**
  * Insere ou atualiza uma relação colaborador ↔ NR.
  */
 export async function insertEmployeeNr(transaction, employeeId, nrTypeId, certificateDocId, expirationDate) {

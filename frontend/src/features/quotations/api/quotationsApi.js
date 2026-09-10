@@ -86,6 +86,23 @@ export async function declareWinner(roundId, winnerQuotationId, deadlineHours) {
 }
 
 /**
+ * Compara múltiplas cotações de uma rodada (retorna dados p/ gráficos).
+ * POST /quotations/rounds/:roundId/compare
+ * @param {number}   roundId
+ * @param {number[]} quotationIds
+ */
+export async function compareQuotations(roundId, quotationIds) {
+  try {
+    const result = await api.post(`/quotations/rounds/${roundId}/compare`, { quotationIds });
+    if (!result.data.success) return null;
+    return result.data.body;
+  } catch (error) {
+    console.error('compareQuotations error:', error);
+    return null;
+  }
+}
+
+/**
  * Adiciona um novo convite a uma rodada existente (mesmo prazo do round).
  * POST /quotations/rounds/addInvite
  */

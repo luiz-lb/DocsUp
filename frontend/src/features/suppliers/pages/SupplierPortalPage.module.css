@@ -170,3 +170,32 @@
     flex-basis: 100%;
   }
 }
+
+/* ── Cabeçalho da página (dentro do layout com sidebar) ── */
+.pageHeader {
+  margin-bottom: 1.5rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 250, 228, 0.6);
+}
+
+.pageTitle {
+  margin: 0.15rem 0 0;
+  font-size: 1.6rem;
+  color: var(--color-creamText, #fffae4);
+}
+
+.itemClickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.itemClickable:hover {
+  border-color: var(--color-success, #2f9e44);
+  background: rgba(47, 158, 68, 0.18);
+}

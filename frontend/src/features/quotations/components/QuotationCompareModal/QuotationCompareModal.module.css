@@ -1,0 +1,185 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.loading {
+  color: rgba(255, 250, 228, 0.7);
+  font-size: 0.9rem;
+}
+
+/* Legenda */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.legendDot {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Blocos */
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.blockHint {
+  margin: 0;
+  font-size: 0.78rem;
+  opacity: 0.65;
+}
+
+/* Barras horizontais */
+.hbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.hbarRow {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hbarLabel {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hbarTrack {
+  height: 1.1rem;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hbarFill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 2px;
+  transition: width 0.3s ease;
+}
+
+.hbarValue {
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Barras agrupadas */
+.grouped {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.25rem;
+  height: 180px;
+  padding-top: 0.5rem;
+  overflow-x: auto;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  height: 100%;
+  min-width: 3rem;
+}
+
+.groupBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
+  height: 100%;
+}
+
+.groupBar {
+  width: 0.9rem;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 3px;
+  position: relative;
+}
+
+.groupBarValue {
+  position: absolute;
+  top: -1.1rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.groupLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Matriz de documentos */
+.matrixWrap {
+  overflow-x: auto;
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.matrix th,
+.matrix td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.matrix th {
+  font-size: 0.78rem;
+}
+
+.matrixCorner,
+.matrixLabel {
+  text-align: left;
+}
+
+.matrixLabel {
+  font-weight: 600;
+}
+
+.matrixCell .yes {
+  color: #2f9e44;
+  font-weight: 700;
+}
+
+.matrixCell .no {
+  color: #e5484d;
+  font-weight: 700;
+}

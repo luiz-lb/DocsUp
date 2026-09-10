@@ -156,6 +156,38 @@ export async function addInviteToRound(req, res) {
 }
 
 /**
+ * Compara múltiplas cotações de uma rodada.
+ * POST /quotations/rounds/:roundId/compare
+ * Body: { quotationIds: number[] }
+ */
+export async function compareQuotations(req, res) {
+    try {
+        const roundId = Number(req.params.roundId);
+        const { quotationIds } = req.body;
+
+        if (!Number.isInteger(roundId) || roundId <= 0) {
+            return res.status(400).json({ success: false, body: { message: 'roundId inválido.' } });
+        }
+        if (!Array.isArray(quotationIds) || quotationIds.length < 2) {
+            return res.status(400).json({
+                success: false,
+                body: { message: 'Selecione ao menos duas cotações para comparar.' },
+            });
+        }
+
+        const result = await quotationService.compareQuotations(roundId, quotationIds);
+        if (!result.success) {
+            return res.status(400).json({ success: false, body: { message: result.message } });
+        }
+
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('compareQuotations controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
  * Retorna os dados do convite para o fornecedor preencher a cotação.
  * GET /quotations/invite/:token  (público)
  */

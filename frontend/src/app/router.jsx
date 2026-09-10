@@ -90,10 +90,12 @@ export const router = createBrowserRouter([
           { path: ROUTES.suppliers.login, element: <SupplierLoginPage /> },
           { path: ROUTES.suppliers.mfa, element: <SupplierMfaPage /> },
           { path: ROUTES.suppliers.register, element: <SupplierRegisterPage /> },
-          { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
           { path: ROUTES.employees.phase2(), element: <Phase2UploadPage /> },
         ],
       },
+      // Portal do fornecedor: usa seu próprio shell com sidebar (SupplierLayout),
+      // por isso fica fora do PublicLayout para ocupar a tela inteira.
+      { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
     ],
   },
 ]);

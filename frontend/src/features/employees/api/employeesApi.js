@@ -21,25 +21,27 @@ export async function getPhase2ByToken(token) {
 }
 
 /**
- * Cadastra um funcionário com documentos na Fase 2.
+ * Cadastra/atualiza um colaborador com UMA NR e o respectivo certificado (um PDF).
  * POST /phase2/:token/employee  (exige cookie supplier_token)
  *
+ * Modelo "uma NR por vez": cada envio associa o colaborador a uma única NR e ao
+ * PDF comprobatório daquela NR, para sabermos qual documento é de qual NR.
+ *
  * @param {string}   token
- * @param {{ fullName, cpf, rg?, roleFunction, nrTypeIds[] }} employeeData
- * @param {File[]}   files  — arquivos do FileDropzone
+ * @param {{ fullName, cpf, rg?, roleFunction, nrTypeId }} employeeData
+ * @param {File}     file  — o certificado desta NR (um único arquivo)
  */
-export async function addEmployee(token, employeeData, files = []) {
+export async function addEmployee(token, employeeData, file) {
   try {
     const formData = new FormData();
     formData.append('fullName', employeeData.fullName);
     formData.append('cpf', employeeData.cpf);
     if (employeeData.rg) formData.append('rg', employeeData.rg);
     if (employeeData.roleFunction) formData.append('roleFunction', employeeData.roleFunction);
-    formData.append('nrTypeIds', JSON.stringify(employeeData.nrTypeIds ?? []));
+    if (employeeData.nrTypeId != null) formData.append('nrTypeId', String(employeeData.nrTypeId));
 
-    for (const file of files) {
-      formData.append('files', file);
-    }
+    // Um único arquivo — o certificado da NR selecionada
+    if (file) formData.append('files', file);
 
     const result = await api.post(`/phase2/${token}/employee`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

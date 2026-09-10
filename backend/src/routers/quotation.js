@@ -21,6 +21,9 @@ router.post('/rounds/declareWinner', verificarToken, quotationController.declare
 // Adiciona novo convite a uma rodada existente
 router.post('/rounds/addInvite', verificarToken, quotationController.addInviteToRound);
 
+// Compara múltiplas cotações de uma rodada (gráficos comparativos)
+router.post('/rounds/:roundId/compare', verificarToken, quotationController.compareQuotations);
+
 // ─── Portal do Fornecedor ──────────────────────────────────────────────────────
 // Busca dados do convite pelo token (público — para pré-carregar a tela)
 router.get('/invite/:token', quotationController.getInviteByToken);
