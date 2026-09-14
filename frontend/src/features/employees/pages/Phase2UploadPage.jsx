@@ -59,9 +59,9 @@ export default function Phase2UploadPage() {
             icon={LuLogIn}
             fullWidth
             onClick={() =>
-              navigate(ROUTES.suppliers.login, {
-                state: { returnTo: `/fase2/${token}` },
-              })
+              // Passa o token da Fase 2 na URL para que login → MFA
+              // consigam redirecionar de volta para /fase2/:token após autenticar.
+              navigate(`${ROUTES.suppliers.login}?fase2=${token}`)
             }
           >
             Entrar no portal
@@ -227,7 +227,7 @@ export default function Phase2UploadPage() {
               </div>
             )}
 
-            {!deadline.isExpired ? (
+            {!deadline.isExpired && (
               <div className={styles.formSection}>
                 <div className={styles.dropzoneSpacer}>
                   <FileDropzone
@@ -237,15 +237,14 @@ export default function Phase2UploadPage() {
                   />
                 </div>
 
-                {/* Para cada arquivo, selecionar o tipo de documento */}
+                {/* Para cada arquivo, selecionar o tipo de documento
+                    (mesmo padrão de select do restante do sistema: FormField + <select>) */}
                 {companyItems.length > 0 && (
                   <div className={styles.typedList}>
                     <p className={styles.groupLabel}>Classifique cada arquivo:</p>
                     {companyItems.map((item, index) => (
-                      <div key={`${item.file.name}-${index}`} className={styles.typedRow}>
-                        <span className={styles.typedFileName}>{item.file.name}</span>
+                      <FormField key={`${item.file.name}-${index}`} label={item.file.name}>
                         <select
-                          className={styles.typeSelect}
                           value={item.documentTypeId}
                           onChange={(e) => setCompanyItemType(index, e.target.value)}
                         >
@@ -254,7 +253,7 @@ export default function Phase2UploadPage() {
                             <option key={opt.id} value={opt.id}>{opt.name}</option>
                           ))}
                         </select>
-                      </div>
+                      </FormField>
                     ))}
                   </div>
                 )}
@@ -271,8 +270,6 @@ export default function Phase2UploadPage() {
                   Enviar documentos da empresa
                 </Button>
               </div>
-            ) : (
-              <Banner tone="danger" description="O prazo da Fase 2 encerrou. Não é possível enviar documentos." />
             )}
 
             {companyDocuments.length > 0 && (

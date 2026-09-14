@@ -300,6 +300,64 @@ export async function reviewDocument(validationId, documentId, reviewerId, decis
 }
 
 // ─────────────────────────────────────────────
+// Atualização direta de status (RH / Segurança do Trabalho)
+// ─────────────────────────────────────────────
+
+/**
+ * Atualiza diretamente o status de um documento para qualquer valor válido.
+ * status: 0=Pendente, 1=Validando, 2=Aprovado, 3=Reprovado, 4=Reenvio Necessário, 5=Expirado
+ *
+ * Quando o status é uma decisão terminal (aprovado/reprovado/reenvio), registra
+ * também a decisão manual na validação mais recente (para trilha de auditoria).
+ *
+ * @param {number} documentId
+ * @param {number} status
+ * @param {number} reviewerId
+ * @param {string} [comments]
+ */
+export async function setDocumentStatus(documentId, status, reviewerId, comments) {
+    const VALID = [0, 1, 2, 3, 4, 5];
+    if (!VALID.includes(Number(status))) {
+        return { success: false, message: 'Status inválido. Use 0..5.' };
+    }
+
+    let transaction;
+    let transactionDone = false;
+
+    try {
+        transaction = await trasaction.iniciarTransacao();
+
+        // Atualiza o status do documento
+        await documentValidationModel.updateDocumentStatus(transaction, documentId, Number(status));
+
+        // Registra a decisão manual quando aplicável (aprovado=2 → decision 1; reprovado=3/reenvio=4 → decision 2)
+        const latest = await documentValidationModel.getLatestValidationId(documentId);
+        if (latest) {
+            let manualDecision = null;
+            if (Number(status) === 2) manualDecision = 1;      // Aprovado
+            else if (Number(status) === 3 || Number(status) === 4) manualDecision = 2; // Reprovado / Reenvio
+
+            if (manualDecision !== null) {
+                await documentValidationModel.applyManualDecision(
+                    transaction, latest.id, reviewerId, manualDecision, comments,
+                );
+            }
+        }
+
+        await trasaction.finalizarTransacao(transaction, true);
+        transactionDone = true;
+
+        return { success: true, body: { message: 'Status atualizado com sucesso.' } };
+    } catch (error) {
+        if (transaction && !transactionDone) {
+            await trasaction.finalizarTransacao(transaction, false);
+        }
+        console.error('setDocumentStatus error:', error);
+        return { success: false, message: 'Erro ao atualizar status do documento.' };
+    }
+}
+
+// ─────────────────────────────────────────────
 // Listagens (painel interno)
 // ─────────────────────────────────────────────
 

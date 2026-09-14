@@ -20,8 +20,18 @@ export function SupplierAuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Tenta restaurar sessão a partir do cookie supplier_token
+  // Só restaura a sessão de fornecedor quando estamos na área do fornecedor
+  // (portal, login/cadastro/MFA de fornecedor ou Fase 2). Evita chamar o
+  // /supplier/auth/me nas telas internas de colaborador.
   useEffect(() => {
+    const path = window.location.pathname;
+    const isSupplierArea = path.startsWith('/fornecedor') || path.startsWith('/fase2');
+
+    if (!isSupplierArea) {
+      setIsLoading(false);
+      return;
+    }
+
     meSupplier()
       .then((result) => {
         if (result.success) {
@@ -32,9 +42,15 @@ export function SupplierAuthProvider({ children }) {
       .finally(() => setIsLoading(false));
   }, []);
 
-  /** Fase 1: CNPJ + senha. Retorna { success, requiresMfa, devOtp? } */
-  const loginPhase1 = async (cnpj, password) => {
-    return loginSupplier(cnpj, password);
+  /**
+   * Fase 1: identificador (CNPJ ou e-mail operacional) + senha.
+   * @param {string} identifier
+   * @param {string} password
+   * @param {'cnpj'|'email'} mode
+   * Retorna { success, requiresMfa, devOtp? }
+   */
+  const loginPhase1 = async (identifier, password, mode = 'cnpj') => {
+    return loginSupplier(identifier, password, mode);
   };
 
   /** Fase 2: OTP de 6 dígitos. Seta cookie e popula o contexto. */

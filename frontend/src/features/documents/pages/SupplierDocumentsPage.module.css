@@ -1,0 +1,34 @@
+.docCell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fileName {
+  font-size: 0.78rem;
+  color: var(--color-textMuted, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+.actionCell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusSelect {
+  padding: 0.45em 0.6em;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--color-border, #d1d5db);
+  background: #f9fafb;
+  color: var(--color-textDark, #111827);
+  font-size: 0.85rem;
+}
+
+.filterField {
+  min-width: 200px;
+  margin: 0;
+}

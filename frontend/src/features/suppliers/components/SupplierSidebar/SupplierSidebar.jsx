@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LuLayoutDashboard, LuUser } from 'react-icons/lu';
+import { LuLayoutDashboard, LuUser, LuBuilding2 } from 'react-icons/lu';
 import { cn } from '../../../../utils/cn.js';
 import { ROUTES } from '../../../../constants/routes.js';
 import styles from './SupplierSidebar.module.css';
 
 const NAV_ITEMS = [
   { label: 'Minhas cotações', to: ROUTES.suppliers.portal, icon: LuLayoutDashboard, end: true },
+  { label: 'Perfil da empresa', to: ROUTES.suppliers.myProfile, icon: LuBuilding2 },
 ];
 
 /**

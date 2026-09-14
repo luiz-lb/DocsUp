@@ -24,11 +24,13 @@ export const ROUTES = {
     mfa: '/fornecedor/mfa',
     register: '/fornecedor/cadastro',
     portal: '/fornecedor/painel',
+    myProfile: '/fornecedor/perfil',
   },
 
   documents: {
     center: '/documentos',
     review: '/documentos/revisao',
+    supplierDocs: '/documentos/fornecedores',
   },
 
   employees: {

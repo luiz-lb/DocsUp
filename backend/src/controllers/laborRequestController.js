@@ -8,7 +8,7 @@ export async function createLaborRequest(req, res) {
 
         const idUser = req.usuario.id;
 
-        if (!idUser || !activityTypeId || !title || !location || !urgency || !startDate) {
+        if (!idUser || !activityTypeId || !title || !location || (urgency !== 0 && !urgency) || !startDate) {
             return res.status(400).json({ success: false, body: { message: "Falta de informações para criação de solicitação." } });
         }
 

@@ -48,3 +48,31 @@
     font-weight: 700;
     cursor: pointer;
 }
+
+/* Alternador CNPJ / e-mail operacional no login do fornecedor */
+.segmented {
+    display: flex;
+    gap: 0.25em;
+    padding: 0.25em;
+    margin-bottom: 1.25em;
+    border-radius: var(--radius-pill, 999px);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.segment,
+.segmentActive {
+    flex: 1;
+    padding: 0.5em 0.75em;
+    border: none;
+    border-radius: var(--radius-pill, 999px);
+    background: transparent;
+    color: rgba(255, 250, 228, 0.7);
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.segmentActive {
+    background: var(--color-teal, #004643);
+    color: var(--color-creamText, #fffae4);
+}

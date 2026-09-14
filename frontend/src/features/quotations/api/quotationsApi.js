@@ -104,15 +104,39 @@ export async function compareQuotations(roundId, quotationIds) {
 
 /**
  * Adiciona um novo convite a uma rodada existente (mesmo prazo do round).
+ * Aceita convite por e-mail OU por CNPJ (fornecedor já cadastrado).
  * POST /quotations/rounds/addInvite
+ * @param {number} roundId
+ * @param {{ email?: string, cnpj?: string }} invitee
  */
-export async function addInviteToRound(roundId, inviteeEmail) {
+export async function addInviteToRound(roundId, invitee) {
   try {
-    const result = await api.post('/quotations/rounds/addInvite', { roundId, inviteeEmail });
+    const payload = { roundId };
+    if (invitee?.cnpj) payload.inviteeCnpj = invitee.cnpj;
+    if (invitee?.email) payload.inviteeEmail = invitee.email;
+    const result = await api.post('/quotations/rounds/addInvite', payload);
     return result.data;
   } catch (error) {
     console.error('addInviteToRound error:', error);
     return { success: false, body: { message: 'Erro ao adicionar convite.' } };
+  }
+}
+
+/**
+ * Busca um fornecedor cadastrado por e-mail ou CNPJ (para o modal de convite).
+ * GET /quotations/supplier-lookup?email=... | ?cnpj=...
+ * @returns {{ found: boolean, supplier: object|null }}
+ */
+export async function lookupSupplierForInvite({ email, cnpj }) {
+  try {
+    const params = new URLSearchParams();
+    if (email) params.append('email', email);
+    if (cnpj) params.append('cnpj', cnpj);
+    const result = await api.get(`/quotations/supplier-lookup?${params.toString()}`);
+    return result.data.body ?? { found: false, supplier: null };
+  } catch (error) {
+    console.error('lookupSupplierForInvite error:', error);
+    return { found: false, supplier: null };
   }
 }
 

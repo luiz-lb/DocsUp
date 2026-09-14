@@ -75,16 +75,20 @@ export async function register(req, res) {
 // ─────────────────────────────────────────────
 export async function login(req, res) {
     try {
-        const { cnpj, password } = req.body;
+        const { cnpj, email, password } = req.body;
 
-        if (!cnpj || !password) {
+        if ((!cnpj && !email) || !password) {
             return res.status(400).json({
                 success: false,
-                body: { message: 'CNPJ e senha são obrigatórios.' },
+                body: { message: 'Informe o CNPJ ou e-mail operacional e a senha.' },
             });
         }
 
-        const result = await supplierAuthService.loginPhase1(cnpj, password, req.session);
+        const result = await supplierAuthService.loginPhase1(
+            { cnpj, email },
+            password,
+            req.session,
+        );
 
         if (!result.success) {
             return res.status(401).json({ success: false, body: { message: result.message } });
@@ -151,6 +155,40 @@ export async function logout(req, res) {
         delete req.session.mfaPending;
     }
     return res.status(200).json({ success: true, body: { message: 'Logout realizado.' } });
+}
+
+// ─────────────────────────────────────────────
+// Perfil — GET /supplier/auth/profile
+// ─────────────────────────────────────────────
+export async function getProfile(req, res) {
+    try {
+        const supplierId = req.fornecedor.supplierId;
+        const result = await supplierAuthService.getSupplierProfile(supplierId);
+        if (!result.success) {
+            return res.status(404).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('getProfile controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
+// Perfil — PUT /supplier/auth/profile
+// ─────────────────────────────────────────────
+export async function updateProfile(req, res) {
+    try {
+        const supplierId = req.fornecedor.supplierId;
+        const result = await supplierAuthService.updateSupplierProfile(supplierId, req.body ?? {});
+        if (!result.success) {
+            return res.status(400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('updateProfile controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
 }
 
 // ─────────────────────────────────────────────

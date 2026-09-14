@@ -128,19 +128,22 @@ export async function declareWinner(req, res) {
  */
 export async function addInviteToRound(req, res) {
     try {
-        const { roundId, inviteeEmail } = req.body;
+        const { roundId, inviteeEmail, inviteeCnpj } = req.body;
         const createdBy = req.usuario.id;
 
-        if (!roundId || !inviteeEmail) {
+        if (!roundId || (!inviteeEmail && !inviteeCnpj)) {
             return res.status(400).json({
                 success: false,
-                body: { message: 'roundId e inviteeEmail são obrigatórios.' },
+                body: { message: 'roundId e (inviteeEmail ou inviteeCnpj) são obrigatórios.' },
             });
         }
+
+        console.log("::::", Number(roundId),"::", roundId,"::", inviteeEmail,"::", inviteeCnpj,"::", createdBy);
 
         const result = await quotationService.addInviteToRound({
             roundId: Number(roundId),
             inviteeEmail,
+            inviteeCnpj,
             createdBy,
         });
 
@@ -151,6 +154,26 @@ export async function addInviteToRound(req, res) {
         return res.status(201).json({ success: true, body: { inviteId: result.inviteId } });
     } catch (error) {
         console.error('addInviteToRound controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
+ * Busca dados de um fornecedor cadastrado por e-mail ou CNPJ (para o modal de convite).
+ * GET /quotations/supplier-lookup?email=... | ?cnpj=...
+ * Retorna { found, supplier: { id, cnpj, razaoSocial, nomeFantasia } | null }
+ */
+export async function lookupSupplierForInvite(req, res) {
+    try {
+        const { email, cnpj } = req.query;
+        if (!email && !cnpj) {
+            return res.status(400).json({ success: false, body: { message: 'Informe email ou cnpj.' } });
+        }
+
+        const result = await quotationService.lookupSupplierForInvite({ email, cnpj });
+        return res.status(200).json({ success: true, body: result });
+    } catch (error) {
+        console.error('lookupSupplierForInvite controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }

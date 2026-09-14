@@ -8,6 +8,7 @@ const router = express.Router();
 router.get('/', verificarToken, documentController.listDocuments);
 router.get('/review-queue', verificarToken, documentController.listReviewQueue);
 router.post('/review', verificarToken, documentController.reviewDocument);
+router.post('/set-status', verificarToken, documentController.setStatus);
 
 // Webhook do N8N (autenticado por X-Webhook-Secret)
 router.post('/ai-result', documentController.receiveAiResult);

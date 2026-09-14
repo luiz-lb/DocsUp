@@ -74,6 +74,41 @@ export async function reviewDocument(req, res) {
 }
 
 /**
+ * POST /documents/set-status
+ * Body: { documentId, status (0..5), comments? }
+ * RH / Segurança do Trabalho define o status do documento diretamente.
+ */
+export async function setStatus(req, res) {
+    try {
+        const { documentId, status, comments } = req.body;
+        const reviewerId = req.usuario.id;
+
+        if (!documentId || status === undefined) {
+            return res.status(400).json({
+                success: false,
+                body: { message: 'documentId e status são obrigatórios.' },
+            });
+        }
+
+        const result = await documentValidationService.setDocumentStatus(
+            Number(documentId),
+            Number(status),
+            reviewerId,
+            comments,
+        );
+
+        if (!result.success) {
+            return res.status(400).json({ success: false, body: { message: result.message } });
+        }
+
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('setStatus controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
  * POST /documents/ai-result  — webhook do N8N com resultado da IA
  * Body: { documentId, validationId, aiScore, aiResultJson, aiModelUsed }
  * Protegido por X-Webhook-Secret para uso interno

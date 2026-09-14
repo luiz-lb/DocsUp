@@ -109,6 +109,80 @@ export async function insertQuotationInvite(transaction, { roundId, supplierId, 
 }
 
 /**
+ * Verifica se já existe um convite nesta rodada para o fornecedor dono do
+ * e-mail informado — considerando QUALQUER e-mail de contato dele
+ * (legal/operacional/financeiro) OU um convite já vinculado ao supplier_id.
+ *
+ * Retorna o convite existente { id, invite_email, supplier_id } ou null.
+ * Usado para evitar convidar duas vezes a mesma empresa por e-mails diferentes.
+ */
+export async function findExistingInviteForEmail(roundId, email) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('round_id', sql.Int, roundId)
+        .input('email', sql.NVarChar(200), email)
+        .query(`
+            SELECT TOP 1 i.id, i.invite_email, i.supplier_id
+            FROM quotation_invites AS i
+            WHERE i.round_id = @round_id
+              AND (
+                    -- mesmo e-mail exato já convidado
+                    LOWER(i.invite_email) = LOWER(@email)
+                    -- OU o convite pertence ao fornecedor dono deste e-mail de contato
+                    OR i.supplier_id IN (
+                        SELECT sc.supplier_id
+                        FROM supplier_contacts AS sc
+                        WHERE LOWER(sc.email) = LOWER(@email)
+                    )
+                    -- OU já existe convite (por e-mail) para outro contato do MESMO fornecedor
+                    OR EXISTS (
+                        SELECT 1
+                        FROM supplier_contacts AS sc_target
+                        INNER JOIN supplier_contacts AS sc_invited
+                            ON sc_invited.supplier_id = sc_target.supplier_id
+                        WHERE LOWER(sc_target.email) = LOWER(@email)
+                          AND LOWER(sc_invited.email) = LOWER(i.invite_email)
+                    )
+              )
+        `);
+    return result.recordset[0] ?? null;
+}
+
+/**
+ * Busca um fornecedor (id, cnpj, razão social) pelo CNPJ formatado.
+ * Usado para convite por CNPJ e para exibir dados ao convidar por e-mail.
+ */
+export async function getSupplierBriefByCnpj(cnpj) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('cnpj', sql.VarChar(18), cnpj)
+        .query(`
+            SELECT id, cnpj, razao_social, nome_fantasia
+            FROM suppliers
+            WHERE cnpj = @cnpj
+        `);
+    return result.recordset[0] ?? null;
+}
+
+/**
+ * Busca um fornecedor (id, cnpj, razão social) por um e-mail de contato
+ * (qualquer tipo). Usado para mostrar CNPJ/Razão Social ao convidar por e-mail.
+ */
+export async function getSupplierBriefByContactEmail(email) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('email', sql.NVarChar(200), email)
+        .query(`
+            SELECT TOP 1 s.id, s.cnpj, s.razao_social, s.nome_fantasia
+            FROM suppliers AS s
+            INNER JOIN supplier_contacts AS sc ON sc.supplier_id = s.id
+            WHERE LOWER(sc.email) = LOWER(@email)
+            ORDER BY s.id ASC
+        `);
+    return result.recordset[0] ?? null;
+}
+
+/**
  * Busca um convite pelo token único.
  */
 export async function getInviteByToken(token) {
@@ -317,6 +391,7 @@ export async function getInvitesWithQuotationsByRoundId(roundId) {
                 -- Fornecedor (vem do invite ou da cotação)
                 COALESCE(si.razao_social, sq.razao_social) AS supplier_name,
                 COALESCE(si.nome_fantasia, sq.nome_fantasia) AS nome_fantasia,
+                COALESCE(si.cnpj, sq.cnpj) AS supplier_cnpj,
 
                 -- Cotação (NULL se ainda não respondeu)
                 q.id            AS q_id,

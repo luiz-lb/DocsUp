@@ -186,28 +186,120 @@ export async function registerSupplier(payload) {
 }
 
 // ─────────────────────────────────────────────
+// Perfil do fornecedor (tela de Perfil no portal)
+// ─────────────────────────────────────────────
+
+/**
+ * Retorna o perfil completo do fornecedor: dados da empresa, contatos e regiões.
+ */
+export async function getSupplierProfile(supplierId) {
+    try {
+        const supplier = await supplierModel.getSupplierProfile(supplierId);
+        if (!supplier) {
+            return { success: false, message: 'Fornecedor não encontrado.' };
+        }
+        const contacts = await supplierModel.getSupplierContacts(supplierId);
+        const regions = await supplierModel.getSupplierRegions(supplierId);
+
+        return { success: true, body: { supplier, contacts, regions } };
+    } catch (error) {
+        console.error('getSupplierProfile error:', error);
+        return { success: false, message: 'Erro ao buscar perfil.' };
+    }
+}
+
+/**
+ * Atualiza o perfil do fornecedor: dados da empresa, contatos (por tipo) e regiões.
+ *
+ * @param {number} supplierId
+ * @param {object} payload — { nomeFantasia, employeeCount, address, city, state, zipCode,
+ *                             phone, website, contacts: [{ name,email,phone,contactType,isPrimary }],
+ *                             regionIds: number[] }
+ */
+export async function updateSupplierProfile(supplierId, payload) {
+    const { contacts = [], regionIds, ...companyData } = payload;
+
+    // Valida os contatos obrigatórios (legal e operacional precisam de email)
+    const legal = contacts.find((c) => Number(c.contactType) === 0);
+    const op = contacts.find((c) => Number(c.contactType) === 1);
+    if (contacts.length > 0) {
+        if (legal && !legal.email) {
+            return { success: false, message: 'O e-mail do responsável legal é obrigatório.' };
+        }
+        if (op && !op.email) {
+            return { success: false, message: 'O e-mail do responsável operacional é obrigatório.' };
+        }
+    }
+
+    let transaction;
+    let transactionDone = false;
+
+    try {
+        transaction = await trasaction.iniciarTransacao();
+
+        await supplierModel.updateSupplierProfile(transaction, supplierId, companyData);
+
+        for (const contact of contacts) {
+            if (!contact.email) continue; // ignora contatos vazios (ex.: financeiro não preenchido)
+            await supplierModel.upsertSupplierContactByType(transaction, supplierId, {
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone,
+                contactType: Number(contact.contactType),
+                isPrimary: contact.isPrimary ?? false,
+            });
+        }
+
+        if (Array.isArray(regionIds)) {
+            await supplierModel.replaceSupplierRegions(transaction, supplierId, regionIds.map(Number));
+        }
+
+        await trasaction.finalizarTransacao(transaction, true);
+        transactionDone = true;
+
+        return { success: true, body: { message: 'Perfil atualizado com sucesso.' } };
+    } catch (error) {
+        if (transaction && !transactionDone) {
+            await trasaction.finalizarTransacao(transaction, false);
+        }
+        console.error('updateSupplierProfile error:', error);
+        return { success: false, message: 'Erro ao atualizar perfil.' };
+    }
+}
+
+// ─────────────────────────────────────────────
 // Login — Fase 1: valida credenciais e envia OTP
 // ─────────────────────────────────────────────
 
 /**
- * Fase 1 do login: verifica CNPJ + senha e envia OTP por email.
- * O OTP é armazenado (hash + expiração) na sessão do servidor.
+ * Fase 1 do login: verifica credenciais (por CNPJ ou e-mail operacional)
+ * e envia OTP por email. O OTP é armazenado (hash + expiração) na sessão.
  *
- * @param {string} cnpj
+ * @param {{ cnpj?: string, email?: string }} identifier
  * @param {string} password
  * @param {object} session  — req.session do Express
  */
-export async function loginPhase1(cnpj, password, session) {
-    const cleanCnpj = cnpj.replace(/\D/g, '');
-    const formattedCnpj = cleanCnpj.replace(
-        /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
-        '$1.$2.$3/$4-$5'
-    );
+export async function loginPhase1(identifier, password, session) {
+    const { cnpj, email } = identifier ?? {};
 
-    const supplier = await supplierModel.getSupplierByCnpj(formattedCnpj);
+    let supplier = null;
 
-    if (!supplier) {
-        return { success: false, message: 'CNPJ não cadastrado.' };
+    if (email) {
+        // Login por e-mail operacional (contact_type = 1)
+        supplier = await supplierModel.getSupplierByOperationalEmail(email.trim());
+        if (!supplier) {
+            return { success: false, message: 'E-mail operacional não encontrado.' };
+        }
+    } else {
+        const cleanCnpj = String(cnpj ?? '').replace(/\D/g, '');
+        const formattedCnpj = cleanCnpj.replace(
+            /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+            '$1.$2.$3/$4-$5'
+        );
+        supplier = await supplierModel.getSupplierByCnpj(formattedCnpj);
+        if (!supplier) {
+            return { success: false, message: 'CNPJ não cadastrado.' };
+        }
     }
 
     if (supplier.status === 3) {
@@ -238,7 +330,7 @@ export async function loginPhase1(cnpj, password, session) {
         console.warn(`Fornecedor ID ${supplier.id} não tem emails de contato cadastrados.`);
         // Em ambiente de desenvolvimento, logamos o OTP para não travar o fluxo
         if (process.env.NODE_ENV !== 'production') {
-            console.log(`[DEV] OTP para CNPJ ${formattedCnpj}: ${otp}`);
+            console.log(`[DEV] OTP para CNPJ ${supplier.cnpj}: ${otp}`);
         }
     } else {
         try {
@@ -250,7 +342,7 @@ export async function loginPhase1(cnpj, password, session) {
                 html: `
                     <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
                         <h2 style="color: #004643;">Portal do Fornecedor</h2>
-                        <p>Um novo acesso foi solicitado para o CNPJ <strong>${formattedCnpj}</strong>.</p>
+                        <p>Um novo acesso foi solicitado para o CNPJ <strong>${supplier.cnpj}</strong>.</p>
                         <p>Seu código de verificação é:</p>
                         <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;
                                     background: #f3f4f6; padding: 1rem 2rem;
@@ -267,7 +359,7 @@ export async function loginPhase1(cnpj, password, session) {
             console.error('Erro ao enviar email MFA:', emailError.message);
             // Não bloqueia o fluxo — em desenvolvimento o OTP fica no log
             if (process.env.NODE_ENV !== 'production') {
-                console.log(`[DEV] OTP para CNPJ ${formattedCnpj}: ${otp}`);
+                console.log(`[DEV] OTP para CNPJ ${supplier.cnpj}: ${otp}`);
             }
         }
     }

@@ -180,6 +180,22 @@ export async function updateDocumentStatus(transaction, documentId, status) {
 }
 
 /**
+ * Retorna o id da validação mais recente de um documento (ou null).
+ */
+export async function getLatestValidationId(documentId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('document_id', sql.Int, documentId)
+        .query(`
+            SELECT TOP 1 id
+            FROM document_validations
+            WHERE document_id = @document_id
+            ORDER BY created_at DESC
+        `);
+    return result.recordset[0] ?? null;
+}
+
+/**
  * Busca um documento por ID com o tipo de validação.
  */
 export async function getDocumentById(documentId) {

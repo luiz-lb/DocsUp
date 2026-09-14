@@ -36,6 +36,17 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
+    // Só busca a sessão de colaborador quando NÃO estamos na área do fornecedor
+    // (portal, login/cadastro/MFA de fornecedor ou Fase 2). Evita chamar o /me
+    // interno em telas que são exclusivas do fornecedor.
+    const path = window.location.pathname;
+    const isSupplierArea = path.startsWith('/fornecedor') || path.startsWith('/fase2');
+
+    if (isSupplierArea) {
+      setIsLoading(false);
+      return;
+    }
+
     findCookie().finally(() => setIsLoading(false));
   }, []);
 

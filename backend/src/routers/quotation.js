@@ -24,6 +24,9 @@ router.post('/rounds/addInvite', verificarToken, quotationController.addInviteTo
 // Compara múltiplas cotações de uma rodada (gráficos comparativos)
 router.post('/rounds/:roundId/compare', verificarToken, quotationController.compareQuotations);
 
+// Busca fornecedor cadastrado por email/cnpj (modal de convite)
+router.get('/supplier-lookup', verificarToken, quotationController.lookupSupplierForInvite);
+
 // ─── Portal do Fornecedor ──────────────────────────────────────────────────────
 // Busca dados do convite pelo token (público — para pré-carregar a tela)
 router.get('/invite/:token', quotationController.getInviteByToken);

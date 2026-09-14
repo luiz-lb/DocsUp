@@ -510,15 +510,17 @@ export async function compareQuotations(roundId, quotationIds) {
         const nrTypes = await quotationModel.getNrTypesByIds(nrTypeIds);
         const docTypes = await quotationModel.getDocumentTypesByIds(docTypeIds);
 
+        // Total de colaboradores vem do CADASTRO do fornecedor (suppliers.employee_count),
+        // não da soma das declarações por NR.
+        const supplierIds = [...new Set(details.map((q) => q.supplier_id))];
+        const employeeCounts = await supplierModel.getEmployeeCountsByIds(supplierIds);
+        const employeeCountMap = new Map(employeeCounts.map((s) => [s.id, s.employee_count]));
+
         // Monta a resposta normalizada por cotação
         const quotations = details.map((q) => {
             const nrMap = new Map((q.nrDeclarations ?? []).map((n) => [n.nr_type_id, n.employee_count]));
             const docSet = new Set(
                 (q.checklist ?? []).filter((c) => c.has_document).map((c) => c.document_type_id),
-            );
-
-            const totalEmployees = (q.nrDeclarations ?? []).reduce(
-                (sum, n) => sum + (n.employee_count ?? 0), 0,
             );
 
             return {
@@ -530,7 +532,8 @@ export async function compareQuotations(roundId, quotationIds) {
                 status: q.status,
                 ranking: q.ranking,
                 submittedAt: q.submitted_at,
-                totalDeclaredEmployees: totalEmployees,
+                // Colaboradores declarados no cadastro do fornecedor
+                totalDeclaredEmployees: employeeCountMap.get(q.supplier_id) ?? 0,
                 declaredDocumentsCount: docSet.size,
                 // vetores alinhados aos eixos para facilitar os gráficos
                 employeesByNr: nrTypeIds.map((id) => nrMap.get(id) ?? 0),
@@ -566,6 +569,45 @@ export async function compareQuotations(roundId, quotationIds) {
 }
 
 /**
+ * Busca dados de um fornecedor cadastrado por e-mail (qualquer contato) ou CNPJ.
+ * Usado pelo modal de convite para mostrar CNPJ + Razão Social (somente leitura).
+ *
+ * @param {{ email?: string, cnpj?: string }} query
+ * @returns {{ found: boolean, supplier: object|null }}
+ */
+export async function lookupSupplierForInvite({ email, cnpj }) {
+    try {
+        let supplier = null;
+
+        if (cnpj) {
+            const cleanCnpj = String(cnpj).replace(/\D/g, '');
+            const formattedCnpj = cleanCnpj.replace(
+                /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+                '$1.$2.$3/$4-$5'
+            );
+            supplier = await quotationModel.getSupplierBriefByCnpj(formattedCnpj);
+        } else if (email) {
+            supplier = await quotationModel.getSupplierBriefByContactEmail(email.trim());
+        }
+
+        if (!supplier) return { found: false, supplier: null };
+
+        return {
+            found: true,
+            supplier: {
+                id: supplier.id,
+                cnpj: supplier.cnpj,
+                razaoSocial: supplier.razao_social,
+                nomeFantasia: supplier.nome_fantasia,
+            },
+        };
+    } catch (error) {
+        console.error('lookupSupplierForInvite error:', error);
+        return { found: false, supplier: null };
+    }
+}
+
+/**
  * Lista os rounds de uma solicitação (painel interno).
  */
 export async function listRoundsByLaborRequest(laborRequestId) {
@@ -586,10 +628,10 @@ export async function listRoundsByLaborRequest(laborRequestId) {
  * @param {{ roundId, inviteeEmail, createdBy }} payload
  */
 export async function addInviteToRound(payload) {
-    const { roundId, inviteeEmail, createdBy } = payload;
+    const { roundId, inviteeEmail, inviteeCnpj, createdBy } = payload;
 
-    if (!roundId || !inviteeEmail) {
-        return { success: false, message: 'roundId e email do fornecedor são obrigatórios.' };
+    if (!roundId || (!inviteeEmail && !inviteeCnpj)) {
+        return { success: false, message: 'Informe o e-mail ou o CNPJ do fornecedor.' };
     }
 
     // Carrega o round para herdar o deadline e validar o status
@@ -606,20 +648,63 @@ export async function addInviteToRound(payload) {
         return { success: false, message: 'O prazo desta rodada já expirou. Não é possível adicionar novos convites.' };
     }
 
+    console.log("::::1");
+
+
+    // ── Convite por CNPJ: o fornecedor precisa já estar cadastrado ──────────
+    let resolvedSupplierId = null;
+    let emailForInvite = inviteeEmail ? inviteeEmail.trim() : null;
+
+    if (inviteeCnpj) {
+        const cleanCnpj = String(inviteeCnpj).replace(/\D/g, '');
+        const formattedCnpj = cleanCnpj.replace(
+            /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
+            '$1.$2.$3/$4-$5'
+        );
+        const supplier = await quotationModel.getSupplierBriefByCnpj(formattedCnpj);
+        if (!supplier) {
+            return { success: false, message: 'CNPJ não cadastrado. Para convite por CNPJ o fornecedor precisa já ter cadastro.' };
+        }
+        resolvedSupplierId = supplier.id;
+
+        // Usa o e-mail operacional (ou legal) do fornecedor para enviar o convite
+        const contacts = await supplierModel.getSupplierContactEmails(supplier.id);
+        const opContact = contacts.find((c) => c.contact_type === 1) ?? contacts[0];
+        emailForInvite = opContact?.email ?? null;
+    }
+
+    // ── Guarda contra convite duplicado para a MESMA empresa ────────────────
+    // Verifica se qualquer e-mail de contato do fornecedor (legal/op/financeiro)
+    // já recebeu esta solicitação de proposta (nesta rodada).
+    const checkEmail = emailForInvite ?? inviteeEmail;
+    if (checkEmail) {
+        const existing = await quotationModel.findExistingInviteForEmail(roundId, checkEmail);
+        if (existing) {
+            return {
+                success: false,
+                message: 'Esta empresa já foi convidada para esta rodada (um dos e-mails de contato já recebeu a solicitação).',
+            };
+        }
+    }
+
+    if (!emailForInvite) {
+        return { success: false, message: 'Não foi possível determinar um e-mail para enviar o convite.' };
+    }
+
     let transaction;
     let transactionDone = false;
 
     try {
         transaction = await trasaction.iniciarTransacao();
-
+        console.log("::::2");
         const token = generateToken();
         const inviteId = await quotationModel.insertQuotationInvite(transaction, {
             roundId,
-            supplierId: null,
-            inviteEmail: inviteeEmail,
+            supplierId: resolvedSupplierId,
+            inviteEmail: emailForInvite,
             inviteToken: token,
         });
-
+        console.log("::::3");
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
 
@@ -631,7 +716,7 @@ export async function addInviteToRound(payload) {
             const transporter = createMailTransport();
             await transporter.sendMail({
                 from: `"DocsUp Suprimentos" <${process.env.SMTP_USER}>`,
-                to: inviteeEmail,
+                to: emailForInvite,
                 subject: `Convite para cotação: ${round.labor_request_title}`,
                 html: `
                     <div style="font-family: sans-serif; max-width: 560px; margin: auto;">

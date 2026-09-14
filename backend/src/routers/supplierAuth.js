@@ -14,4 +14,8 @@ router.post('/logout', supplierAuth.logout);
 // Rota protegida — retorna dados do fornecedor logado
 router.get('/me', verificarTokenFornecedor, supplierAuth.getMe);
 
+// Perfil do fornecedor (edição de dados da empresa)
+router.get('/profile', verificarTokenFornecedor, supplierAuth.getProfile);
+router.put('/profile', verificarTokenFornecedor, supplierAuth.updateProfile);
+
 export default router;

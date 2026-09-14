@@ -20,7 +20,8 @@ import {
 import { formatCurrency, formatDateTime } from '../../../utils/formatters.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { useDisclosure } from '../../../hooks/useDisclosure.js';
-import { getQuotationRound, declareWinner, addInviteToRound } from '../api/quotationsApi.js';
+import { getQuotationRound, declareWinner, addInviteToRound, lookupSupplierForInvite } from '../api/quotationsApi.js';
+import { formatCnpj } from '../../../utils/formatters.js';
 import QuotationDetailModal from '../components/QuotationDetailModal/index.js';
 import QuotationCompareModal from '../components/QuotationCompareModal/index.js';
 
@@ -46,10 +47,15 @@ export default function QuotationRoundPage() {
   const [selectedQuotIds, setSelectedQuotIds] = useState([]);
 
   // Estado do modal "Convidar novo fornecedor"
+  const [inviteMode,        setInviteMode]        = useState('email'); // 'email' | 'cnpj'
   const [newInviteEmail,    setNewInviteEmail]    = useState('');
+  const [newInviteCnpj,     setNewInviteCnpj]     = useState('');
   const [isAddingInvite,    setIsAddingInvite]    = useState(false);
   const [inviteError,       setInviteError]       = useState('');
   const [inviteSuccess,     setInviteSuccess]     = useState(false);
+  // Fornecedor encontrado no lookup (CNPJ + Razão Social, somente leitura)
+  const [lookupSupplier,    setLookupSupplier]    = useState(null);
+  const [isLookingUp,       setIsLookingUp]       = useState(false);
 
   if (isLoading) return null;
   if (!round)    return <EmptyState title="Rodada de cotação não encontrada" />;
@@ -84,15 +90,41 @@ export default function QuotationRoundPage() {
     }
   };
 
+  // Busca fornecedor cadastrado (mostra CNPJ + Razão Social somente leitura)
+  const runSupplierLookup = async ({ email, cnpj }) => {
+    setLookupSupplier(null);
+    if ((email && email.includes('@')) || (cnpj && cnpj.replace(/\D/g, '').length === 14)) {
+      setIsLookingUp(true);
+      const result = await lookupSupplierForInvite({ email, cnpj });
+      setIsLookingUp(false);
+      setLookupSupplier(result.found ? result.supplier : null);
+    }
+  };
+
   const handleAddInvite = async () => {
     setInviteError('');
-    if (!newInviteEmail.trim()) {
+
+    const invitee = inviteMode === 'cnpj'
+      ? { cnpj: newInviteCnpj.trim() }
+      : { email: newInviteEmail.trim() };
+
+    if (inviteMode === 'email' && !invitee.email) {
       setInviteError('Informe o e-mail do fornecedor.');
       return;
     }
+    if (inviteMode === 'cnpj') {
+      if (newInviteCnpj.replace(/\D/g, '').length !== 14) {
+        setInviteError('Informe um CNPJ válido.');
+        return;
+      }
+      if (!lookupSupplier) {
+        setInviteError('CNPJ não encontrado na base. Para convite por CNPJ o fornecedor precisa estar cadastrado.');
+        return;
+      }
+    }
 
     setIsAddingInvite(true);
-    const result = await addInviteToRound(round.id, newInviteEmail.trim());
+    const result = await addInviteToRound(round.id, invitee);
     setIsAddingInvite(false);
 
     if (!result.success) {
@@ -102,14 +134,18 @@ export default function QuotationRoundPage() {
 
     setInviteSuccess(true);
     setNewInviteEmail('');
+    setNewInviteCnpj('');
     reload();
   };
 
   const handleCloseInviteModal = () => {
     inviteModal.close();
+    setInviteMode('email');
     setNewInviteEmail('');
+    setNewInviteCnpj('');
     setInviteError('');
     setInviteSuccess(false);
+    setLookupSupplier(null);
   };
 
   // ── Comparação ──────────────────────────────────────────────────────────
@@ -148,6 +184,11 @@ export default function QuotationRoundPage() {
       key: 'supplier_name',
       header: 'Fornecedor',
       render: (row) => row.supplier_name ?? row.i_invite_email ?? '—',
+    },
+    {
+      key: 'supplier_cnpj',
+      header: 'CNPJ',
+      render: (row) => (row.supplier_cnpj ? formatCnpj(row.supplier_cnpj) : '—'),
     },
     {
       key: 'i_status',
@@ -342,26 +383,93 @@ export default function QuotationRoundPage() {
           <Banner
             tone="success"
             title="Convite enviado!"
-            description={`O e-mail de convite foi enviado. O fornecedor tem até ${formatDateTime(round.deadline)} para responder.`}
+            description={`O convite foi enviado. O fornecedor tem até ${formatDateTime(round.deadline)} para responder.`}
           />
         ) : (
           <>
-            <FormField
-              label="E-mail do fornecedor"
-              hint={`O convite usa o mesmo prazo da rodada: ${formatDateTime(round.deadline)}.`}
-              required
-            >
-              <input
-                type="email"
-                value={newInviteEmail}
-                onChange={(e) => setNewInviteEmail(e.target.value)}
-                placeholder="email@fornecedor.com.br"
-                disabled={isAddingInvite}
-                autoFocus
-              />
-            </FormField>
+            {/* Alternância: convidar por e-mail ou por CNPJ (já cadastrado) */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <Button
+                size="sm"
+                variant={inviteMode === 'email' ? 'primary' : 'secondary'}
+                onClick={() => { setInviteMode('email'); setInviteError(''); setLookupSupplier(null); }}
+              >
+                Por e-mail
+              </Button>
+              <Button
+                size="sm"
+                variant={inviteMode === 'cnpj' ? 'primary' : 'secondary'}
+                onClick={() => { setInviteMode('cnpj'); setInviteError(''); setLookupSupplier(null); }}
+              >
+                Por CNPJ
+              </Button>
+            </div>
+
+            {inviteMode === 'email' ? (
+              <FormField
+                label="E-mail do fornecedor"
+                hint={`O convite usa o mesmo prazo da rodada: ${formatDateTime(round.deadline)}.`}
+                required
+              >
+                <input
+                  type="email"
+                  value={newInviteEmail}
+                  onChange={(e) => setNewInviteEmail(e.target.value)}
+                  onBlur={() => runSupplierLookup({ email: newInviteEmail.trim() })}
+                  placeholder="email@fornecedor.com.br"
+                  disabled={isAddingInvite}
+                  autoFocus
+                />
+              </FormField>
+            ) : (
+              <FormField
+                label="CNPJ do fornecedor"
+                hint="O fornecedor precisa já estar cadastrado na base."
+                required
+              >
+                <input
+                  value={formatCnpj(newInviteCnpj)}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 14);
+                    setNewInviteCnpj(digits);
+                    runSupplierLookup({ cnpj: digits });
+                  }}
+                  placeholder="00.000.000/0000-00"
+                  disabled={isAddingInvite}
+                  autoFocus
+                />
+              </FormField>
+            )}
+
+            {/* Prévia somente-leitura do fornecedor encontrado */}
+            {isLookingUp && (
+              <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: '0.5rem 0 0' }}>Buscando fornecedor…</p>
+            )}
+            {lookupSupplier && (
+              <div style={{
+                marginTop: '0.75rem', padding: '0.75rem 0.9rem',
+                borderRadius: '10px', background: 'rgba(47,158,68,0.10)',
+                border: '1px solid rgba(47,158,68,0.4)',
+              }}>
+                <p style={{ margin: 0, fontSize: '0.72rem', textTransform: 'uppercase', opacity: 0.7 }}>
+                  Fornecedor cadastrado
+                </p>
+                <p style={{ margin: '0.15rem 0 0', fontWeight: 700 }}>{lookupSupplier.razaoSocial}</p>
+                <p style={{ margin: 0, fontSize: '0.82rem', opacity: 0.8 }}>
+                  CNPJ: {formatCnpj(lookupSupplier.cnpj)}
+                </p>
+              </div>
+            )}
+            {inviteMode === 'email' && newInviteEmail.includes('@') && !isLookingUp && !lookupSupplier && (
+              <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: '0.5rem 0 0' }}>
+                E-mail ainda não cadastrado — o convite será enviado por e-mail.
+              </p>
+            )}
+
             {inviteError && (
-              <Banner tone="danger" description={inviteError} />
+              <div style={{ marginTop: '0.75rem' }}>
+                <Banner tone="danger" description={inviteError} />
+              </div>
             )}
           </>
         )}

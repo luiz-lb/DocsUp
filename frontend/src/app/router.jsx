@@ -25,9 +25,11 @@ const SupplierLoginPage = lazy(() => import('../features/suppliers/pages/Supplie
 const SupplierMfaPage = lazy(() => import('../features/suppliers/pages/SupplierMfaPage.jsx'));
 const SupplierRegisterPage = lazy(() => import('../features/suppliers/pages/SupplierRegisterPage.jsx'));
 const SupplierPortalPage = lazy(() => import('../features/suppliers/pages/SupplierPortalPage.jsx'));
+const SupplierMyProfilePage = lazy(() => import('../features/suppliers/pages/SupplierMyProfilePage.jsx'));
 
 const DocumentCenterPage = lazy(() => import('../features/documents/pages/DocumentCenterPage.jsx'));
 const DocumentReviewPage = lazy(() => import('../features/documents/pages/DocumentReviewPage.jsx'));
+const SupplierDocumentsPage = lazy(() => import('../features/documents/pages/SupplierDocumentsPage.jsx'));
 
 const Phase2UploadPage = lazy(() => import('../features/employees/pages/Phase2UploadPage.jsx'));
 const EmployeeListPage = lazy(() => import('../features/employees/pages/EmployeeListPage.jsx'));
@@ -70,6 +72,7 @@ export const router = createBrowserRouter([
 
               { path: ROUTES.documents.center, element: <DocumentCenterPage /> },
               { path: ROUTES.documents.review, element: <DocumentReviewPage /> },
+              { path: ROUTES.documents.supplierDocs, element: <SupplierDocumentsPage /> },
 
               { path: ROUTES.employees.list, element: <EmployeeListPage /> },
 
@@ -96,6 +99,7 @@ export const router = createBrowserRouter([
       // Portal do fornecedor: usa seu próprio shell com sidebar (SupplierLayout),
       // por isso fica fora do PublicLayout para ocupar a tela inteira.
       { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
+      { path: ROUTES.suppliers.myProfile, element: <SupplierMyProfilePage /> },
     ],
   },
 ]);

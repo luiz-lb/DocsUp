@@ -37,13 +37,19 @@ export async function registerSupplier(payload) {
 }
 
 /**
- * Fase 1 do login: CNPJ + senha → backend envia OTP por email.
+ * Fase 1 do login: CNPJ OU e-mail operacional + senha → backend envia OTP.
  * POST /supplier/auth/login
+ * @param {string} identifier  — CNPJ ou e-mail operacional
+ * @param {string} password
+ * @param {'cnpj'|'email'} mode
  * Retorna { success: true, body: { requiresMfa: true, devOtp? } }
  */
-export async function loginSupplier(cnpj, password) {
+export async function loginSupplier(identifier, password, mode = 'cnpj') {
   try {
-    const result = await api.post('/supplier/auth/login', { cnpj, password });
+    const payload = mode === 'email'
+      ? { email: identifier, password }
+      : { cnpj: identifier, password };
+    const result = await api.post('/supplier/auth/login', payload);
     return result.data;
   } catch (error) {
     console.error('loginSupplier error:', error);
@@ -88,6 +94,35 @@ export async function meSupplier() {
     return result.data;
   } catch {
     return { success: false };
+  }
+}
+
+/**
+ * Busca o perfil completo do fornecedor autenticado (dados, contatos, regiões).
+ * GET /supplier/auth/profile
+ */
+export async function getSupplierProfile() {
+  try {
+    const result = await api.get('/supplier/auth/profile');
+    if (!result.data.success) return null;
+    return result.data.body;
+  } catch (error) {
+    console.error('getSupplierProfile error:', error);
+    return null;
+  }
+}
+
+/**
+ * Atualiza o perfil do fornecedor autenticado.
+ * PUT /supplier/auth/profile
+ */
+export async function updateSupplierProfile(payload) {
+  try {
+    const result = await api.put('/supplier/auth/profile', payload);
+    return result.data;
+  } catch (error) {
+    console.error('updateSupplierProfile error:', error);
+    return { success: false, body: { message: 'Erro ao atualizar perfil.' } };
   }
 }
 

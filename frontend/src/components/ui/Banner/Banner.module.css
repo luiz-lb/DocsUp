@@ -5,6 +5,7 @@
     padding: 1em 1.25em;
     border-radius: var(--radius-md, 10px);
     border: 1px solid transparent;
+    margin-bottom: 1rem;
 }
 
 .icon {

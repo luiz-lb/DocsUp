@@ -15,6 +15,8 @@ export default function SupplierMfaPage() {
   const devOtp = location.state?.devOtp ?? null;
   // Token de proposta propagado desde a tela de login
   const tokenProposta = location.state?.tokenProposta ?? null;
+  // Token da Fase 2 propagado desde a tela de login
+  const fase2Token = location.state?.fase2Token ?? null;
 
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +32,12 @@ export default function SupplierMfaPage() {
 
     if (!result.success) {
       setError(result.body?.message ?? 'Código inválido. Confira o e-mail enviado.');
+      return;
+    }
+
+    // Se veio da Fase 2, redireciona direto para o envio de documentos
+    if (fase2Token) {
+      navigate(ROUTES.employees.phase2(fase2Token));
       return;
     }
 
