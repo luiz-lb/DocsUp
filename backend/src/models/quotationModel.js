@@ -208,6 +208,43 @@ export async function getInviteByToken(token) {
 }
 
 /**
+ * Busca um convite pelo ID, com dados do round, da solicitação e do fornecedor
+ * (quando vinculado). Usado para reenviar o e-mail de convite.
+ */
+export async function getInviteByIdFull(inviteId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('id', sql.Int, inviteId)
+        .query(`
+            SELECT
+                i.id, i.round_id, i.supplier_id, i.invite_email, i.invite_token, i.[status],
+                r.deadline        AS round_deadline,
+                r.[status]        AS round_status,
+                lr.title          AS labor_request_title,
+                lr.id             AS labor_request_id,
+                s.cnpj            AS supplier_cnpj,
+                s.razao_social    AS supplier_name
+            FROM quotation_invites AS i
+            INNER JOIN quotation_rounds AS r ON r.id = i.round_id
+            INNER JOIN labor_requests   AS lr ON lr.id = r.labor_request_id
+            LEFT  JOIN suppliers        AS s ON s.id = i.supplier_id
+            WHERE i.id = @id
+        `);
+    return result.recordset[0] ?? null;
+}
+
+/**
+ * Atualiza o e-mail de um convite (usado ao reenviar para um e-mail confirmado).
+ */
+export async function updateInviteEmail(inviteId, email) {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('id', sql.Int, inviteId)
+        .input('email', sql.NVarChar(200), email)
+        .query('UPDATE quotation_invites SET invite_email = @email WHERE id = @id');
+}
+
+/**
  * Marca um convite como visualizado (status=1).
  */
 export async function markInviteViewed(inviteId) {

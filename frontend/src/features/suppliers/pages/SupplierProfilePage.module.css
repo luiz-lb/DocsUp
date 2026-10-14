@@ -55,3 +55,10 @@
         grid-template-columns: 1fr;
     }
 }
+
+.emptyMsg {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    color: var(--color-textMuted, #6b7280);
+    font-style: italic;
+}

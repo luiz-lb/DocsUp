@@ -22,8 +22,8 @@ export default function Phase2CountdownBanner({ deadline }) {
       title={isExpired ? 'Prazo estourado' : 'Envie os colaboradores dentro do prazo'}
       description={
         isExpired
-          ? 'O fornecedor sera marcado como DESCLASSIFICADO POR DOC. Suprimentos foi alertado para considerar o 2o colocado.'
-          : 'Apos o prazo, o fornecedor e desclassificado por documentacao e perde pontos no score de qualificacao.'
+          ? 'O fornecedor será marcado como DESCLASSIFICADO POR DOC. Suprimentos foi alertado para considerar o 2º colocado.'
+          : 'Após o prazo, o fornecedor é desclassificado por documentação e perde pontos no score de qualificação.'
       }
       actions={
         <div className={styles.timer}>

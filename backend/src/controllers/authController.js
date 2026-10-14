@@ -65,9 +65,10 @@ export async function registerNewUser(req, res, next) {
 
 export async function getMe(req, res, next) {
     try{
-        const usuario = req.usuario; 
+        const usuario = req.usuario;
 
-        console.log('Informações do usuário extraídas do token:', usuario);
+        // Evita logar PII do usuário (nome/email) — registra apenas o id.
+        console.log(`getMe: usuário ${usuario?.id} autenticado.`);
 
         return res.status(200).json({ success: true, body: { message: 'Usuário autenticado.', id: usuario.id, email: usuario.email, name: usuario.name, department: usuario.department, role: usuario.role } });
     } catch (error) {

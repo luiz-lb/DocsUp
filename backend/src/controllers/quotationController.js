@@ -159,6 +159,31 @@ export async function addInviteToRound(req, res) {
 }
 
 /**
+ * Reenvia o e-mail de convite de uma cotação.
+ * POST /quotations/invites/:inviteId/resend
+ * Body: { email? } — e-mail confirmado (opcional; para CNPJ usa o operacional).
+ */
+export async function resendInvite(req, res) {
+    try {
+        const inviteId = Number(req.params.inviteId);
+        const { email } = req.body ?? {};
+
+        if (!Number.isInteger(inviteId) || inviteId <= 0) {
+            return res.status(400).json({ success: false, body: { message: 'Convite inválido.' } });
+        }
+
+        const result = await quotationService.resendInvite(inviteId, email);
+        if (!result.success) {
+            return res.status(400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('resendInvite controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
  * Busca dados de um fornecedor cadastrado por e-mail ou CNPJ (para o modal de convite).
  * GET /quotations/supplier-lookup?email=... | ?cnpj=...
  * Retorna { found, supplier: { id, cnpj, razaoSocial, nomeFantasia } | null }

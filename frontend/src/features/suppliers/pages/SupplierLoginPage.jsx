@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { LuLogIn, LuUserPlus } from 'react-icons/lu';
 import { Card, Button, FormField, Banner } from '../../../components/ui/index.js';
 import { ROUTES } from '../../../constants/routes.js';
@@ -12,12 +12,15 @@ const IDENTIFIER = { CNPJ: 'cnpj', EMAIL: 'email' };
 
 export default function SupplierLoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   // Token de proposta (cotação) vindo na URL: ?tokenProposta=XXX
   const tokenProposta = searchParams.get('tokenProposta');
   // Token da Fase 2 vindo na URL: ?fase2=XXX
   const fase2Token = searchParams.get('fase2');
+  // Rota de origem quando o guard redirecionou para o login
+  const returnTo = location.state?.returnTo ?? null;
 
   const { loginPhase1 } = useSupplierAuth();
 
@@ -50,6 +53,7 @@ export default function SupplierLoginPage() {
           devOtp: result.body?.devOtp ?? null,
           tokenProposta: tokenProposta ?? null,
           fase2Token: fase2Token ?? null,
+          returnTo: returnTo ?? null,
         },
       });
     }

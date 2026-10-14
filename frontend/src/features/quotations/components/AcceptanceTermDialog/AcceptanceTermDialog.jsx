@@ -26,26 +26,26 @@ export default function AcceptanceTermDialog({ open, onClose, onAccept, isSubmit
         <>
           <Button variant="ghost" onClick={onClose}>Voltar e revisar</Button>
           <Button icon={LuSignature} disabled={!canAccept} isLoading={isSubmitting} onClick={onAccept}>
-            Assinar e enviar cotacao
+            Assinar e enviar cotação
           </Button>
         </>
       }
     >
       <p className={styles.paragraph}>
-        Ao assinar este termo, ficara registrado nesta cotacao o seu IP e o horario exato da confirmacao,
+        Ao assinar este termo, ficará registrado nesta cotação o seu IP e o horário exato da confirmação,
         com validade de aceite digital.
       </p>
 
       <label className={styles.checkRow}>
         <input type="checkbox" checked={checklistAck} onChange={(event) => setChecklistAck(event.target.checked)} />
-        <span>Declaro que as informacoes de documentacao da empresa preenchidas nesta cotacao sao verdadeiras.</span>
+        <span>Declaro que as informações de documentação da empresa preenchidas nesta cotação são verdadeiras.</span>
       </label>
 
       <label className={styles.checkRow}>
         <input type="checkbox" checked={omissionAck} onChange={(event) => setOmissionAck(event.target.checked)} />
         <span>
-          Estou ciente de que a omissao de documentacao obrigatoria pode causar atraso no pagamento e ate
-          mudanca ou cancelamento do contrato.
+          Estou ciente de que a omissão de documentação obrigatória pode causar atraso no pagamento e até
+          mudança ou cancelamento do contrato.
         </span>
       </label>
     </Modal>

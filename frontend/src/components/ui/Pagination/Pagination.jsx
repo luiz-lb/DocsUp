@@ -59,7 +59,7 @@ export default function Pagination({
       </div>
 
       <div className={styles.pageSize}>
-        <label htmlFor="pagination-page-size">Itens por pagina</label>
+        <label htmlFor="pagination-page-size">Itens por página</label>
         <select
           id="pagination-page-size"
           value={pageSize}
@@ -79,7 +79,7 @@ export default function Pagination({
           className={styles.navButton}
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          aria-label="Pagina anterior"
+          aria-label="Página anterior"
         >
           <LuChevronLeft />
         </button>
@@ -108,7 +108,7 @@ export default function Pagination({
           className={styles.navButton}
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          aria-label="Proxima pagina"
+          aria-label="Próxima página"
         >
           <LuChevronRight />
         </button>

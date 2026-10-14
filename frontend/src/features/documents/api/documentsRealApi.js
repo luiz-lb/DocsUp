@@ -1,4 +1,5 @@
 import { api } from '../../../utils/api.js';
+import { toErrorResult } from '../../../utils/apiError.js';
 
 // ─────────────────────────────────────────────
 // Central de documentos (dados reais do backend)
@@ -37,6 +38,6 @@ export async function setDocumentStatus(documentId, status, comments) {
     return result.data;
   } catch (error) {
     console.error('setDocumentStatus error:', error);
-    return { success: false, body: { message: 'Erro ao atualizar status.' } };
+    return toErrorResult(error, 'Erro ao atualizar status.');
   }
 }

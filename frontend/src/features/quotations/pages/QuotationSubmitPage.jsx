@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LuFileCheck, LuSend, LuLogIn } from 'react-icons/lu';
+import { LuFileCheck, LuSend, LuLogIn, LuHouse } from 'react-icons/lu';
 import { Card, Button, FormField, Banner, CountdownTimer } from '../../../components/ui/index.js';
 import { formatCurrency, formatDateTime } from '../../../utils/formatters.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
@@ -75,6 +75,13 @@ export default function QuotationSubmitPage() {
     const record = submitted ?? existingQuotation;
     return (
       <Card tone="dark" className={styles.card}>
+        <Button
+          icon={LuHouse}
+          onClick={() => navigate(ROUTES.suppliers.portal)}
+          className={styles.homeButton}
+        >
+          Ir para o início
+        </Button>
         <Card.Body className={styles.successBody}>
           <LuFileCheck className={styles.successIcon} />
           <h1 className={styles.title}>Cotação enviada com sucesso</h1>
@@ -90,6 +97,17 @@ export default function QuotationSubmitPage() {
 
   // IDs dos documentos obrigatórios para o checklist da empresa
   const requiredDocIds = (laborRequest.requiredDocuments ?? []).map((d) => d.document_type_id);
+
+  // NRs exigidas para a atividade (vêm do backend, não de mock),
+  // ordenadas pelo número da NR (NR-6 antes de NR-10, etc.)
+  const nrNumber = (code) => Number(String(code ?? '').replace(/\D/g, '')) || 0;
+  const requiredNrTypes = (laborRequest.requiredNrTypes ?? [])
+    .map((nr) => ({
+      id: nr.nr_type_id,
+      code: nr.nr_code,
+      name: nr.nr_name,
+    }))
+    .sort((a, b) => nrNumber(a.code) - nrNumber(b.code));
 
   const handleAccept = async () => {
     setSubmitError('');
@@ -154,7 +172,7 @@ export default function QuotationSubmitPage() {
           <p className={styles.hint}>
             Não envie dados de colaboradores agora — apenas quantos já possuem cada NR.
           </p>
-          <NrDeclarationsForm values={nrValues} onChange={setNrValues} />
+          <NrDeclarationsForm nrTypes={requiredNrTypes} values={nrValues} onChange={setNrValues} />
         </div>
 
         {/* Checklist da empresa */}

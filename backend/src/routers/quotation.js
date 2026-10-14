@@ -27,6 +27,9 @@ router.post('/rounds/:roundId/compare', verificarToken, quotationController.comp
 // Busca fornecedor cadastrado por email/cnpj (modal de convite)
 router.get('/supplier-lookup', verificarToken, quotationController.lookupSupplierForInvite);
 
+// Reenvia o e-mail de convite de uma cotação
+router.post('/invites/:inviteId/resend', verificarToken, quotationController.resendInvite);
+
 // ─── Portal do Fornecedor ──────────────────────────────────────────────────────
 // Busca dados do convite pelo token (público — para pré-carregar a tela)
 router.get('/invite/:token', quotationController.getInviteByToken);

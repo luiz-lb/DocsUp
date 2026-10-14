@@ -1,4 +1,5 @@
 import { api } from '../../../utils/api.js';
+import { toErrorResult } from '../../../utils/apiError.js';
 
 // ---------------------------------------------------------------------------
 // Labor Requests
@@ -27,20 +28,21 @@ export async function getLaborRequestById(id) {
     return result.data;
   } catch (error) {
     console.error('Erro ao buscar solicitação:', error);
-    return { success: false, body: { message: 'Erro ao buscar solicitação.' } };
+    return toErrorResult(error, 'Erro ao buscar solicitação.');
   }
 }
 
 export async function createLaborRequest(payload) {
   try {
     const result = await api.post('/laborRequest/create', payload);
+    // Propaga a mensagem específica do backend quando success=false
     if (!result.data.success) {
-      return { success: false, body: { message: 'Erro ao criar solicitação.' } };
+      return result.data;
     }
     return result.data;
   } catch (error) {
     console.error('Erro ao criar solicitação:', error);
-    return { success: false, body: { message: 'Erro ao criar solicitação.' } };
+    return toErrorResult(error, 'Erro ao criar solicitação.');
   }
 }
 
@@ -87,7 +89,7 @@ export async function submitApproval(laborRequestId, decision, comments, documen
     return result.data;
   } catch (error) {
     console.error('Erro ao registrar aprovação:', error);
-    return { success: false, body: { message: 'Erro ao registrar aprovação.' } };
+    return toErrorResult(error, 'Erro ao registrar aprovação.');
   }
 }
 
@@ -104,7 +106,7 @@ export async function updateDocsRequired(laborRequestId, documentTypeIds) {
     return result.data;
   } catch (error) {
     console.error('Erro ao atualizar documentos obrigatórios:', error);
-    return { success: false, body: { message: 'Erro ao atualizar documentos.' } };
+    return toErrorResult(error, 'Erro ao atualizar documentos.');
   }
 }
 

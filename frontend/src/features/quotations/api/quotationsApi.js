@@ -1,4 +1,5 @@
 import { api } from '../../../utils/api.js';
+import { toErrorResult } from '../../../utils/apiError.js';
 
 // ─────────────────────────────────────────────
 // Painel interno (colaboradores)
@@ -14,7 +15,7 @@ export async function createRound(payload) {
     return result.data;
   } catch (error) {
     console.error('createRound error:', error);
-    return { success: false, body: { message: 'Erro ao criar rodada.' } };
+    return toErrorResult(error, 'Erro ao criar rodada.');
   }
 }
 
@@ -81,7 +82,7 @@ export async function declareWinner(roundId, winnerQuotationId, deadlineHours) {
     return result.data;
   } catch (error) {
     console.error('declareWinner error:', error);
-    return { success: false, body: { message: 'Erro ao declarar vencedor.' } };
+    return toErrorResult(error, 'Erro ao declarar vencedor.');
   }
 }
 
@@ -118,7 +119,23 @@ export async function addInviteToRound(roundId, invitee) {
     return result.data;
   } catch (error) {
     console.error('addInviteToRound error:', error);
-    return { success: false, body: { message: 'Erro ao adicionar convite.' } };
+    return toErrorResult(error, 'Erro ao adicionar convite.');
+  }
+}
+
+/**
+ * Reenvia o e-mail de convite de uma cotação.
+ * POST /quotations/invites/:inviteId/resend
+ * @param {number} inviteId
+ * @param {string} [email] — e-mail confirmado (para CNPJ, o backend usa o operacional)
+ */
+export async function resendInvite(inviteId, email) {
+  try {
+    const result = await api.post(`/quotations/invites/${inviteId}/resend`, { email });
+    return result.data;
+  } catch (error) {
+    console.error('resendInvite error:', error);
+    return toErrorResult(error, 'Erro ao reenviar o convite.');
   }
 }
 
@@ -171,6 +188,6 @@ export async function submitQuotation(token, payload) {
     return result.data;
   } catch (error) {
     console.error('submitQuotation error:', error);
-    return { success: false, body: { message: 'Erro ao enviar cotação.' } };
+    return toErrorResult(error, 'Erro ao enviar cotação.');
   }
 }

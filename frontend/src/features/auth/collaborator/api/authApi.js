@@ -1,4 +1,5 @@
 import { api } from '../../../../utils/api';
+import { toErrorResult } from '../../../../utils/apiError.js';
 
 //End Point POST para logar na plataforma - User Everest
 export async function loginApi(email, password) {
@@ -7,11 +8,11 @@ export async function loginApi(email, password) {
 
         return result.data;
     } catch (erro) {
-        if (erro.response && erro.response.status === 401) {
-            return erro.response.data
-        } else {
-            return { success: false, body: { message: "Erro interno ao tentar conectar com o servidor." } }
+        // Propaga a mensagem específica do backend (ex.: "Senha incorreta.")
+        if (erro.response?.data) {
+            return erro.response.data;
         }
+        return toErrorResult(erro, 'Erro interno ao tentar conectar com o servidor.');
     }
 }
 
@@ -22,10 +23,9 @@ export async function me(){
 
         return result.data;
     } catch (erro) {
-        if (erro.response && erro.response.status === 401) {
-            return erro.response.data
-        } else {
-            return { success: false, body: { message: "Erro interno ao tentar conectar com o servidor." } }
+        if (erro.response?.data) {
+            return erro.response.data;
         }
+        return toErrorResult(erro, 'Erro interno ao tentar conectar com o servidor.');
     }
 }

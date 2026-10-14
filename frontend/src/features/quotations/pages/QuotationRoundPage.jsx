@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { LuTrophy, LuExternalLink, LuUserPlus, LuChartColumn, LuX } from 'react-icons/lu';
+import { LuTrophy, LuExternalLink, LuUserPlus, LuChartColumn, LuX, LuMailCheck } from 'react-icons/lu';
 import {
   PageHeader,
   DataTable,
@@ -20,7 +20,7 @@ import {
 import { formatCurrency, formatDateTime } from '../../../utils/formatters.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { useDisclosure } from '../../../hooks/useDisclosure.js';
-import { getQuotationRound, declareWinner, addInviteToRound, lookupSupplierForInvite } from '../api/quotationsApi.js';
+import { getQuotationRound, declareWinner, addInviteToRound, lookupSupplierForInvite, resendInvite } from '../api/quotationsApi.js';
 import { formatCnpj } from '../../../utils/formatters.js';
 import QuotationDetailModal from '../components/QuotationDetailModal/index.js';
 import QuotationCompareModal from '../components/QuotationCompareModal/index.js';
@@ -36,6 +36,7 @@ export default function QuotationRoundPage() {
   const detailModal      = useDisclosure(false);
   const inviteModal      = useDisclosure(false);
   const compareModal     = useDisclosure(false);
+  const resendModal      = useDisclosure(false);
 
   const [candidate,    setCandidate]    = useState(null);
   const [selectedRow,  setSelectedRow]  = useState(null);
@@ -56,6 +57,13 @@ export default function QuotationRoundPage() {
   // Fornecedor encontrado no lookup (CNPJ + Razão Social, somente leitura)
   const [lookupSupplier,    setLookupSupplier]    = useState(null);
   const [isLookingUp,       setIsLookingUp]       = useState(false);
+
+  // Estado do reenvio de convite (para fornecedores que ainda não responderam)
+  const [resendTarget,   setResendTarget]   = useState(null);
+  const [resendEmail,    setResendEmail]    = useState('');
+  const [isResending,    setIsResending]    = useState(false);
+  const [resendError,    setResendError]    = useState('');
+  const [resendFeedback, setResendFeedback] = useState(null);
 
   if (isLoading) return null;
   if (!round)    return <EmptyState title="Rodada de cotação não encontrada" />;
@@ -148,6 +156,39 @@ export default function QuotationRoundPage() {
     setLookupSupplier(null);
   };
 
+  // ── Reenvio de convite ────────────────────────────────────────────────────
+  const openResend = (row) => {
+    setResendTarget(row);
+    setResendEmail(row.i_invite_email ?? '');
+    setResendError('');
+    resendModal.open();
+  };
+
+  const closeResend = () => {
+    resendModal.close();
+    setResendTarget(null);
+    setResendEmail('');
+    setResendError('');
+  };
+
+  const handleResendConfirm = async () => {
+    setResendError('');
+    if (!resendEmail.trim() || !resendEmail.includes('@')) {
+      setResendError('Confirme um e-mail válido para o reenvio.');
+      return;
+    }
+    setIsResending(true);
+    const result = await resendInvite(resendTarget.i_id, resendEmail.trim());
+    setIsResending(false);
+
+    if (!result.success) {
+      setResendError(result.body?.message ?? 'Erro ao reenviar o convite.');
+      return;
+    }
+    setResendFeedback(`Convite reenviado para ${result.body?.email ?? resendEmail.trim()}.`);
+    closeResend();
+  };
+
   // ── Comparação ──────────────────────────────────────────────────────────
   const toggleCompareMode = () => {
     setCompareMode((prev) => !prev);
@@ -236,6 +277,20 @@ export default function QuotationRoundPage() {
             </Button>
           );
         }
+        // Fornecedor ainda não enviou a proposta e a rodada está aberta:
+        // permite reenviar o e-mail do convite.
+        if (round.status === 0 && row.q_id == null) {
+          return (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={LuMailCheck}
+              onClick={(e) => { e.stopPropagation(); openResend(row); }}
+            >
+              Reenviar e-mail
+            </Button>
+          );
+        }
         // Ícone de detalhe quando cotação existe mas a rodada já foi encerrada
         if (row.q_id != null) {
           return <LuExternalLink className="icon-muted" aria-hidden="true" />;
@@ -301,6 +356,10 @@ export default function QuotationRoundPage() {
         />
       )}
 
+      {resendFeedback && (
+        <Banner tone="success" description={resendFeedback} />
+      )}
+
       {compareMode && (
         <Banner
           tone="info"
@@ -356,6 +415,55 @@ export default function QuotationRoundPage() {
           `Confirma ${candidate.supplier_name ?? candidate.i_invite_email} como vencedor por ${formatCurrency(candidate.q_total_value)}? Um prazo de 72h para envio dos documentos dos colaboradores será iniciado imediatamente.`
         }
       />
+
+      {/* Modal de reenvio de convite — confirma o e-mail do destinatário */}
+      <Modal
+        open={resendModal.isOpen}
+        onClose={closeResend}
+        title="Reenviar convite"
+        maxWidth="xs"
+        actions={
+          <>
+            <Button variant="ghost" onClick={closeResend}>Cancelar</Button>
+            <Button icon={LuMailCheck} isLoading={isResending} onClick={handleResendConfirm}>
+              Confirmar e reenviar
+            </Button>
+          </>
+        }
+      >
+        {resendTarget && (
+          <>
+            <p style={{ margin: '0 0 1rem', fontWeight: 700 }}>
+              {resendTarget.supplier_name ?? resendTarget.i_invite_email}
+              {resendTarget.supplier_cnpj && (
+                <span style={{ fontWeight: 400, opacity: 0.75 }}> · {formatCnpj(resendTarget.supplier_cnpj)}</span>
+              )}
+            </p>
+            <FormField
+              label="E-mail do destinatário"
+              hint={
+                resendTarget.supplier_cnpj
+                  ? 'Fornecedor cadastrado: confirme ou ajuste o e-mail (padrão: responsável operacional).'
+                  : 'Confirme o e-mail para o qual o convite será reenviado.'
+              }
+              required
+            >
+              <input
+                type="email"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                placeholder="email@fornecedor.com.br"
+                autoFocus
+              />
+            </FormField>
+            {resendError && (
+              <div style={{ marginTop: '0.75rem' }}>
+                <Banner tone="danger" description={resendError} />
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
 
       {/* Modal de convite adicional */}
       <Modal

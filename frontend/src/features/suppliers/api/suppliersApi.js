@@ -1,4 +1,5 @@
 import { api } from '../../../utils/api.js';
+import { toErrorResult } from '../../../utils/apiError.js';
 
 // ─────────────────────────────────────────────
 // Auth do Fornecedor
@@ -32,7 +33,7 @@ export async function registerSupplier(payload) {
     return result.data;
   } catch (error) {
     console.error('registerSupplier error:', error);
-    return { success: false, body: { message: 'Erro ao cadastrar fornecedor.' } };
+    return toErrorResult(error, 'Erro ao cadastrar fornecedor.');
   }
 }
 
@@ -53,7 +54,7 @@ export async function loginSupplier(identifier, password, mode = 'cnpj') {
     return result.data;
   } catch (error) {
     console.error('loginSupplier error:', error);
-    return { success: false, body: { message: 'Erro ao fazer login.' } };
+    return toErrorResult(error, 'Erro ao fazer login.');
   }
 }
 
@@ -68,7 +69,7 @@ export async function verifyMfaCode(otp) {
     return result.data;
   } catch (error) {
     console.error('verifyMfaCode error:', error);
-    return { success: false, body: { message: 'Erro ao verificar código.' } };
+    return toErrorResult(error, 'Erro ao verificar código.');
   }
 }
 
@@ -122,7 +123,45 @@ export async function updateSupplierProfile(payload) {
     return result.data;
   } catch (error) {
     console.error('updateSupplierProfile error:', error);
-    return { success: false, body: { message: 'Erro ao atualizar perfil.' } };
+    return toErrorResult(error, 'Erro ao atualizar perfil.');
+  }
+}
+
+// ─────────────────────────────────────────────
+// Painel interno — base de fornecedores (dados reais)
+// ─────────────────────────────────────────────
+
+/**
+ * Lista fornecedores cadastrados (painel interno).
+ * GET /suppliers?search=&status=
+ */
+export async function listSuppliers(filters = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.status !== undefined && filters.status !== '') params.append('status', filters.status);
+    const result = await api.get(`/suppliers?${params.toString()}`);
+    if (!result.data.success) return [];
+    return result.data.body?.suppliers ?? [];
+  } catch (error) {
+    console.error('listSuppliers error:', error);
+    return [];
+  }
+}
+
+/**
+ * Detalhe completo de um fornecedor (painel interno).
+ * GET /suppliers/:id
+ * @returns {{ supplier, contacts, regions, categories } | null}
+ */
+export async function getSupplierDetail(id) {
+  try {
+    const result = await api.get(`/suppliers/${id}`);
+    if (!result.data.success) return null;
+    return result.data.body;
+  } catch (error) {
+    console.error('getSupplierDetail error:', error);
+    return null;
   }
 }
 
@@ -194,61 +233,4 @@ export async function getMyQuotations() {
     console.error('getMyQuotations error:', error);
     return [];
   }
-}
-import { mockDelay } from '../../../hooks/useMockApi.js';
-
-const suppliers = [
-  {
-    id: 1,
-    cnpj: '12.345.678/0001-90',
-    razaoSocial: 'Eletro Instala Servicos Eletricos LTDA',
-    nomeFantasia: 'Eletro Instala',
-    status: 1,
-    overallScore: 87.4,
-    employeeCount: 42,
-    city: 'Sao Paulo',
-    state: 'SP',
-    categoryIds: [1],
-    regionIds: [1, 2],
-    contacts: [
-      { name: 'Roberto Nunes', email: 'roberto@eletroinstala.com.br', type: 0 },
-      { name: 'Patricia Melo', email: 'patricia@eletroinstala.com.br', type: 1 },
-    ],
-  },
-  {
-    id: 2,
-    cnpj: '98.765.432/0001-10',
-    razaoSocial: 'Solda Forte Caldeiraria e Estruturas S.A.',
-    nomeFantasia: 'Solda Forte',
-    status: 1,
-    overallScore: 71.2,
-    employeeCount: 28,
-    city: 'Barueri',
-    state: 'SP',
-    categoryIds: [4],
-    regionIds: [1],
-    contacts: [{ name: 'Igor Tavares', email: 'igor@soldaforte.com.br', type: 0 }],
-  },
-  {
-    id: 3,
-    cnpj: '11.222.333/0001-44',
-    razaoSocial: 'Limpa Obra Servicos Gerais LTDA',
-    nomeFantasia: 'Limpa Obra',
-    status: 0,
-    overallScore: 0,
-    employeeCount: 15,
-    city: 'Campinas',
-    state: 'SP',
-    categoryIds: [3],
-    regionIds: [2],
-    contacts: [{ name: 'Sueli Cardoso', email: 'sueli@limpaobra.com.br', type: 0 }],
-  },
-];
-
-export function listSuppliers() {
-  return mockDelay([...suppliers]);
-}
-
-export function getSupplier(id) {
-  return mockDelay(suppliers.find((supplier) => supplier.id === Number(id)) ?? null);
 }

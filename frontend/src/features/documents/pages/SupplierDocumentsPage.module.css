@@ -32,3 +32,42 @@
   min-width: 200px;
   margin: 0;
 }
+
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.chevron {
+  color: var(--color-textMuted, #6b7280);
+  font-size: 1.1rem;
+}
+
+.drillHeader {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.drillTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.drillCount {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-textMuted, #6b7280);
+}

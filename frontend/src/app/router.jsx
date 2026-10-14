@@ -5,6 +5,7 @@ import PublicLayout from '../components/layout/PublicLayout/index.js';
 import RouteFallback from './RouteFallback.jsx';
 import { ROUTES } from '../constants/routes.js';
 import RequireAuth from '../features/auth/collaborator/RequireAuth.jsx';
+import RequireSupplierAuth from '../features/suppliers/RequireSupplierAuth.jsx';
 
 // Cada pagina e' code-split via React.lazy: rotas pouco usadas (fase 2,
 // cadastro de fornecedor) nao engordam o bundle inicial do painel interno.
@@ -98,8 +99,14 @@ export const router = createBrowserRouter([
       },
       // Portal do fornecedor: usa seu próprio shell com sidebar (SupplierLayout),
       // por isso fica fora do PublicLayout para ocupar a tela inteira.
-      { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
-      { path: ROUTES.suppliers.myProfile, element: <SupplierMyProfilePage /> },
+      // Protegido por RequireSupplierAuth: sem sessão, volta para o login.
+      {
+        element: <RequireSupplierAuth />,
+        children: [
+          { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
+          { path: ROUTES.suppliers.myProfile, element: <SupplierMyProfilePage /> },
+        ],
+      },
     ],
   },
 ]);

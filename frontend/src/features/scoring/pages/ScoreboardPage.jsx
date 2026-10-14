@@ -10,7 +10,7 @@ const COLUMNS = [
   { key: 'supplierName', header: 'Fornecedor' },
   { key: 'quotationDeliveryScore', header: 'Prazo (peso 1)', render: (row) => row.quotationDeliveryScore.toFixed(1) },
   { key: 'documentationScore', header: 'Docs (peso 3)', render: (row) => row.documentationScore.toFixed(1) },
-  { key: 'evaluationScore', header: 'Avaliacao (peso 5)', render: (row) => row.evaluationScore.toFixed(1) },
+  { key: 'evaluationScore', header: 'Avaliação (peso 5)', render: (row) => row.evaluationScore.toFixed(1) },
   { key: 'finalScore', header: 'Score final', render: (row) => <ScoreGauge score={row.finalScore * 10} size={52} /> },
 ];
 
@@ -21,9 +21,9 @@ export default function ScoreboardPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Qualificacao de fornecedores"
+        eyebrow="Qualificação de fornecedores"
         title="Ranking de fornecedores"
-        description="Media ponderada entre entrega de cotacao, documentacao/retrabalho e avaliacao das equipes."
+        description="Média ponderada entre entrega de cotação, documentação/retrabalho e avaliação das equipes."
       />
       <DataTable
         columns={COLUMNS}
@@ -33,7 +33,7 @@ export default function ScoreboardPage() {
         emptyTitle="Nenhum fornecedor avaliado ainda"
         getRowKey={(row) => row.id}
       />
-      <p className={styles.hint}>Clique em um fornecedor para registrar uma nova avaliacao.</p>
+      <p className={styles.hint}>Clique em um fornecedor para registrar uma nova avaliação.</p>
     </div>
   );
 }

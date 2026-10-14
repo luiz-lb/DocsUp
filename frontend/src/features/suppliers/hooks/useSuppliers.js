@@ -1,10 +1,10 @@
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
-import { listSuppliers, getSupplier } from '../api/suppliersApi.js';
+import { listSuppliers, getSupplierDetail } from '../api/suppliersApi.js';
 
 export function useSuppliers() {
-  return useAsyncData(listSuppliers, []);
+  return useAsyncData(() => listSuppliers(), []);
 }
 
 export function useSupplier(id) {
-  return useAsyncData(() => getSupplier(id), [id]);
+  return useAsyncData(() => getSupplierDetail(id), [id]);
 }

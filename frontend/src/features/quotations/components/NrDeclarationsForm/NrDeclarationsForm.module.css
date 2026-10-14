@@ -30,3 +30,10 @@
     color: var(--color-textDark, #111827);
     background: #fff;
 }
+
+.empty {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-textMuted, #6b7280);
+    font-style: italic;
+}

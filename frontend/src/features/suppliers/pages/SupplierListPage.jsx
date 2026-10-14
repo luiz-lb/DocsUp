@@ -2,23 +2,28 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader, DataTable, StatusBadge } from '../../../components/ui/index.js';
 import { SUPPLIER_STATUS } from '../../../constants/enums.js';
 import { ROUTES } from '../../../constants/routes.js';
+import { formatCnpj } from '../../../utils/formatters.js';
 import { useSuppliers } from '../hooks/useSuppliers.js';
 import styles from './SupplierListPage.module.css';
 
 const COLUMNS = [
   {
-    key: 'razaoSocial',
+    key: 'razao_social',
     header: 'Fornecedor',
     render: (row) => (
       <div>
-        <strong>{row.nomeFantasia}</strong>
-        <div className={styles.cnpj}>{row.cnpj}</div>
+        <strong>{row.nome_fantasia || row.razao_social}</strong>
+        <div className={styles.cnpj}>{formatCnpj(row.cnpj)}</div>
       </div>
     ),
   },
-  { key: 'city', header: 'Cidade', render: (row) => `${row.city}/${row.state}` },
-  { key: 'employeeCount', header: 'Funcionarios' },
-  { key: 'overallScore', header: 'Score', render: (row) => row.overallScore?.toFixed(1) ?? '-' },
+  {
+    key: 'city',
+    header: 'Cidade',
+    render: (row) => (row.city ? `${row.city}/${row.state ?? ''}`.replace(/\/$/, '') : '—'),
+  },
+  { key: 'employee_count', header: 'Funcionários', render: (row) => row.employee_count ?? '—' },
+  { key: 'overall_score', header: 'Score', render: (row) => (row.overall_score != null ? Number(row.overall_score).toFixed(1) : '-') },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge enumMap={SUPPLIER_STATUS} value={row.status} /> },
 ];
 
@@ -31,7 +36,7 @@ export default function SupplierListPage() {
       <PageHeader
         eyebrow="Suprimentos"
         title="Fornecedores"
-        description="Base de fornecedores cadastrados, com score de qualificacao e status de documentacao."
+        description="Base de fornecedores cadastrados, com score de qualificação e status de documentação."
       />
       <DataTable
         columns={COLUMNS}

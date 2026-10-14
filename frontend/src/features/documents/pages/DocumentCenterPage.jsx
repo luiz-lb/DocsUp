@@ -6,7 +6,7 @@ import { listDocuments } from '../api/documentsApi.js';
 const COLUMNS = [
   { key: 'supplierName', header: 'Fornecedor' },
   { key: 'documentTypeName', header: 'Documento' },
-  { key: 'validationType', header: 'Metodo', render: (row) => <StatusBadge enumMap={VALIDATION_TYPE} value={row.validationType} /> },
+  { key: 'validationType', header: 'Método', render: (row) => <StatusBadge enumMap={VALIDATION_TYPE} value={row.validationType} /> },
   { key: 'aiScore', header: 'Score', render: (row) => (row.aiScore != null ? <ScoreGauge score={row.aiScore} size={48} /> : '—') },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge enumMap={DOCUMENT_STATUS} value={row.status} /> },
 ];
@@ -17,9 +17,9 @@ export default function DocumentCenterPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Documentacao"
+        eyebrow="Documentação"
         title="Central de documentos"
-        description="Visao consolidada de todos os documentos enviados por fornecedores, com o metodo de validacao aplicado."
+        description="Visão consolidada de todos os documentos enviados por fornecedores, com o método de validação aplicado."
       />
       <DataTable columns={COLUMNS} rows={documents ?? []} isLoading={isLoading} emptyTitle="Nenhum documento enviado ainda" />
     </div>

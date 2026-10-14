@@ -1,4 +1,5 @@
 import { api } from '../../../utils/api.js';
+import { toErrorResult } from '../../../utils/apiError.js';
 
 // ─────────────────────────────────────────────
 // Phase 2 — Portal do Fornecedor
@@ -50,7 +51,7 @@ export async function addEmployee(token, employeeData, file) {
     return result.data;
   } catch (error) {
     console.error('addEmployee error:', error);
-    return { success: false, body: { message: 'Erro ao cadastrar funcionário.' } };
+    return toErrorResult(error, 'Erro ao cadastrar funcionário.');
   }
 }
 
@@ -78,7 +79,7 @@ export async function uploadCompanyDocuments(token, files = [], documentTypeIds 
     return result.data;
   } catch (error) {
     console.error('uploadCompanyDocuments error:', error);
-    return { success: false, body: { message: 'Erro ao enviar documentos da empresa.' } };
+    return toErrorResult(error, 'Erro ao enviar documentos da empresa.');
   }
 }
 

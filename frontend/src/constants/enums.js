@@ -4,7 +4,7 @@
 
 export const DEPARTMENT = {
   0: { label: 'RH', tone: 'info' },
-  1: { label: 'Seguranca do Trabalho', tone: 'warning' },
+  1: { label: 'Segurança do Trabalho', tone: 'warning' },
   2: { label: 'Suprimentos', tone: 'indigo' },
   3: { label: 'Fiscal', tone: 'neutral' },
   4: { label: 'Financeiro', tone: 'success' },
@@ -27,9 +27,9 @@ export const SUPPLIER_STATUS = {
 
 export const RISK_LEVEL = {
   0: { label: 'Baixo', tone: 'success' },
-  1: { label: 'Medio', tone: 'warning' },
+  1: { label: 'Médio', tone: 'warning' },
   2: { label: 'Alto', tone: 'danger' },
-  3: { label: 'Critico', tone: 'danger' },
+  3: { label: 'Crítico', tone: 'danger' },
 };
 
 export const DOCUMENT_SCOPE = {
@@ -38,10 +38,10 @@ export const DOCUMENT_SCOPE = {
 };
 
 export const VALIDATION_METHOD = {
-  0: { label: 'API Publica', tone: 'success' },
+  0: { label: 'API Pública', tone: 'success' },
   1: { label: 'IA', tone: 'indigo' },
   2: { label: 'Manual', tone: 'neutral' },
-  3: { label: 'Hibrida', tone: 'warning' },
+  3: { label: 'Híbrida', tone: 'warning' },
 };
 
 export const URGENCY = {
@@ -52,13 +52,13 @@ export const URGENCY = {
 };
 
 export const LABOR_REQUEST_STATUS = {
-  0: { label: 'Pendente de Aprovacao', tone: 'warning' },
+  0: { label: 'Pendente de Aprovação', tone: 'warning' },
   1: { label: 'Aprovado RH', tone: 'info' },
   2: { label: 'Reprovado', tone: 'danger' },
-  3: { label: 'Em Cotacao', tone: 'indigo' },
-  4: { label: 'Cotacao Encerrada', tone: 'neutral' },
-  5: { label: 'Em Contratacao', tone: 'teal' },
-  6: { label: 'Concluido', tone: 'success' },
+  3: { label: 'Em Cotação', tone: 'indigo' },
+  4: { label: 'Cotação Encerrada', tone: 'neutral' },
+  5: { label: 'Em Contratação', tone: 'teal' },
+  6: { label: 'Concluído', tone: 'success' },
   7: { label: 'Cancelado', tone: 'danger' },
 };
 
@@ -95,7 +95,7 @@ export const DOCUMENT_STATUS = {
   1: { label: 'Validando', tone: 'info' },
   2: { label: 'Aprovado', tone: 'success' },
   3: { label: 'Reprovado', tone: 'danger' },
-  4: { label: 'Reenvio Necessario', tone: 'warning' },
+  4: { label: 'Reenvio Necessário', tone: 'warning' },
   5: { label: 'Expirado', tone: 'danger' },
 };
 
@@ -106,20 +106,20 @@ export const VALIDATION_TYPE = {
 };
 
 export const FINAL_VALIDATION_STATUS = {
-  0: { label: 'Pendente de Revisao', tone: 'warning' },
+  0: { label: 'Pendente de Revisão', tone: 'warning' },
   1: { label: 'Aprovado', tone: 'success' },
   2: { label: 'Reprovado', tone: 'danger' },
 };
 
 export const RECEIPT_TYPE = {
-  0: { label: 'Cotacao', tone: 'indigo' },
-  1: { label: 'Documentacao', tone: 'info' },
+  0: { label: 'Cotação', tone: 'indigo' },
+  1: { label: 'Documentação', tone: 'info' },
   2: { label: 'Fase 2', tone: 'teal' },
 };
 
 export const EMPLOYEE_STATUS = {
   0: { label: 'Pendente de Docs', tone: 'warning' },
-  1: { label: 'Docs em Validacao', tone: 'info' },
+  1: { label: 'Docs em Validação', tone: 'info' },
   2: { label: 'Aprovado', tone: 'success' },
   3: { label: 'Reprovado', tone: 'danger' },
   4: { label: 'Ativo', tone: 'success' },
@@ -128,7 +128,7 @@ export const EMPLOYEE_STATUS = {
 
 export const PHASE2_STATUS = {
   0: { label: 'Em Andamento', tone: 'info' },
-  1: { label: 'Concluido', tone: 'success' },
+  1: { label: 'Concluído', tone: 'success' },
   2: { label: 'Expirado', tone: 'danger' },
   3: { label: 'Desclassificado por Doc.', tone: 'danger' },
 };
@@ -152,7 +152,7 @@ export const INVOICE_STATUS = {
   0: { label: 'Recebida', tone: 'info' },
   1: { label: 'Validada', tone: 'indigo' },
   2: { label: 'Negada - Docs Pendentes', tone: 'danger' },
-  3: { label: 'Lancada no Fiscal', tone: 'teal' },
+  3: { label: 'Lançada no Fiscal', tone: 'teal' },
   4: { label: 'Paga', tone: 'success' },
   5: { label: 'Cancelada', tone: 'neutral' },
 };
@@ -173,11 +173,11 @@ export const PAYMENT_BLOCK_STATUS = {
 
 export const REFRESH_STATUS = {
   0: { label: 'Pendente', tone: 'warning' },
-  1: { label: 'Concluido', tone: 'success' },
+  1: { label: 'Concluído', tone: 'success' },
   2: { label: 'Expirado', tone: 'danger' },
 };
 
-/** Helper generico: resolve { label, tone } de um enum, com fallback seguro. */
+/** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */
 export function resolveEnum(enumMap, value) {
   return enumMap[value] ?? { label: 'Desconhecido', tone: 'neutral' };
 }

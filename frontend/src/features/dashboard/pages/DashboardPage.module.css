@@ -33,6 +33,149 @@
 .metricIcon[data-tone='warning'] { color: var(--color-warning, #f5a524); }
 .metricIcon[data-tone='info'] { color: var(--color-info, #3b82f6); }
 .metricIcon[data-tone='danger'] { color: var(--color-danger, #e5484d); }
+.metricIcon[data-tone='teal'] { color: var(--color-teal, #004643); }
+.metricIcon[data-tone='success'] { color: var(--color-success, #2f9e44); }
+.metricIcon[data-tone='neutral'] { color: var(--color-textMuted, #6b7280); }
+
+/* ── Grid de gráficos/cards ── */
+.chartsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1em;
+    margin-bottom: 1.5em;
+}
+
+.cardTitle {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin: 0 0 1em;
+    font-size: 1rem;
+    color: var(--color-teal, #004643);
+}
+
+.cardSub {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.emptyMsg {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-textMuted, #6b7280);
+    font-style: italic;
+}
+
+/* ── Distribuição (barras horizontais) ── */
+.dist {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+}
+
+.distRow {
+    display: grid;
+    grid-template-columns: 150px 1fr auto;
+    align-items: center;
+    gap: 0.6em;
+}
+
+.distLabel {
+    font-size: 0.82rem;
+    color: var(--color-textDark, #111827);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.distTrack {
+    height: 0.85rem;
+    background: rgba(15, 23, 42, 0.06);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.distFill {
+    height: 100%;
+    border-radius: 999px;
+    min-width: 3px;
+    background: var(--color-indigo, #4f46e5);
+    transition: width 0.3s ease;
+}
+
+.distFill[data-tone='indigo']  { background: var(--color-indigo, #4f46e5); }
+.distFill[data-tone='warning'] { background: var(--color-warning, #f5a524); }
+.distFill[data-tone='info']    { background: var(--color-info, #3b82f6); }
+.distFill[data-tone='danger']  { background: var(--color-danger, #e5484d); }
+.distFill[data-tone='success'] { background: var(--color-success, #2f9e44); }
+.distFill[data-tone='teal']    { background: var(--color-teal, #004643); }
+.distFill[data-tone='neutral'] { background: #9ca3af; }
+
+.distValue {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-textDark, #111827);
+    min-width: 1.5rem;
+    text-align: right;
+}
+
+/* ── Solicitações recentes ── */
+.recentList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.recentItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    width: 100%;
+    padding: 0.7em 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-border, #e5e7eb);
+    cursor: pointer;
+    text-align: left;
+}
+
+.recentList li:last-child .recentItem {
+    border-bottom: none;
+}
+
+.recentItem:hover {
+    background: rgba(15, 23, 42, 0.03);
+}
+
+.recentInfo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.recentTitle {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--color-textDark, #111827);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recentMeta {
+    font-size: 0.78rem;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.recentArrow {
+    color: var(--color-textMuted, #9ca3af);
+    flex-shrink: 0;
+}
 
 .metricValue {
     font-size: 1.9rem;

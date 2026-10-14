@@ -17,6 +17,8 @@ export default function SupplierMfaPage() {
   const tokenProposta = location.state?.tokenProposta ?? null;
   // Token da Fase 2 propagado desde a tela de login
   const fase2Token = location.state?.fase2Token ?? null;
+  // Rota de origem (quando o guard redirecionou para o login)
+  const returnTo = location.state?.returnTo ?? null;
 
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +46,12 @@ export default function SupplierMfaPage() {
     // Se veio com token de proposta, abre direto a cotação apontada
     if (tokenProposta) {
       navigate(ROUTES.quotations.submit(tokenProposta));
+      return;
+    }
+
+    // Se foi redirecionado pelo guard, volta para a rota de origem
+    if (returnTo) {
+      navigate(returnTo);
       return;
     }
 

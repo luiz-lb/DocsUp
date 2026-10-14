@@ -10,7 +10,7 @@ import { ROUTES } from '../../../constants/routes.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import styles from './NewRequestPage.module.css';
 
-const STEPS = ['Dados da solicitacão', 'Revisão e envio'];
+const STEPS = ['Dados da solicitação', 'Revisão e envio'];
 
 const INITIAL_FORM = {
   title: '',
@@ -74,8 +74,8 @@ export default function NewRequestPage() {
     <div>
       <PageHeader
         eyebrow="Obra"
-        title="Nova solicitacao de mão de obra"
-        description="Ao enviar, o departamento de Suprimentos é notificado por e-mail para dar sequencia a cotação."
+        title="Nova solicitação de mão de obra"
+        description="Ao enviar, o departamento de Suprimentos é notificado por e-mail para dar sequência à cotação."
       />
 
       <WizardStepper steps={STEPS} activeStep={step} />
@@ -84,8 +84,8 @@ export default function NewRequestPage() {
         <Card.Body>
           {step === 0 && (
             <div className={styles.grid}>
-              <FormField label="Titulo da solicitacao" required className={styles.fullSpan}>
-                <input value={form.title} onChange={updateField('title')} placeholder="Ex.: Equipe de instalacao eletrica - Torre B" />
+              <FormField label="Título da solicitação" required className={styles.fullSpan}>
+                <input value={form.title} onChange={updateField('title')} placeholder="Ex.: Equipe de instalação elétrica - Torre B" />
               </FormField>
 
               <FormField label="Tipo de atividade" required>
@@ -101,7 +101,7 @@ export default function NewRequestPage() {
                 <input value={form.location} onChange={updateField('location')} placeholder="Ex.: Torre B - Alphaville" />
               </FormField>
 
-              <FormField label="Urgencia" required>
+              <FormField label="Urgência" required>
                 <select value={form.urgency} onChange={updateField('urgency')}>
                   <option value={0}>Baixa</option>
                   <option value={1}>Normal</option>
@@ -110,7 +110,7 @@ export default function NewRequestPage() {
                 </select>
               </FormField>
 
-              <FormField label="Data prevista de inicio">
+              <FormField label="Data prevista de início">
                 <DatePicker
                   selected={form.startDate}
                   onChange={(date) => setForm((prev) => ({ ...prev, startDate: date }))}
@@ -122,7 +122,7 @@ export default function NewRequestPage() {
               </FormField>
 
               <FormField label="Observações" className={styles.fullSpan}>
-                <textarea rows={3} value={form.description} onChange={updateField('description')} placeholder="Detalhes do escopo, riscos ja mapeados, etc." />
+                <textarea rows={3} value={form.description} onChange={updateField('description')} placeholder="Detalhes do escopo, riscos já mapeados, etc." />
               </FormField>
             </div>
           )}
@@ -149,7 +149,7 @@ export default function NewRequestPage() {
           {step === 1 && (
             <div className={styles.review}>
               <dl className={styles.reviewGrid}>
-                <dt>Titulo</dt>
+                <dt>Título</dt>
                 <dd>{form.title || '-'}</dd>
                 <dt>Atividade</dt>
                 <dd>{activity?.name ?? '-'}</dd>
@@ -162,7 +162,7 @@ export default function NewRequestPage() {
               <Banner
                 tone="success"
                 title="Pronto para enviar"
-                description="Suprimentos recebera um e-mail assim que você enviar esta solicitação."
+                description="Suprimentos receberá um e-mail assim que você enviar esta solicitação."
               />
             </div>
           )}
@@ -185,7 +185,7 @@ export default function NewRequestPage() {
           )}*/}
           {step === 1 && (
             <Button icon={LuSend} onClick={handleSubmit} isLoading={isSubmitting}>
-              Enviar solicitacao
+              Enviar solicitação
             </Button>
           )}
         </Card.Footer>

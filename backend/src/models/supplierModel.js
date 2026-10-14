@@ -155,6 +155,52 @@ export async function getSupplierRegions(supplierId) {
     return result.recordset;
 }
 
+/**
+ * Lista fornecedores para o painel interno (Suprimentos), com busca e filtro.
+ */
+export async function listSuppliers({ search = '', status } = {}) {
+    const pool = await poolPromise;
+    const request = pool.request();
+    const conditions = [];
+
+    if (search) {
+        request.input('search', sql.NVarChar(300), `%${search}%`);
+        conditions.push('(s.razao_social LIKE @search OR s.nome_fantasia LIKE @search OR s.cnpj LIKE @search)');
+    }
+    if (status !== undefined && status !== null) {
+        request.input('status', sql.TinyInt, status);
+        conditions.push('s.[status] = @status');
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await request.query(`
+        SELECT id, uid, cnpj, razao_social, nome_fantasia,
+               employee_count, city, [state], overall_score, status, created_at
+        FROM suppliers AS s
+        ${where}
+        ORDER BY s.razao_social ASC
+    `);
+    return result.recordset;
+}
+
+/**
+ * Categorias/atividades de serviço de um fornecedor (nomes resolvidos).
+ */
+export async function getSupplierCategories(supplierId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('supplier_id', sql.Int, supplierId)
+        .query(`
+            SELECT a.id, a.[name]
+            FROM supplier_categories AS sc
+            INNER JOIN activity_types AS a ON a.id = sc.category_id
+            WHERE sc.supplier_id = @supplier_id
+            ORDER BY a.[name] ASC
+        `);
+    return result.recordset;
+}
+
 // ─────────────────────────────────────────────
 // Escrita
 // ─────────────────────────────────────────────

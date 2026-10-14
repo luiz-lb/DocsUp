@@ -35,12 +35,12 @@ export default function PaymentTrackingPage() {
       <PageHeader
         eyebrow="Fiscal & Financeiro"
         title="Acompanhamento de pagamentos"
-        description="Cruzamento entre notas fiscais recebidas na pasta do fiscal e a documentacao pendente do fornecedor."
+        description="Cruzamento entre notas fiscais recebidas na pasta do fiscal e a documentação pendente do fornecedor."
       />
 
       {activeBlocks.length === 0 ? (
         <div className={styles.blocksSpacer}>
-          <EmptyState title="Nenhum pagamento travado" description="Todos os fornecedores estao com a documentacao em dia." />
+          <EmptyState title="Nenhum pagamento travado" description="Todos os fornecedores estão com a documentação em dia." />
         </div>
       ) : (
         <div className={styles.blocks}>

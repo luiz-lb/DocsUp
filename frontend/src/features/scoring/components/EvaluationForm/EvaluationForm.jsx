@@ -18,12 +18,12 @@ export default function EvaluationForm({ roleLabel, onSubmit, isSubmitting }) {
         <Slider value={score} onChange={(_, value) => setScore(value)} min={0} max={10} step={0.5} valueLabelDisplay="on" />
       </div>
 
-      <FormField label="Comentarios">
-        <textarea rows={3} value={comments} onChange={(event) => setComments(event.target.value)} placeholder="Observacoes sobre o desempenho do fornecedor" />
+      <FormField label="Comentários">
+        <textarea rows={3} value={comments} onChange={(event) => setComments(event.target.value)} placeholder="Observações sobre o desempenho do fornecedor" />
       </FormField>
 
       <Button icon={LuSend} isLoading={isSubmitting} onClick={() => onSubmit(score, comments)}>
-        Enviar avaliacao
+        Enviar avaliação
       </Button>
     </div>
   );

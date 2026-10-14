@@ -10,6 +10,10 @@
     gap: 0.6em;
 }
 
+.companyBanner{
+    padding-top: 1.5em;
+}
+
 .chip {
     padding: 0.5em 1em;
     border-radius: var(--radius-pill, 999px);

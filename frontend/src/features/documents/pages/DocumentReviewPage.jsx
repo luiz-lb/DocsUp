@@ -12,7 +12,7 @@ export default function DocumentReviewPage() {
 
   const decide = async (documentId, decision) => {
     setDecidingId(documentId);
-    await reviewDocument(documentId, decision, decision === 1 ? 'Aprovado apos revisao manual.' : 'Reprovado apos revisao manual.');
+    await reviewDocument(documentId, decision, decision === 1 ? 'Aprovado após revisão manual.' : 'Reprovado após revisão manual.');
     setDecidingId(null);
     reload();
   };
@@ -22,13 +22,13 @@ export default function DocumentReviewPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="RH & Seguranca"
-        title="Fila de revisao manual"
-        description="Documentos com score de IA abaixo de 85 caem aqui para decisao humana."
+        eyebrow="RH & Segurança"
+        title="Fila de revisão manual"
+        description="Documentos com score de IA abaixo de 85 caem aqui para decisão humana."
       />
 
       {queue.length === 0 ? (
-        <EmptyState title="Fila vazia" description="Nenhum documento aguardando revisao manual no momento." />
+        <EmptyState title="Fila vazia" description="Nenhum documento aguardando revisão manual no momento." />
       ) : (
         <div className={styles.list}>
           {queue.map((doc) => (
@@ -41,7 +41,7 @@ export default function DocumentReviewPage() {
                   </div>
                 </div>
 
-                <Banner tone="warning" description="Score de IA abaixo do limite de confianca (85). Revise os pontos antes de decidir." />
+                <Banner tone="warning" description="Score de IA abaixo do limite de confiança (85). Revise os pontos antes de decidir." />
 
                 <div className={styles.resultSpacer}>
                   <AiValidationResultCard score={doc.aiScore} checklist={doc.aiChecklist} />

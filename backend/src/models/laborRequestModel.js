@@ -43,8 +43,15 @@ export async function getLaborRequest({ page = 1, limit = 10, search = '', statu
     }
 
     if (status !== undefined && status !== null) {
-        request.input('status', sql.TinyInt, status);
-        conditions.push('r.[status] = @status');
+        // Aceita um único status ou uma lista de status (filtro múltiplo).
+        const statusList = Array.isArray(status) ? status : [status];
+        if (statusList.length > 0) {
+            const params = statusList.map((value, index) => {
+                request.input(`status${index}`, sql.TinyInt, value);
+                return `@status${index}`;
+            });
+            conditions.push(`r.[status] IN (${params.join(', ')})`);
+        }
     }
 
     if (urgency !== undefined && urgency !== null) {

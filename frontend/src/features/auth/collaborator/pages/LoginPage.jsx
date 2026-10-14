@@ -31,7 +31,7 @@ export default function LoginPage() {
       <Card.Body>
         <p className={authStyles.eyebrow}>DocsUp</p>
         <h1 className={authStyles.title}>Entrar</h1>
-        <p className={authStyles.subtitle}>Acesse com seu e-mail corporativo para acompanhar solicitacoes, cotacoes e documentacao.</p>
+        <p className={authStyles.subtitle}>Acesse com seu e-mail corporativo para acompanhar solicitações, cotações e documentação.</p>
 
         <form className={authStyles.form} onSubmit={handleSubmit}>
           <FormField label="E-mail corporativo" required>

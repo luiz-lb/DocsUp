@@ -40,8 +40,6 @@ export async function register(req, res) {
             contacts, categoryIds, regionIds,
         } = req.body;
 
-        console.log("::::", req.body)
-
         if (!cnpj || !razaoSocial || !password) {
             return res.status(400).json({
                 success: false,

@@ -248,7 +248,9 @@ export default function SupplierRegisterPage() {
         {step === 1 && (
           <div className={authStyles.form}>
             {form.razaoSocial && (
-              <Banner tone="info" description={`Razão social: ${form.razaoSocial}`} />
+              <div className={styles.companyBanner}>
+                <Banner tone="info" description={`Razão social: ${form.razaoSocial}`} />
+              </div>
             )}
 
             <span className={styles.groupLabel}>Responsável legal</span>

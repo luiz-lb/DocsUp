@@ -17,15 +17,19 @@ function generateOtp() {
 
 /** Retorna o transporte de email configurado pelas env vars */
 function createMailTransport() {
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
+    // TODO: SMTP desativado temporariamente (Gmail recusando credenciais — 535 BadCredentials).
+    // Descomentar quando SMTP_USER/SMTP_PASS estiverem corretos no .env.
+    // return nodemailer.createTransport({
+    //     host: process.env.SMTP_HOST,
+    //     port: Number(process.env.SMTP_PORT || 587),
+    //     secure: process.env.SMTP_SECURE === 'true',
+    //     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    // });
+    return {
+        sendMail: async ({ to, subject }) => {
+            console.log(`[SMTP DESATIVADO] Email não enviado → para: ${to} | assunto: ${subject}`);
         },
-    });
+    };
 }
 
 /** Emite um JWT de fornecedor (tipo separado do JWT de colaborador) */
@@ -98,8 +102,6 @@ export async function registerSupplier(payload) {
         categoryIds = [],
         regionIds = [],
     } = payload;
-
-    console.log("::::", payload)
 
     // Validações básicas
     if (!cnpj || !razaoSocial || !password) {

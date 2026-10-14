@@ -28,7 +28,7 @@ export default function Topbar({ onOpenSidebar }) {
 
       <div className={styles.spacer} />
 
-      <button type="button" className={styles.iconButton} aria-label="Notificacoes">
+      <button type="button" className={styles.iconButton} aria-label="Notificações">
         <LuBell />
       </button>
 

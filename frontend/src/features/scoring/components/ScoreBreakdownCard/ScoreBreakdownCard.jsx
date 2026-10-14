@@ -2,9 +2,9 @@ import ScoreGauge from '../../../../components/ui/ScoreGauge/index.js';
 import styles from './ScoreBreakdownCard.module.css';
 
 const ROWS = [
-  { key: 'quotationDeliveryScore', label: 'Prazo de entrega da cotacao', weightKey: 'quotation' },
-  { key: 'documentationScore', label: 'Documentacao e retrabalho', weightKey: 'documentation' },
-  { key: 'evaluationScore', label: 'Avaliacao (RH, Suprimentos, Obra)', weightKey: 'evaluation' },
+  { key: 'quotationDeliveryScore', label: 'Prazo de entrega da cotação', weightKey: 'quotation' },
+  { key: 'documentationScore', label: 'Documentação e retrabalho', weightKey: 'documentation' },
+  { key: 'evaluationScore', label: 'Avaliação (RH, Suprimentos, Obra)', weightKey: 'evaluation' },
 ];
 
 /** Media ponderada de qualificacao do fornecedor: peso 1/3/5 conforme o criterio. */
@@ -23,7 +23,7 @@ export default function ScoreBreakdownCard({ score }) {
           </div>
         ))}
         {score.reworkCount > 0 && (
-          <p className={styles.reworkNote}>{score.reworkCount} retrabalho(s) de documentacao registrados.</p>
+          <p className={styles.reworkNote}>{score.reworkCount} retrabalho(s) de documentação registrados.</p>
         )}
       </div>
     </div>

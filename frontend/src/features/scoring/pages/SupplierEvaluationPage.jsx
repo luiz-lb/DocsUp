@@ -17,7 +17,7 @@ export default function SupplierEvaluationPage() {
   const evaluatorRole = ROLE_BY_DEPARTMENT[user.department] ?? { code: 0, label: 'RH' };
 
   if (isLoading) return null;
-  if (!data?.score) return <EmptyState title="Nenhum score encontrado para esta solicitacao" />;
+  if (!data?.score) return <EmptyState title="Nenhum score encontrado para esta solicitação" />;
 
   const handleSubmit = async (score, comments) => {
     await submitEvaluation(DEMO_SUPPLIER_ID, requestId, evaluatorRole.code, score, comments);
@@ -27,9 +27,9 @@ export default function SupplierEvaluationPage() {
   return (
     <div>
       <PageHeader
-        eyebrow={`Solicitacao #${requestId}`}
-        title={`Avaliacao — ${data.score.supplierName}`}
-        description="A media ponderada final considera prazo de cotacao (peso 1), documentacao/retrabalho (peso 3) e avaliacao dos times (peso 5)."
+        eyebrow={`Solicitação #${requestId}`}
+        title={`Avaliação — ${data.score.supplierName}`}
+        description="A média ponderada final considera prazo de cotação (peso 1), documentação/retrabalho (peso 3) e avaliação dos times (peso 5)."
       />
 
       <div className={styles.layout}>

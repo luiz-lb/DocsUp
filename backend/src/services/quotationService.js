@@ -14,12 +14,19 @@ function generateToken() {
 }
 
 function createMailTransport() {
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
+    // TODO: SMTP desativado temporariamente (Gmail recusando credenciais — 535 BadCredentials).
+    // Descomentar quando SMTP_USER/SMTP_PASS estiverem corretos no .env.
+    // return nodemailer.createTransport({
+    //     host: process.env.SMTP_HOST,
+    //     port: Number(process.env.SMTP_PORT || 587),
+    //     secure: process.env.SMTP_SECURE === 'true',
+    //     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    // });
+    return {
+        sendMail: async ({ to, subject }) => {
+            console.log(`[SMTP DESATIVADO] Email não enviado → para: ${to} | assunto: ${subject}`);
+        },
+    };
 }
 
 // ─────────────────────────────────────────────
@@ -184,9 +191,10 @@ export async function getInviteByToken(token) {
             return { success: false, message: 'O prazo para esta cotação já encerrou.' };
         }
 
-        // Busca dados da solicitação e documentos obrigatórios
+        // Busca dados da solicitação, documentos obrigatórios e NRs exigidas
         const laborRequest = await laborRequestModel.getLaborRequestById(round.labor_request_id);
         const requiredDocs = await laborRequestModel.getLaborRequestDocuments(round.labor_request_id);
+        const requiredNrTypes = await laborRequestModel.getLaborRequestNrs(round.labor_request_id);
 
         // Verifica se já existe cotação submetida para esse convite
         let existingQuotation = null;
@@ -202,7 +210,7 @@ export async function getInviteByToken(token) {
             body: {
                 invite,
                 round,
-                laborRequest: { ...laborRequest, requiredDocuments: requiredDocs },
+                laborRequest: { ...laborRequest, requiredDocuments: requiredDocs, requiredNrTypes },
                 existingQuotation,
             },
         };
@@ -566,6 +574,91 @@ export async function compareQuotations(roundId, quotationIds) {
         console.error('compareQuotations error:', error);
         return { success: false, message: 'Erro ao comparar cotações.' };
     }
+}
+
+/**
+ * Reenvia o e-mail de convite de uma cotação para um fornecedor.
+ *
+ * @param {number} inviteId
+ * @param {string} [confirmedEmail] — e-mail confirmado pelo colaborador (opcional).
+ *   Para convites vinculados a um fornecedor (ex.: convidado por CNPJ), o destino
+ *   padrão é o e-mail do responsável OPERACIONAL do fornecedor.
+ */
+export async function resendInvite(inviteId, confirmedEmail) {
+    const invite = await quotationModel.getInviteByIdFull(inviteId);
+    if (!invite) {
+        return { success: false, message: 'Convite não encontrado.' };
+    }
+    if (invite.round_status !== 0) {
+        return { success: false, message: 'A rodada já foi encerrada — não é possível reenviar o convite.' };
+    }
+    if (new Date() > new Date(invite.round_deadline)) {
+        return { success: false, message: 'O prazo desta rodada já expirou — não é possível reenviar o convite.' };
+    }
+
+    // Determina o e-mail de destino:
+    //  1. e-mail confirmado pelo colaborador, se informado
+    //  2. senão, para convite vinculado a fornecedor, o responsável operacional
+    //  3. senão, o e-mail original do convite
+    let targetEmail = confirmedEmail?.trim() || null;
+
+    if (!targetEmail && invite.supplier_id) {
+        const contacts = await supplierModel.getSupplierContactEmails(invite.supplier_id);
+        const opContact = contacts.find((c) => c.contact_type === 1) ?? contacts[0];
+        targetEmail = opContact?.email ?? null;
+    }
+
+    if (!targetEmail) {
+        targetEmail = invite.invite_email;
+    }
+
+    if (!targetEmail) {
+        return { success: false, message: 'Não há e-mail de destino para este convite.' };
+    }
+
+    // Atualiza o e-mail do convite se o destino mudou (mantém o histórico coerente)
+    if (targetEmail.toLowerCase() !== String(invite.invite_email ?? '').toLowerCase()) {
+        await quotationModel.updateInviteEmail(inviteId, targetEmail);
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+    const link = `${frontendUrl}/cotacoes/responder/${invite.invite_token}`;
+
+    try {
+        const transporter = createMailTransport();
+        await transporter.sendMail({
+            from: `"DocsUp Suprimentos" <${process.env.SMTP_USER}>`,
+            to: targetEmail,
+            subject: `Reenvio — Convite para cotação: ${invite.labor_request_title}`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 560px; margin: auto;">
+                    <h2 style="color: #004643;">Convite para cotação (reenvio)</h2>
+                    <p>Você foi convidado para apresentar uma proposta para o serviço:</p>
+                    <p style="font-size: 1.1rem; font-weight: bold;">${invite.labor_request_title}</p>
+                    <p><strong>Prazo para resposta:</strong> ${new Date(invite.round_deadline).toLocaleString('pt-BR')}</p>
+                    <p style="margin-top: 1.5rem;">
+                        <a href="${link}"
+                           style="background:#004643; color:#fff; padding:12px 24px;
+                                  border-radius:6px; text-decoration:none; font-weight:bold;">
+                            Responder cotação
+                        </a>
+                    </p>
+                    <p style="color:#6b7280; font-size:0.8rem; margin-top:1rem;">
+                        Este link é único e intransferível.
+                    </p>
+                </div>
+            `,
+        });
+    } catch (emailError) {
+        console.error('Erro ao reenviar convite:', emailError.message);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV] Reenvio de convite ${inviteId} → ${targetEmail}: ${link}`);
+            return { success: true, body: { email: targetEmail, devLink: link } };
+        }
+        return { success: false, message: 'Não foi possível reenviar o e-mail. Tente novamente.' };
+    }
+
+    return { success: true, body: { email: targetEmail } };
 }
 
 /**

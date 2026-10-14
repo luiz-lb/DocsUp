@@ -47,6 +47,8 @@ export async function listDocumentsWithValidation({ supplierId, laborRequestId, 
             d.expires_at,
             d.uploaded_at,
             d.labor_request_id,
+            lr.title             AS labor_request_title,
+            lr.[location]        AS labor_request_location,
             /* Última validação */
             dv.id                AS validation_id,
             dv.validation_type,
@@ -56,9 +58,10 @@ export async function listDocumentsWithValidation({ supplierId, laborRequestId, 
             dv.manual_comments,
             dv.reviewed_at
         FROM documents AS d
-        INNER JOIN suppliers     AS s  ON s.id  = d.supplier_id
+        INNER JOIN suppliers      AS s  ON s.id  = d.supplier_id
         INNER JOIN document_types AS dt ON dt.id = d.document_type_id
-        LEFT  JOIN employees     AS e  ON e.id  = d.employee_id
+        LEFT  JOIN employees      AS e  ON e.id  = d.employee_id
+        LEFT  JOIN labor_requests AS lr ON lr.id = d.labor_request_id
         OUTER APPLY (
             SELECT TOP 1 *
             FROM document_validations

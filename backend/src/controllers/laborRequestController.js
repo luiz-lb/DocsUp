@@ -34,12 +34,22 @@ export async function listLaborRequest(req, res) {
         const limit = ALLOWED_PAGE_SIZES.includes(parsedLimit) ? parsedLimit : 10;
         const search = typeof searchParam === 'string' ? searchParam.trim().slice(0, 200) : '';
 
-        const status = statusParam !== undefined && statusParam !== '' ? Number.parseInt(statusParam, 10) : undefined;
+        // status pode ser um único valor (ex.: "0") ou uma lista separada por vírgula (ex.: "3,5")
+        let status;
+        if (statusParam !== undefined && statusParam !== '') {
+            const parsedStatuses = String(statusParam)
+                .split(',')
+                .map((value) => Number.parseInt(value, 10))
+                .filter((value) => !Number.isNaN(value));
+
+            if (parsedStatuses.length === 0) {
+                return res.status(400).json({ success: false, body: { message: "status deve ser um número válido." } });
+            }
+            status = parsedStatuses.length === 1 ? parsedStatuses[0] : parsedStatuses;
+        }
+
         const urgency = urgencyParam !== undefined && urgencyParam !== '' ? Number.parseInt(urgencyParam, 10) : undefined;
 
-        if (status !== undefined && Number.isNaN(status)) {
-            return res.status(400).json({ success: false, body: { message: "status deve ser um número válido." } });
-        }
         if (urgency !== undefined && Number.isNaN(urgency)) {
             return res.status(400).json({ success: false, body: { message: "urgency deve ser um número válido." } });
         }
