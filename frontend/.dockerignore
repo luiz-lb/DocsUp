@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-ssr
+npm-debug.log*
+*.log
+*.local
+.env
+.env.*
+!.env.example
+uploads
+.git
+.vscode
+Dockerfile
+.dockerignore

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import routes from './src/routers/index.js';
 import cors from 'cors';
 import { processExpiredPhase2Deadlines } from './src/services/phase2Service.js';
+import { ensureInitialAdmin } from './src/services/bootstrapService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +56,11 @@ app.use((err, req, res, next) => {
         app.listen(port, '0.0.0.0', () => {
             console.log(`Servidor rodando e acessível na rede na porta: ${port}`);
             console.log(`Ambiente: ${process.env.NODE_ENV || 'production'}`);
+        });
+
+        // Admin inicial (USER_ADMIN / SENHA_ADMIN): criado só se o e-mail ainda não existir
+        ensureInitialAdmin().catch((err) => {
+            console.error('[Bootstrap] Erro ao criar o Admin inicial:', err.message);
         });
 
         // Job de expiração da Fase 2: roda a cada 5 minutos

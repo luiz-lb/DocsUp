@@ -25,6 +25,15 @@ export async function getUserByEmail(email) {
     return result.recordset[0] ?? null;
 }
 
+// Busca o id pelo email sem filtrar is_active (usuário inativo também conta como existente)
+export async function getUserIdByEmailAnyStatus(email) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('email', sql.NVarChar(200), email)
+        .query('SELECT id FROM users WHERE email = @email');
+    return result.recordset[0]?.id ?? null;
+}
+
 export async function insertUser({ uid, name, email, department, role, passwordHash }) {
     const pool = await poolPromise;
     const result = await pool.request()

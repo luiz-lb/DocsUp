@@ -1,0 +1,101 @@
+# DocsUp: banco (SQL Server 2022), inicialização do banco, backend e frontend.
+# Antes de subir: copie .env.example para .env (nesta pasta) e preencha.
+
+name: docsup
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Defina MSSQL_SA_PASSWORD no .env}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+      TZ: ${TZ:-America/Sao_Paulo}
+    ports:
+      # Só no 127.0.0.1 da máquina (SSMS / Azure Data Studio), com porta diferente de 1433
+      # para não conflitar com um SQL Server local. No SSMS: "127.0.0.1,14330" (vírgula).
+      - "127.0.0.1:${DB_HOST_PORT:-14330}:1433"
+    volumes:
+      - db-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - SQLCMDPASSWORD="$$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "SELECT 1" -o /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  # Roda o database/init-db.sh e termina: cria o database, aplica schema/seed/migrações
+  # e o login da aplicação. Idempotente; roda a cada `docker compose up`.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Defina MSSQL_SA_PASSWORD no .env}
+      DB_DATABASE: ${DB_DATABASE:?Defina DB_DATABASE no .env}
+      DB_USERENV: ${DB_USERENV:?Defina DB_USERENV no .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env}
+    volumes:
+      - ./database:/database:ro
+    # Remove \r antes de executar, caso o script tenha sido salvo com fim de linha do Windows
+    entrypoint: ["/bin/bash", "-c", "tr -d '\\r' < /database/init-db.sh > /tmp/init-db.sh && exec /bin/bash /tmp/init-db.sh"]
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    init: true
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: "3000"
+      TZ: ${TZ:-America/Sao_Paulo}
+      # Usuário da aplicação (permissão mínima). O backend nunca usa o sa.
+      DB_SERVER: db
+      DB_PORT: "1433"
+      DB_DATABASE: ${DB_DATABASE:?Defina DB_DATABASE no .env}
+      DB_USERENV: ${DB_USERENV:?Defina DB_USERENV no .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env}
+      DB_ENCRYPT: ${DB_ENCRYPT:-true}
+      DB_TRUST_CERT: ${DB_TRUST_CERT:-true}
+      SESSION_SECRET: ${SESSION_SECRET:?Defina SESSION_SECRET no .env}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Defina WEBHOOK_SECRET no .env}
+      FRONTEND_URL: ${FRONTEND_URL:?Defina FRONTEND_URL no .env}
+      UPLOAD_DIR: /app/uploads
+      USER_ADMIN: ${USER_ADMIN:-}
+      SENHA_ADMIN: ${SENHA_ADMIN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-${SMTP_USER:-}}
+      HUBDEV_TOKEN: ${HUBDEV_TOKEN:-}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_URL_BACKEND: ${VITE_URL_BACKEND:?Defina VITE_URL_BACKEND no .env}
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  uploads:
