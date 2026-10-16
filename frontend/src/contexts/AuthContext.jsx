@@ -66,14 +66,18 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    // Apaga o cookie no backend; o estado local é limpo mesmo se a chamada falhar
-    await logoutApi();
+    // O cookie é httpOnly: só o backend consegue apagá-lo. Se a chamada falhar, a sessão
+    // continua válida, então o estado também continua e o resultado volta para a tela avisar.
+    const result = await logoutApi();
+    if (!result?.success) return result;
+
     setIsAuthenticated(false);
     setUserId(null);
     setUserEmail(null);
     setUserName(null);
     setUserDepartament(null);
     setUserRole(null);
+    return result;
   };
 
   const value = useMemo(() => {

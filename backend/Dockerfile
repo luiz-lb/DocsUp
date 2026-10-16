@@ -14,5 +14,5 @@ COPY . .
 RUN mkdir -p /app/uploads && chown node:node /app/uploads
 
 USER node
-EXPOSE 3000
+EXPOSE 3003
 CMD ["node", "server.js"]

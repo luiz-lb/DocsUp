@@ -55,7 +55,7 @@ services:
     init: true
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      PORT: "3000"
+      PORT: "3003"
       TZ: ${TZ:-America/Sao_Paulo}
       # Usuário da aplicação (permissão mínima). O backend nunca usa o sa.
       DB_SERVER: db
@@ -81,7 +81,7 @@ services:
       SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-${SMTP_USER:-}}
       HUBDEV_TOKEN: ${HUBDEV_TOKEN:-}
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "${BACKEND_PORT:-3003}:3003"
     volumes:
       - uploads:/app/uploads
     restart: unless-stopped

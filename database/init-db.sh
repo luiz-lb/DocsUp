@@ -19,7 +19,7 @@ DB_HOST="${DB_HOST:-db}"
 
 log()  { echo "[db-init] $*"; }
 fail() { echo "[db-init] ERRO: $*" >&2; exit 1; }
-trap 'echo "[db-init] Falhou (linha $LINENO). Veja o erro acima. Se foi numa migração, ela foi desfeita por inteiro." >&2' ERR
+trap 'echo "[db-init] Falhou (linha $LINENO). Veja o erro acima. Se foi numa migração, a transação dela foi desfeita e a versão não foi registrada." >&2' ERR
 
 [ -n "${MSSQL_SA_PASSWORD:-}" ] || fail "MSSQL_SA_PASSWORD não definido."
 [ -n "${DB_DATABASE:-}" ]       || fail "DB_DATABASE não definido."
@@ -71,7 +71,7 @@ GO
 :r $file
 GO
 IF @@TRANCOUNT <> 1
-    THROW 50001, N'O script abriu, confirmou ou desfez uma transação por conta própria; a versão $version não foi registrada.', 1;
+    THROW 50001, N'O script abriu, confirmou ou desfez uma transação por conta própria; a versão $version não foi registrada. Se ele deu COMMIT, o que rodou até ali ficou gravado: confira o banco antes de rodar de novo.', 1;
 INSERT INTO dbo.schema_migrations (version) VALUES (N'$version');
 COMMIT TRANSACTION;
 GO

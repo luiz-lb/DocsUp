@@ -13,6 +13,15 @@ import { ensureInitialAdmin } from './src/services/bootstrapService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Sem estes segredos, login e sessão só quebram na hora do uso (ex.: o OTP do fornecedor é
+// consumido e a resposta vem 500). Melhor parar na subida dizendo o que falta.
+const REQUIRED_SECRETS = ['JWT_SECRET', 'SUPPLIER_JWT_SECRET', 'SESSION_SECRET'];
+const missingSecrets = REQUIRED_SECRETS.filter((name) => !process.env[name]);
+if (missingSecrets.length > 0) {
+    console.error(`Variáveis obrigatórias ausentes no .env: ${missingSecrets.join(', ')}`);
+    process.exit(1);
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 const ambiente = process.env.NODE_ENV || 'production';

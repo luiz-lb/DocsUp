@@ -11,7 +11,7 @@ O serviço `db-init` do `docker-compose.yml` roda o [init-db.sh](init-db.sh) a c
 | 5 | `migrations/NNNN_*.sql` | uma vez cada, em ordem de nome |
 | 6 | `init/04_app_user.sql` | sempre (login da aplicação com permissão mínima) |
 
-Cada script das etapas 3 a 5 roda numa transação. Se der erro, nada daquele script fica gravado e o `db-init` termina com erro; o backend só sobe se o `db-init` terminar com sucesso. As versões aplicadas ficam em `dbo.schema_migrations`.
+Cada script das etapas 3 a 5 roda numa transação. Se der erro, a transação é desfeita, a versão não é registrada e o `db-init` termina com erro; o backend só sobe se o `db-init` terminar com sucesso. A exceção é um script que dá `COMMIT` por conta própria (proibido, ver abaixo): o que ele gravou até ali fica no banco. As versões aplicadas ficam em `dbo.schema_migrations`.
 
 Se o banco já existir com o schema (ex.: restaurado de outro servidor), a versão `0001_schema_inicial` é só registrada (baseline), sem rodar o script.
 
@@ -43,9 +43,17 @@ O usuário da aplicação (`DB_PASSWORD`) é diferente: o `db-init` sincroniza a
 
 Um backup (`.bak`) só restaura numa versão igual ou mais nova do SQL Server. O banco de desenvolvimento atual é SQL Server 2025, e o container é 2022, então o backup de lá não restaura aqui. Para levar os dados:
 
-1. Suba o stack uma vez, para o `db-init` criar o schema.
+1. Suba **só o banco**, para o `db-init` criar o schema: `docker compose up -d db-init` (o `db` sobe junto). Espere `docker compose logs db-init` terminar em `Banco pronto.`. Não suba o backend antes de importar: ele cria o Admin de `USER_ADMIN` com `id` 1, que conflita com o usuário 1 do banco de origem.
 2. No SSMS, no banco de origem: Tarefas > Gerar Scripts > Avançado, com "Tipos de dados para script" = **Somente dados** e "Script para a versão do servidor" = **SQL Server 2022**.
-3. Rode o script gerado no container como `sa` (`127.0.0.1,14330`). Se o seed já preencheu um catálogo, limpe essa tabela antes, ou tire os `INSERT` dela do script.
+3. No script gerado, apague a linha `USE [...]` do topo, se o nome do banco de origem for diferente de `DB_DATABASE`.
+4. Conectado no container como `sa` (`127.0.0.1,14330`), apague os catálogos que o seed criou, porque o script traz os da origem com os mesmos ids:
+   ```sql
+   DELETE FROM dbo.activity_types; DELETE FROM dbo.document_types;
+   DELETE FROM dbo.nr_types;       DELETE FROM dbo.regions;
+   ```
+5. Rode o script gerado no banco `DB_DATABASE`.
+6. Os prazos de rodada (`quotation_rounds.deadline`) gravados pelo backend antes da Fase 2.1 estão em UTC. Desde a 2.1 o backend grava hora local, então essas linhas aparecem 3h mais tarde. Corrija só as antigas: `UPDATE dbo.quotation_rounds SET deadline = DATEADD(HOUR, -3, deadline);` (rode uma vez, logo após importar).
+7. Suba o resto: `docker compose up -d`.
 
 ## Usuários
 
