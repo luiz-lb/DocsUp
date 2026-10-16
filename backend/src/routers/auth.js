@@ -5,8 +5,8 @@ import { verificarToken } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 router.post('/login',  auth.login);
-// rota pendente de finalização
-router.post('/register', auth.registerNewUser);
+// encerra a sessão: apaga o cookie do JWT (funciona mesmo com o token já expirado)
+router.post('/logout', auth.logout);
 // rota usada para verificar token quando usuario carregar tel
 router.get('/me', verificarToken, auth.getMe);
 

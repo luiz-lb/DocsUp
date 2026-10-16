@@ -15,8 +15,8 @@ export default function Topbar({ onOpenSidebar }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate(ROUTES.auth.login);
   };
 

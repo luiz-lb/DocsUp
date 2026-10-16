@@ -14,8 +14,9 @@ export async function login(email, password) {
         if (!isPasswordValid) {
             return { success: false, message: 'Senha incorreta.' };
         }
-        
-        const token = jwt.sign({ email, id, name, department, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+        // type 'user' separa o token de colaborador do token de fornecedor (type 'supplier')
+        const token = jwt.sign({ type: 'user', email, id, name, department, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         return { success: true, token, id, name, department, role };
     } catch (error) {
@@ -24,27 +25,11 @@ export async function login(email, password) {
     }
 }
 
-export async function registerNewUser({ name, email, departament, role, password }) {
-    try {
-        const existingUser = await authModel.getUserByEmail(email);
-        if (existingUser) {
-            return { success: false, message: 'Email já cadastrado.' };
-        }
-
-        const uid = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        const result = await authModel.insertUser({ uid: uid, name, email, department: departament, role, passwordHash });
-
-        if (!result || result.rowsAffected === 0 || !result.id) {
-            return { success: false, message: 'Erro ao registrar usuário.' };
-        }
-
-        const token = jwt.sign({ email, id: result.id }, process.env.JWT_SECRET, { expiresIn: '1h' }); 
-
-        return { success: true, id: result.id, token };
-    } catch (error) {
-        console.error('Erro no register service:', error);
-        throw error;
-    }
+/**
+ * Usuário ativo pelo id, lido do banco a cada requisição autenticada:
+ * inativação e troca de departamento valem na hora, sem esperar o JWT vencer.
+ * Retorna null se o usuário não existe ou está inativo.
+ */
+export async function getActiveUserById(id) {
+    return authModel.getActiveUserById(id);
 }

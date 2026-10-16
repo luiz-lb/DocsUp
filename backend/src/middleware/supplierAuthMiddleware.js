@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { getSupplierJwtSecret } from '../config/jwtSecrets.js';
 
 /**
  * Middleware de autenticação para fornecedores.
@@ -15,22 +16,31 @@ export function verificarTokenFornecedor(req, res, next) {
         });
     }
 
+    let secret;
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        secret = getSupplierJwtSecret();
+    } catch (error) {
+        console.error('verificarTokenFornecedor:', error.message);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
 
-        if (decoded.type !== 'supplier') {
-            return res.status(401).json({
-                success: false,
-                body: { message: 'Token inválido para este recurso.' },
-            });
-        }
-
-        req.fornecedor = decoded;
-        next();
+    let decoded;
+    try {
+        decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
     } catch (error) {
         return res.status(401).json({
             success: false,
             body: { message: 'Token de fornecedor inválido ou expirado.' },
         });
     }
+
+    if (decoded.type !== 'supplier') {
+        return res.status(401).json({
+            success: false,
+            body: { message: 'Token inválido para este recurso.' },
+        });
+    }
+
+    req.fornecedor = decoded;
+    next();
 }

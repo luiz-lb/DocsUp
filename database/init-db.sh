@@ -58,6 +58,8 @@ is_applied() {
 
 # Aplica um script numa transação e registra a versão. Qualquer erro encerra o
 # sqlcmd, a conexão cai e o SQL Server desfaz a transação inteira.
+# Se o próprio script abrir, confirmar ou desfazer transação (ex.: TRY/CATCH com
+# ROLLBACK que engole o erro), @@TRANCOUNT deixa de ser 1 e nada é registrado.
 apply() {
   local version="$1" file="$2" wrapper
   wrapper="$(mktemp)"
@@ -68,6 +70,8 @@ BEGIN TRANSACTION;
 GO
 :r $file
 GO
+IF @@TRANCOUNT <> 1
+    THROW 50001, N'O script abriu, confirmou ou desfez uma transação por conta própria; a versão $version não foi registrada.', 1;
 INSERT INTO dbo.schema_migrations (version) VALUES (N'$version');
 COMMIT TRANSACTION;
 GO

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { DEPARTMENT } from '../constants/enums.js';
-import { loginApi, me } from '../features/auth/collaborator/api/authApi.js';
+import { loginApi, logoutApi, me } from '../features/auth/collaborator/api/authApi.js';
 
 const AuthContext = createContext(null);
 
@@ -65,7 +65,9 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Apaga o cookie no backend; o estado local é limpo mesmo se a chamada falhar
+    await logoutApi();
     setIsAuthenticated(false);
     setUserId(null);
     setUserEmail(null);

@@ -183,6 +183,18 @@ export async function updateDocumentStatus(transaction, documentId, status) {
 }
 
 /**
+ * Retorna a validação se ela pertencer ao documento informado (ou null).
+ */
+export async function getValidationByIdAndDocument(validationId, documentId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('id', sql.Int, validationId)
+        .input('document_id', sql.Int, documentId)
+        .query('SELECT id FROM document_validations WHERE id = @id AND document_id = @document_id');
+    return result.recordset[0] ?? null;
+}
+
+/**
  * Retorna o id da validação mais recente de um documento (ou null).
  */
 export async function getLatestValidationId(documentId) {

@@ -209,17 +209,30 @@ export async function triggerDocumentValidation(documentId, supplierId) {
  *
  * @param {{ documentId, validationId, aiScore, aiResultJson, aiModelUsed }} payload
  */
-export async function receiveAiValidationResult(payload) {
-    const { documentId, validationId, aiScore, aiResultJson, aiModelUsed } = payload;
+export async function receiveAiValidationResult(payload = {}) {
+    const { aiResultJson, aiModelUsed } = payload;
+    // O N8N pode mandar números como texto ("123"): converte antes de validar
+    const documentId = Number(payload.documentId);
+    const validationId = Number(payload.validationId);
+    const aiScore = payload.aiScore === null || payload.aiScore === '' ? NaN : Number(payload.aiScore);
 
-    if (!documentId || aiScore === undefined) {
-        return { success: false, message: 'documentId e aiScore são obrigatórios.' };
+    if (!Number.isInteger(documentId) || documentId <= 0 || !Number.isInteger(validationId) || validationId <= 0) {
+        return { success: false, message: 'documentId e validationId devem ser inteiros positivos.' };
+    }
+    if (!Number.isFinite(aiScore) || aiScore < 0 || aiScore > 100) {
+        return { success: false, message: 'aiScore deve ser um número entre 0 e 100.' };
     }
 
     let transaction;
     let transactionDone = false;
 
     try {
+        // A validação precisa ser deste documento: impede aprovar um documento com o validationId de outro
+        const validation = await documentValidationModel.getValidationByIdAndDocument(validationId, documentId);
+        if (!validation) {
+            return { success: false, message: 'Validação não encontrada para este documento.' };
+        }
+
         transaction = await trasaction.iniciarTransacao();
 
         const isAutoApproved = aiScore >= AI_AUTO_APPROVE_THRESHOLD;

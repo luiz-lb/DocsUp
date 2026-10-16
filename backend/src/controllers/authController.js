@@ -1,5 +1,13 @@
 import * as authService from '../services/authService.js';
 
+// Opções do cookie do JWT de colaborador. O logout usa as mesmas para conseguir apagá-lo.
+const COLLABORATOR_COOKIE_OPTIONS = {
+    httpOnly: true,  // Impede acesso via JavaScript (Protege contra XSS)
+    secure: process.env.NODE_ENV === 'production', // true em produção (exige HTTPS)
+    sameSite: 'Lax', // Protege contra CSRF (Cross-Site Request Forgery)
+    maxAge: 3600000 // 1 hora em milissegundos
+};
+
 export async function login(req, res, next) {
     try {
         const { email, password } = req.body;
@@ -16,12 +24,7 @@ export async function login(req, res, next) {
 
         const body = {message: "Login realizado com sucesso.", id: tokenESuccess.id, email, name: tokenESuccess.name, department: tokenESuccess.department, role: tokenESuccess.role};
 
-        res.cookie('token', tokenESuccess.token, {
-            httpOnly: true,  // Impede acesso via JavaScript (Protege contra XSS)
-            secure: process.env.NODE_ENV === 'production', // true em produção (exige HTTPS)
-            sameSite: 'Lax', // Protege contra CSRF (Cross-Site Request Forgery)
-            maxAge: 3600000 // 1 hora em milissegundos
-        });
+        res.cookie('token', tokenESuccess.token, COLLABORATOR_COOKIE_OPTIONS);
 
         console.log(`Usuário ${email} logado com sucesso.`);
 
@@ -34,33 +37,9 @@ export async function login(req, res, next) {
 
 }
 
-export async function registerNewUser(req, res, next) {
-    try {
-        const { name, email, departament, role, password } = req.body;
-
-        if (!name || !email || !departament || !role || !password) {
-            return res.status(400).json({ success: false, body: { message: 'Os campos nome, email, departamento, regra e senha são obrigatórios.' } });
-        }
-
-        const registerResult = await authService.registerNewUser({ name, email, departament, role, password });
-        if (!registerResult.success) {
-            return res.status(400).json({ success: false, body: { message: registerResult.message } });
-        }
-
-        res.cookie('token', registerResult.token, {
-            httpOnly: true,  // Impede acesso via JavaScript (Protege contra XSS)
-            secure: process.env.NODE_ENV === 'production', // true em produção (exige HTTPS)
-            sameSite: 'Lax', // Protege contra CSRF (Cross-Site Request Forgery)
-            maxAge: 3600000 // 1 hora em milissegundos
-        });
-
-        console.log(`Usuário ${email} logado com sucesso.`);
-        
-        return res.status(201).json({ success: true, body: { message: 'Usuário registrado com sucesso.', id: registerResult.id, email} });
-    } catch (error) {
-        console.error('Erro no register controller:', error);
-        return res.status(500).json({ success: false, body: { message: "Erro interno do servidor." } });
-    }
+export async function logout(req, res) {
+    res.clearCookie('token', COLLABORATOR_COOKIE_OPTIONS);
+    return res.status(200).json({ success: true, body: { message: 'Logout realizado.' } });
 }
 
 export async function getMe(req, res, next) {

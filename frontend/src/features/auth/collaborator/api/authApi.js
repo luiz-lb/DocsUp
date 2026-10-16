@@ -16,6 +16,20 @@ export async function loginApi(email, password) {
     }
 }
 
+//End point POST para sair: o backend apaga o cookie do JWT
+export async function logoutApi() {
+    try {
+        const result = await api.post('/auth/logout');
+
+        return result.data;
+    } catch (erro) {
+        if (erro.response?.data) {
+            return erro.response.data;
+        }
+        return toErrorResult(erro, 'Erro interno ao tentar conectar com o servidor.');
+    }
+}
+
 //End point GET para verificar com o cookie se o usuário está logado ainda ou não e se ainda é valido
 export async function me(){
     try{

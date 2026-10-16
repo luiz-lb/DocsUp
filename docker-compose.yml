@@ -67,6 +67,7 @@ services:
       DB_TRUST_CERT: ${DB_TRUST_CERT:-true}
       SESSION_SECRET: ${SESSION_SECRET:?Defina SESSION_SECRET no .env}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env}
+      SUPPLIER_JWT_SECRET: ${SUPPLIER_JWT_SECRET:?Defina SUPPLIER_JWT_SECRET no .env}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Defina WEBHOOK_SECRET no .env}
       FRONTEND_URL: ${FRONTEND_URL:?Defina FRONTEND_URL no .env}
       UPLOAD_DIR: /app/uploads

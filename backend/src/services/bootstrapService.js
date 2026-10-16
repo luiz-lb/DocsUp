@@ -1,18 +1,49 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import * as authModel from '../models/authModel.js';
+import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
 
 // users.department: 6 = Admin (espelhado em DEPARTMENT no frontend)
 const ADMIN_DEPARTMENT = 6;
 const ADMIN_ROLE = 'ADMIN';
 const ADMIN_NAME = 'Administrador';
-const MIN_PASSWORD_LENGTH = 8;
+
+// Hash bcrypt completo ($2a$, $2b$ ou $2y$ + custo + 53 caracteres)
+const BCRYPT_HASH = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 
 // Violação de UNIQUE/PK no SQL Server (outra instância criou o mesmo e-mail ao mesmo tempo)
 const SQL_DUPLICATE_KEY_ERRORS = [2601, 2627];
 
 /**
- * Cria o usuário Admin inicial a partir de USER_ADMIN (e-mail) e SENHA_ADMIN.
+ * Converte SENHA_ADMIN em hash bcrypt.
+ * Aceita a senha em texto (gera o hash) ou um hash bcrypt pronto (grava como está),
+ * para o .env não precisar guardar a senha em texto.
+ * Retorna { passwordHash } ou { error }.
+ */
+async function resolveAdminPasswordHash(value) {
+    if (BCRYPT_HASH.test(value)) {
+        // $2y$ (PHP/htpasswd) é o mesmo algoritmo do $2b$, que é o que o bcrypt do Node lê
+        return { passwordHash: value.startsWith('$2y$') ? '$2b$' + value.slice(4) : value };
+    }
+
+    if (/^\$2[aby]\$/.test(value)) {
+        return {
+            error: 'SENHA_ADMIN parece um hash bcrypt incompleto. No .env do docker compose, '
+                + "coloque o hash entre aspas simples (SENHA_ADMIN='$2b$...'), senão o $ é lido como variável.",
+        };
+    }
+
+    const policyError = getPasswordPolicyError(value);
+    if (policyError) {
+        return { error: `SENHA_ADMIN inválida: ${policyError}` };
+    }
+
+    return { passwordHash: await bcrypt.hash(value, 10) };
+}
+
+/**
+ * Cria o usuário Admin inicial a partir de USER_ADMIN (e-mail) e SENHA_ADMIN
+ * (senha em texto ou hash bcrypt).
  *
  * Idempotente: se já existe usuário com esse e-mail (ativo ou não), não faz nada.
  * Em especial, NÃO redefine a senha: trocar SENHA_ADMIN depois não altera o Admin.
@@ -31,19 +62,19 @@ export async function ensureInitialAdmin() {
         return;
     }
 
-    if (password.length < MIN_PASSWORD_LENGTH) {
-        console.error(`[Bootstrap] SENHA_ADMIN precisa ter ao menos ${MIN_PASSWORD_LENGTH} caracteres: Admin inicial não criado.`);
-        return;
-    }
-
     const existingId = await authModel.getUserIdByEmailAnyStatus(email);
     if (existingId) {
         console.log('[Bootstrap] Admin inicial já existe: nada a fazer.');
         return;
     }
 
+    const { passwordHash, error } = await resolveAdminPasswordHash(password);
+    if (error) {
+        console.error(`[Bootstrap] ${error} Admin inicial não criado.`);
+        return;
+    }
+
     try {
-        const passwordHash = await bcrypt.hash(password, 10);
         const result = await authModel.insertUser({
             uid: crypto.randomUUID(),
             name: ADMIN_NAME,

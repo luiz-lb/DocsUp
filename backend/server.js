@@ -24,7 +24,8 @@ app.use(cors({
 }));
 
 // Middleware
-app.use(morgan(ambiente));
+// 'combined' em produção (formato padrão de log de acesso); 'dev' (colorido) fora dela
+app.use(morgan(ambiente === 'production' ? 'combined' : 'dev'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());

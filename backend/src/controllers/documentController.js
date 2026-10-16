@@ -1,4 +1,23 @@
+import crypto from 'crypto';
 import * as documentValidationService from '../services/documentValidationService.js';
+
+/**
+ * Confere o X-Webhook-Secret em tempo constante.
+ * Sem WEBHOOK_SECRET configurado, recusa tudo (antes, a rota ficava aberta).
+ */
+function isValidWebhookSecret(received) {
+    const expected = process.env.WEBHOOK_SECRET;
+    if (!expected) {
+        console.error('[Webhook] WEBHOOK_SECRET não configurado: requisição recusada.');
+        return false;
+    }
+    if (typeof received !== 'string') return false;
+
+    const receivedBuffer = Buffer.from(received);
+    const expectedBuffer = Buffer.from(expected);
+    return receivedBuffer.length === expectedBuffer.length
+        && crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
+}
 
 // ─────────────────────────────────────────────
 // Painel interno
@@ -115,8 +134,7 @@ export async function setStatus(req, res) {
  */
 export async function receiveAiResult(req, res) {
     try {
-        const webhookSecret = req.headers['x-webhook-secret'];
-        if (webhookSecret !== process.env.WEBHOOK_SECRET) {
+        if (!isValidWebhookSecret(req.headers['x-webhook-secret'])) {
             return res.status(401).json({ success: false, body: { message: 'Acesso não autorizado.' } });
         }
 

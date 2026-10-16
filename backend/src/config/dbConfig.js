@@ -9,6 +9,10 @@ const dbConfig = {
     options: {
         encrypt: process.env.DB_ENCRYPT === 'true',
         trustServerCertificate: process.env.DB_TRUST_CERT === 'true',
+        // O banco grava hora local (GETDATE / SYSDATETIMEOFFSET em America/Sao_Paulo): lê e
+        // grava datas no fuso local do Node. Com o padrão (UTC), tudo ficava 3h deslocado.
+        // O backend precisa rodar no mesmo fuso do SQL Server (TZ=America/Sao_Paulo).
+        useUTC: false,
     },
     pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
 };

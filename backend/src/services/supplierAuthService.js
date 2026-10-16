@@ -5,6 +5,7 @@ import axios from 'axios';
 import nodemailer from 'nodemailer';
 import * as supplierModel from '../models/supplierModel.js';
 import * as trasaction from '../models/trasaction.js';
+import { getSupplierJwtSecret } from '../config/jwtSecrets.js';
 
 // ─────────────────────────────────────────────
 // Helpers internos
@@ -41,7 +42,7 @@ function signSupplierToken(supplier) {
             cnpj: supplier.cnpj,
             razaoSocial: supplier.razao_social,
         },
-        process.env.JWT_SECRET,
+        getSupplierJwtSecret(),
         { expiresIn: '4h' }
     );
 }
