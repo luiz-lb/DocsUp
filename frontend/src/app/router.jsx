@@ -5,7 +5,9 @@ import PublicLayout from '../components/layout/PublicLayout/index.js';
 import RouteFallback from './RouteFallback.jsx';
 import { ROUTES } from '../constants/routes.js';
 import RequireAuth from '../features/auth/collaborator/RequireAuth.jsx';
+import RequireDepartment from '../features/auth/collaborator/RequireDepartment.jsx';
 import RequireSupplierAuth from '../features/suppliers/RequireSupplierAuth.jsx';
+import { DEPARTMENT_ID } from '../constants/enums.js';
 
 // Cada pagina e' code-split via React.lazy: rotas pouco usadas (fase 2,
 // cadastro de fornecedor) nao engordam o bundle inicial do painel interno.
@@ -40,6 +42,8 @@ const ScoreboardPage = lazy(() => import('../features/scoring/pages/ScoreboardPa
 
 const PurchaseOrderListPage = lazy(() => import('../features/purchase-orders/pages/PurchaseOrderListPage.jsx'));
 const PaymentTrackingPage = lazy(() => import('../features/purchase-orders/pages/PaymentTrackingPage.jsx'));
+
+const UserListPage = lazy(() => import('../features/users/pages/UserListPage.jsx'));
 
 function SuspendedOutlet() {
   return (
@@ -82,6 +86,14 @@ export const router = createBrowserRouter([
 
               { path: ROUTES.purchaseOrders.list, element: <PurchaseOrderListPage /> },
               { path: ROUTES.purchaseOrders.payments, element: <PaymentTrackingPage /> },
+
+              // Administração: só Admin
+              {
+                element: <RequireDepartment allowed={[DEPARTMENT_ID.ADMIN]} />,
+                children: [
+                  { path: ROUTES.users.list, element: <UserListPage /> },
+                ],
+              },
             ],
           },
         ],

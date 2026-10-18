@@ -1,10 +1,8 @@
-import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import * as authModel from '../models/authModel.js';
+import * as userModel from '../models/userModel.js';
+import { DEPARTMENTS } from '../constants/departments.js';
 import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
 
-// users.department: 6 = Admin (espelhado em DEPARTMENT no frontend)
-const ADMIN_DEPARTMENT = 6;
 const ADMIN_ROLE = 'ADMIN';
 const ADMIN_NAME = 'Administrador';
 
@@ -62,7 +60,7 @@ export async function ensureInitialAdmin() {
         return;
     }
 
-    const existingId = await authModel.getUserIdByEmailAnyStatus(email);
+    const existingId = await userModel.getUserIdByEmail(email);
     if (existingId) {
         console.log('[Bootstrap] Admin inicial já existe: nada a fazer.');
         return;
@@ -75,16 +73,14 @@ export async function ensureInitialAdmin() {
     }
 
     try {
-        const result = await authModel.insertUser({
-            uid: crypto.randomUUID(),
+        const id = await userModel.insertUser({
             name: ADMIN_NAME,
             email,
-            // insertUser declara department como VarChar; o SQL Server converte para TINYINT
-            department: String(ADMIN_DEPARTMENT),
+            department: DEPARTMENTS.ADMIN,
             role: ADMIN_ROLE,
             passwordHash,
         });
-        console.log(`[Bootstrap] Admin inicial criado (id ${result.id}).`);
+        console.log(`[Bootstrap] Admin inicial criado (id ${id}).`);
     } catch (error) {
         if (SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
             console.log('[Bootstrap] Admin inicial já foi criado por outra instância.');

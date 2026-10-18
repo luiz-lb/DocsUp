@@ -65,18 +65,30 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  const logout = async () => {
-    // O cookie é httpOnly: só o backend consegue apagá-lo. Se a chamada falhar, a sessão
-    // continua válida, então o estado também continua e o resultado volta para a tela avisar.
-    const result = await logoutApi();
-    if (!result?.success) return result;
-
+  const clearUser = () => {
     setIsAuthenticated(false);
     setUserId(null);
     setUserEmail(null);
     setUserName(null);
     setUserDepartament(null);
     setUserRole(null);
+  };
+
+  const logout = async () => {
+    // O cookie é httpOnly: só o backend consegue apagá-lo. Se a chamada falhar, a sessão
+    // continua válida, então o estado também continua e o resultado volta para a tela avisar.
+    const result = await logoutApi();
+    if (!result?.success) return result;
+
+    clearUser();
+    return result;
+  };
+
+  // Relê o usuário logado no backend (ex.: depois de o Admin editar o próprio cadastro).
+  // Se a sessão não vale mais (usuário inativado), limpa o estado e o RequireAuth leva ao login.
+  const refreshUser = async () => {
+    const result = await findCookie();
+    if (!result.success) clearUser();
     return result;
   };
 
@@ -88,6 +100,7 @@ export function AuthProvider({ children }) {
       isLoading,
       login,
       logout,
+      refreshUser,
     };
   }, [userId, userName, userEmail, userDepartament, userRole, isAuthenticated, isLoading]);
 

@@ -7,6 +7,7 @@ import suppliers from './suppliers.js';
 import quotation from './quotation.js';
 import phase2 from './phase2.js';
 import documents from './documents.js';
+import users from './users.js';
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use('/suppliers', suppliers);
 router.use('/quotations', quotation);
 router.use('/phase2', phase2);
 router.use('/documents', documents);
+router.use('/users', users);
 
 export default router;

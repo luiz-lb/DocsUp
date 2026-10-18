@@ -12,6 +12,17 @@ export const DEPARTMENT = {
   6: { label: 'Admin', tone: 'danger' },
 };
 
+// Ids do DEPARTMENT por nome, para regras de acesso (mesmos valores do backend)
+export const DEPARTMENT_ID = {
+  RH: 0,
+  SEGURANCA_TRABALHO: 1,
+  SUPRIMENTOS: 2,
+  FISCAL: 3,
+  FINANCEIRO: 4,
+  OBRA: 5,
+  ADMIN: 6,
+};
+
 export const CONTACT_TYPE = {
   0: { label: 'Legal', tone: 'indigo' },
   1: { label: 'Operacional', tone: 'info' },

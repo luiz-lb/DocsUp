@@ -47,4 +47,8 @@ export const ROUTES = {
     list: '/pedidos-compra',
     payments: '/pagamentos',
   },
+
+  users: {
+    list: '/usuarios',
+  },
 };
