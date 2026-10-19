@@ -104,14 +104,15 @@ export async function getLaborRequestById(id) {
                 r.activity_type_id,
                 at.[name] as activity_type_name,
                 -- Sugestões da atividade (activity_type_documents), no formato antigo ("1,2,3"):
-                -- tipos da empresa (categoria 0) e, das NRs (categoria 2), o nr_type_id. Só ativos.
+                -- tipos da empresa (categoria 0) e outros do colaborador (categoria 3) e, das NRs
+                -- (categoria 2), o nr_type_id. Só ativos.
                 (
                     Select STRING_AGG(CAST(atd.document_type_id AS VARCHAR(10)), ',')
                            WITHIN GROUP (ORDER BY atd.document_type_id)
                     from activity_type_documents as atd
                     Inner join document_types as dt on dt.id = atd.document_type_id
                     Where atd.activity_type_id = r.activity_type_id
-                      And dt.category = 0
+                      And dt.category IN (0, 3)
                       And dt.is_active = 1
                 ) as activity_doc_type_id,
                 (

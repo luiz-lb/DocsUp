@@ -93,23 +93,6 @@ export async function submitApproval(laborRequestId, decision, comments, documen
   }
 }
 
-/**
- * Atualiza os documentos obrigatórios de uma solicitação aprovada.
- * POST /laborRequest/updateDocsRequired
- */
-export async function updateDocsRequired(laborRequestId, documentTypeIds) {
-  try {
-    const result = await api.post('/laborRequest/updateDocsRequired', {
-      laborRequestId,
-      documentTypeIds,
-    });
-    return result.data;
-  } catch (error) {
-    console.error('Erro ao atualizar documentos obrigatórios:', error);
-    return toErrorResult(error, 'Erro ao atualizar documentos.');
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Dados de referência
 // ---------------------------------------------------------------------------
@@ -130,6 +113,17 @@ export async function getDocumentsTypes() {
     return { success: true, body: result.data.body.result };
   } catch (error) {
     console.error('Erro ao buscar tipos de documentos:', error);
+    return { success: false, body: [] };
+  }
+}
+
+/** Básicos (categoria 1) e outros (categoria 3) do colaborador, ativos. */
+export async function getEmployeeDocumentTypes() {
+  try {
+    const result = await api.get('/docRequired/employee_document_types');
+    return { success: true, body: result.data.body.result };
+  } catch (error) {
+    console.error('Erro ao buscar tipos de documento do colaborador:', error);
     return { success: false, body: [] };
   }
 }

@@ -1,79 +1,115 @@
 import { useState } from 'react';
-import { LuArrowLeft, LuArrowRight, LuCheck, LuPlus, LuTrash2 } from 'react-icons/lu';
+import { LuArrowLeft, LuArrowRight, LuCheck, LuLock, LuPlus, LuSearch, LuSparkles, LuTrash2 } from 'react-icons/lu';
 import { Button, FormField, WizardStepper } from '../../../components/ui/index.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
-import { getDocumentsTypes, getNrTypes, submitApproval } from '../api/laborRequestsApi.js';
-import { DOCUMENT_SCOPE } from '../../../constants/enums.js';
+import {
+  getDocumentsTypes,
+  getEmployeeDocumentTypes,
+  getNrTypes,
+  submitApproval,
+} from '../api/laborRequestsApi.js';
+import { DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import styles from './ApprovePanel.module.css';
 
-const STEPS = ['Documentos da empresa', 'NRs dos colaboradores'];
+const STEPS = ['Documentos da empresa', 'Documentos dos colaboradores'];
+
+/** Texto sem acentos e em minúsculas, para a busca de NRs. */
+function normalize(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+}
+
+/** Sugeridos pela atividade primeiro; depois na ordem que já veio (nome ou código). */
+function suggestedFirst(items, suggestedSet) {
+  return [...items].sort((a, b) => Number(suggestedSet.has(b.id)) - Number(suggestedSet.has(a.id)));
+}
+
+/** Linha de apoio do documento: validade e prazo padrão. */
+function validityMeta(doc) {
+  if (!doc.has_expiration) return null;
+  return doc.validity_days ? `Tem validade · prazo padrão ${doc.validity_days} dias` : 'Tem validade';
+}
+
+/** Ids iniciais: os sugeridos que existem na lista. */
+function initialSelection(suggestedIds) {
+  return new Set(suggestedIds.map(Number).filter(Boolean));
+}
 
 /**
  * Painel de aprovação da Segurança do Trabalho — 2 etapas.
  *
- * Step 0 — Documentos da empresa:
- *   Define quais document_types são obrigatórios para esta contratação.
- *   Pré-seleção vem de activityDocTypeIds (sugestão da atividade).
- *
- * Step 1 — NRs dos colaboradores:
- *   Define quais NRs os colaboradores do fornecedor devem possuir.
- *   Pré-seleção vem de activityNrTypeIds (sugestão da atividade).
+ * Etapa 0 — Documentos da empresa (ao menos um).
+ * Etapa 1 — Documentos dos colaboradores:
+ *   - Básicos: sempre exigidos (marcados e travados); o backend grava todos os ativos.
+ *   - NRs e Outros: os sugeridos pela atividade já vêm marcados e podem ser desmarcados.
  *   Inclui campo de comentário livre antes do envio.
  *
  * Props:
  *  - laborRequestId     : number
- *  - activityDocTypeIds : number[] — IDs sugeridos de document_types
- *  - activityNrTypeIds  : number[] — IDs sugeridos de nr_types
+ *  - activityDocTypeIds : number[] — ids sugeridos de document_types (empresa e outros)
+ *  - activityNrTypeIds  : number[] — ids sugeridos de nr_types
  *  - onSuccess          : () => void
  */
 export default function ApprovePanel({
   laborRequestId,
   activityDocTypeIds = [],
-  activityNrTypeIds  = [],
+  activityNrTypeIds = [],
   onSuccess,
 }) {
-  const { data: docTypesData, isLoading: isLoadingDocs } = useAsyncData(getDocumentsTypes, []);
-  const { data: nrTypesData,  isLoading: isLoadingNrs  } = useAsyncData(getNrTypes, []);
+  const { data: companyData, isLoading: isLoadingCompany } = useAsyncData(getDocumentsTypes, []);
+  const { data: employeeData, isLoading: isLoadingEmployee } = useAsyncData(getEmployeeDocumentTypes, []);
+  const { data: nrData, isLoading: isLoadingNrs } = useAsyncData(getNrTypes, []);
 
   const [step, setStep] = useState(0);
 
-  // ── Step 0 ───────────────────────────────────────────────────────────────
-  const [selectedDocIds, setSelectedDocIds] = useState(
-    () => new Set(activityDocTypeIds.map(Number).filter(Boolean)),
-  );
-
-  // ── Step 1 ───────────────────────────────────────────────────────────────
-  const [selectedNrIds, setSelectedNrIds] = useState(
-    () => new Set(activityNrTypeIds.map(Number).filter(Boolean)),
-  );
+  // Sugeridos da atividade: empresa e outros vêm juntos em activityDocTypeIds
+  const [selectedDocIds, setSelectedDocIds] = useState(() => initialSelection(activityDocTypeIds));
+  const [selectedNrIds, setSelectedNrIds] = useState(() => initialSelection(activityNrTypeIds));
+  const [nrSearch, setNrSearch] = useState('');
   const [comments, setComments] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const documentTypes = docTypesData?.body ?? [];
-  const nrTypes       = nrTypesData?.body  ?? [];
+  const suggestedDocSet = new Set(activityDocTypeIds.map(Number));
+  const suggestedNrSet = new Set(activityNrTypeIds.map(Number));
 
-  // ── Helpers de toggle ────────────────────────────────────────────────────
-  const toggleDoc = (id) =>
-    setSelectedDocIds((prev) => {
+  const companyTypes = suggestedFirst(companyData?.body ?? [], suggestedDocSet);
+  const employeeTypes = employeeData?.body ?? [];
+  const basicTypes = employeeTypes.filter((doc) => doc.category === DOCUMENT_CATEGORY_ID.BASICO);
+  const otherTypes = suggestedFirst(
+    employeeTypes.filter((doc) => doc.category === DOCUMENT_CATEGORY_ID.OUTRO),
+    suggestedDocSet,
+  );
+  const nrTypes = suggestedFirst(nrData?.body ?? [], suggestedNrSet);
+
+  const searchTerm = normalize(nrSearch.trim());
+  const visibleNrs = searchTerm
+    ? nrTypes.filter((nr) => normalize(`${nr.code} ${nr.name}`).includes(searchTerm))
+    : nrTypes;
+
+  // Contagens só do que está na lista (um sugerido inativo não conta)
+  const companyCount = companyTypes.filter((doc) => selectedDocIds.has(doc.id)).length;
+  const otherCount = otherTypes.filter((doc) => selectedDocIds.has(doc.id)).length;
+  const nrCount = nrTypes.filter((nr) => selectedNrIds.has(nr.id)).length;
+
+  const toggle = (setter) => (id) =>
+    setter((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
+  const toggleDoc = toggle(setSelectedDocIds);
+  const toggleNr = toggle(setSelectedNrIds);
 
-  const toggleNr = (id) =>
-    setSelectedNrIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
-  // ── Avançar step 0 → step 1 ──────────────────────────────────────────────
+  // ── Avançar etapa 0 → etapa 1 ────────────────────────────────────────────
   const handleNext = () => {
     setError('');
-    if (selectedDocIds.size === 0) {
-      setError('Selecione ao menos um documento obrigatório para continuar.');
+    if (companyCount === 0) {
+      setError('Selecione ao menos um documento da empresa para continuar.');
       return;
     }
     setStep(1);
@@ -82,20 +118,15 @@ export default function ApprovePanel({
   // ── Envio final ──────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setError('');
-    if (selectedNrIds.size === 0) {
-      setError('Selecione ao menos uma NR obrigatória antes de aprovar.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const result = await submitApproval(
-        laborRequestId,
-        2, // Aprovado
-        comments,
-        [...selectedDocIds],
-        [...selectedNrIds],
-      );
+      // Empresa e outros marcados; os básicos o backend inclui sozinho
+      const documentTypeIds = [...companyTypes, ...otherTypes]
+        .filter((doc) => selectedDocIds.has(doc.id))
+        .map((doc) => doc.id);
+      const nrTypeIds = nrTypes.filter((nr) => selectedNrIds.has(nr.id)).map((nr) => nr.id);
+
+      const result = await submitApproval(laborRequestId, 2, comments, documentTypeIds, nrTypeIds);
 
       if (!result.success) {
         setError(result.body?.message ?? 'Erro ao registrar decisão.');
@@ -108,64 +139,32 @@ export default function ApprovePanel({
     }
   };
 
-  // ── Separação sugeridos / outros ─────────────────────────────────────────
-  const suggestedDocSet = new Set(activityDocTypeIds.map(Number));
-  const suggestedDocs   = documentTypes.filter((d) => suggestedDocSet.has(d.id));
-  const otherDocs       = documentTypes.filter((d) => !suggestedDocSet.has(d.id));
-
-  const suggestedNrSet  = new Set(activityNrTypeIds.map(Number));
-  const suggestedNrs    = nrTypes.filter((n) => suggestedNrSet.has(n.id));
-  const otherNrs        = nrTypes.filter((n) => !suggestedNrSet.has(n.id));
-
   return (
     <div className={styles.panel}>
       <WizardStepper steps={STEPS} activeStep={step} />
 
-      {/* ── Step 0: Documentos da empresa ──────────────────────────────── */}
+      {/* ── Etapa 0: Documentos da empresa ──────────────────────────────── */}
       {step === 0 && (
         <>
-          <div className={styles.section}>
-            <p className={styles.sectionTitle}>
-              Documentos obrigatórios para a contratação
-              <span className={styles.badge}>{selectedDocIds.size} selecionados</span>
-            </p>
-
-            {isLoadingDocs ? (
+          <Section title="Documentos da empresa" count={companyCount}>
+            {isLoadingCompany ? (
               <p className={styles.loading}>Carregando documentos…</p>
+            ) : companyTypes.length === 0 ? (
+              <p className={styles.loading}>Nenhum documento da empresa cadastrado.</p>
             ) : (
-              <>
-                {suggestedDocs.length > 0 && (
-                  <CheckGroup label="Sugeridos pela atividade">
-                    {suggestedDocs.map((doc) => (
-                      <CheckItem
-                        key={doc.id}
-                        label={doc.name}
-                        meta={`${DOCUMENT_SCOPE[doc.scope]?.label ?? ''}${doc.validity_days ? ` · Validade: ${doc.validity_days} dias` : ''}`}
-                        checked={selectedDocIds.has(doc.id)}
-                        onChange={() => toggleDoc(doc.id)}
-                        disabled={isSubmitting}
-                      />
-                    ))}
-                  </CheckGroup>
-                )}
-
-                {otherDocs.length > 0 && (
-                  <CheckGroup label="Outros disponíveis">
-                    {otherDocs.map((doc) => (
-                      <CheckItem
-                        key={doc.id}
-                        label={doc.name}
-                        meta={`${DOCUMENT_SCOPE[doc.scope]?.label ?? ''}${doc.validity_days ? ` · Validade: ${doc.validity_days} dias` : ''}`}
-                        checked={selectedDocIds.has(doc.id)}
-                        onChange={() => toggleDoc(doc.id)}
-                        disabled={isSubmitting}
-                      />
-                    ))}
-                  </CheckGroup>
-                )}
-              </>
+              companyTypes.map((doc) => (
+                <CheckItem
+                  key={doc.id}
+                  label={doc.name}
+                  meta={validityMeta(doc)}
+                  suggested={suggestedDocSet.has(doc.id)}
+                  checked={selectedDocIds.has(doc.id)}
+                  onChange={() => toggleDoc(doc.id)}
+                  disabled={isSubmitting}
+                />
+              ))
             )}
-          </div>
+          </Section>
 
           {error && <p className={styles.error}>{error}</p>}
 
@@ -174,61 +173,88 @@ export default function ApprovePanel({
               icon={LuArrowRight}
               iconPosition="right"
               onClick={handleNext}
-              disabled={isLoadingDocs}
+              disabled={isLoadingCompany}
             >
-              Próximo: NRs dos colaboradores
+              Próximo: documentos dos colaboradores
             </Button>
           </div>
         </>
       )}
 
-      {/* ── Step 1: NRs dos colaboradores ──────────────────────────────── */}
+      {/* ── Etapa 1: Documentos dos colaboradores ───────────────────────── */}
       {step === 1 && (
         <>
-          <div className={styles.section}>
-            <p className={styles.sectionTitle}>
-              NRs obrigatórias para os colaboradores
-              <span className={styles.badge}>{selectedNrIds.size} selecionadas</span>
-            </p>
+          <Section
+            title="Básicos do colaborador"
+            note="Exigidos de todo colaborador. Ficam gravados nesta solicitação como estão hoje."
+          >
+            {isLoadingEmployee ? (
+              <p className={styles.loading}>Carregando documentos…</p>
+            ) : basicTypes.length === 0 ? (
+              <p className={styles.loading}>Nenhum documento básico cadastrado.</p>
+            ) : (
+              basicTypes.map((doc) => (
+                <CheckItem key={doc.id} label={doc.name} meta={validityMeta(doc)} checked locked />
+              ))
+            )}
+          </Section>
 
+          <Section title="NRs do colaborador" count={nrCount}>
             {isLoadingNrs ? (
               <p className={styles.loading}>Carregando NRs…</p>
+            ) : nrTypes.length === 0 ? (
+              <p className={styles.loading}>Nenhuma NR ativa cadastrada.</p>
             ) : (
               <>
-                {suggestedNrs.length > 0 && (
-                  <CheckGroup label="Sugeridas pela atividade">
-                    {suggestedNrs.map((nr) => (
-                      <CheckItem
-                        key={nr.id}
-                        label={nr.code}
-                        meta={nr.name}
-                        checked={selectedNrIds.has(nr.id)}
-                        onChange={() => toggleNr(nr.id)}
-                        disabled={isSubmitting}
-                      />
-                    ))}
-                  </CheckGroup>
-                )}
-
-                {otherNrs.length > 0 && (
-                  <CheckGroup label="Outras disponíveis">
-                    {otherNrs.map((nr) => (
-                      <CheckItem
-                        key={nr.id}
-                        label={nr.code}
-                        meta={nr.name}
-                        checked={selectedNrIds.has(nr.id)}
-                        onChange={() => toggleNr(nr.id)}
-                        disabled={isSubmitting}
-                      />
-                    ))}
-                  </CheckGroup>
+                <label className={styles.searchField}>
+                  <LuSearch className={styles.searchIcon} aria-hidden="true" />
+                  <input
+                    type="text"
+                    placeholder="Buscar NR por código ou título..."
+                    value={nrSearch}
+                    onChange={(event) => setNrSearch(event.target.value)}
+                  />
+                </label>
+                {visibleNrs.length === 0 ? (
+                  <p className={styles.loading}>Nenhuma NR encontrada para “{nrSearch.trim()}”.</p>
+                ) : (
+                  visibleNrs.map((nr) => (
+                    <CheckItem
+                      key={nr.id}
+                      label={nr.code}
+                      meta={nr.name}
+                      suggested={suggestedNrSet.has(nr.id)}
+                      checked={selectedNrIds.has(nr.id)}
+                      onChange={() => toggleNr(nr.id)}
+                      disabled={isSubmitting}
+                    />
+                  ))
                 )}
               </>
             )}
-          </div>
+          </Section>
 
-          {/* Comentário livre — único campo de texto, no step final */}
+          <Section title="Outros do colaborador" count={otherCount}>
+            {isLoadingEmployee ? (
+              <p className={styles.loading}>Carregando documentos…</p>
+            ) : otherTypes.length === 0 ? (
+              <p className={styles.loading}>Nenhum documento em “Outros” cadastrado.</p>
+            ) : (
+              otherTypes.map((doc) => (
+                <CheckItem
+                  key={doc.id}
+                  label={doc.name}
+                  meta={validityMeta(doc)}
+                  suggested={suggestedDocSet.has(doc.id)}
+                  checked={selectedDocIds.has(doc.id)}
+                  onChange={() => toggleDoc(doc.id)}
+                  disabled={isSubmitting}
+                />
+              ))
+            )}
+          </Section>
+
+          {/* Comentário livre — único campo de texto, na etapa final */}
           <FormField
             label="Comentários (opcional)"
             hint="Observações adicionais para o departamento de Suprimentos."
@@ -258,7 +284,7 @@ export default function ApprovePanel({
               icon={LuCheck}
               onClick={handleSubmit}
               isLoading={isSubmitting}
-              disabled={selectedNrIds.size === 0 || isLoadingNrs}
+              disabled={isLoadingEmployee || isLoadingNrs}
             >
               Aprovar e definir requisitos
             </Button>
@@ -273,34 +299,53 @@ export default function ApprovePanel({
 // Sub-componentes internos
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CheckGroup({ label, children }) {
+function Section({ title, count, note, children }) {
   return (
-    <div className={styles.group}>
-      <span className={styles.groupLabel}>{label}</span>
+    <div className={styles.section}>
+      <p className={styles.sectionTitle}>
+        {title}
+        {count !== undefined && (
+          <span className={styles.badge}>{count} {count === 1 ? 'selecionado' : 'selecionados'}</span>
+        )}
+      </p>
+      {note && <p className={styles.sectionNote}>{note}</p>}
       {children}
     </div>
   );
 }
 
-function CheckItem({ label, meta, checked, onChange, disabled }) {
+function CheckItem({ label, meta, suggested = false, checked, onChange, disabled = false, locked = false }) {
+  const isDisabled = disabled || locked;
   return (
-    <label className={`${styles.item} ${checked ? styles.itemChecked : ''}`}>
+    <label
+      className={`${styles.item} ${checked ? styles.itemChecked : ''} ${locked ? styles.itemLocked : ''}`}
+    >
       <input
         type="checkbox"
         checked={checked}
-        onChange={onChange}
-        disabled={disabled}
+        onChange={onChange ?? (() => {})}
+        disabled={isDisabled}
         className={styles.checkbox}
         aria-label={label}
       />
       <div className={styles.itemInfo}>
-        <span className={styles.itemLabel}>{label}</span>
+        <span className={styles.itemLabel}>
+          {label}
+          {suggested && (
+            <span className={styles.suggestedTag}>
+              <LuSparkles aria-hidden="true" /> sugerido pela atividade
+            </span>
+          )}
+        </span>
         {meta && <span className={styles.itemMeta}>{meta}</span>}
       </div>
-      {checked
-        ? <LuTrash2 className={styles.itemIcon} aria-hidden="true" />
-        : <LuPlus   className={styles.itemIcon} aria-hidden="true" />
-      }
+      {locked ? (
+        <LuLock className={styles.itemIcon} aria-label="Sempre exigido" />
+      ) : checked ? (
+        <LuTrash2 className={styles.itemIcon} aria-hidden="true" />
+      ) : (
+        <LuPlus className={styles.itemIcon} aria-hidden="true" />
+      )}
     </label>
   );
 }

@@ -9,7 +9,7 @@ import {
   Banner,
   Button,
 } from '../../../components/ui/index.js';
-import { LABOR_REQUEST_STATUS, URGENCY, DOCUMENT_SCOPE } from '../../../constants/enums.js';
+import { LABOR_REQUEST_STATUS, URGENCY, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import { useLaborRequest, useLaborRequestApprovals } from '../hooks/useLaborRequests.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
@@ -21,6 +21,13 @@ import { getLatestRoundByLaborRequest } from '../../quotations/api/quotationsApi
 import { useDisclosure } from '../../../hooks/useDisclosure.js';
 import { ROUTES } from '../../../constants/routes.js';
 import styles from './RequestDetailPage.module.css';
+
+// Ordem dos grupos de documentos exigidos (as NRs têm card próprio)
+const REQUIRED_DOC_CATEGORIES = [
+  DOCUMENT_CATEGORY_ID.EMPRESA,
+  DOCUMENT_CATEGORY_ID.BASICO,
+  DOCUMENT_CATEGORY_ID.OUTRO,
+];
 
 /**
  * Página de detalhe de uma solicitação de mão-de-obra.
@@ -76,12 +83,19 @@ export default function RequestDetailPage() {
     navigate(ROUTES.quotations.round(roundId));
   };
 
-  // IDs sugeridos de document_types pela atividade (campo document_type_id de activity_types)
+  // IDs sugeridos de document_types pela atividade (empresa e outros do colaborador)
   const suggestedDocIds = request.activity_doc_type_id
     ? String(request.activity_doc_type_id).split(',').map(Number).filter(Boolean)
     : [];
 
-  // IDs sugeridos de nr_types pela atividade (campo nr_type_id de activity_types)
+  // Documentos exigidos agrupados por categoria (empresa, básicos, outros); NRs ficam no card próprio
+  const requiredDocGroups = REQUIRED_DOC_CATEGORIES.map((category) => ({
+    category,
+    label: DOCUMENT_CATEGORY[category].label,
+    items: (request.requiredDocuments ?? []).filter((doc) => doc.category === category),
+  })).filter((group) => group.items.length > 0);
+
+  // IDs sugeridos de nr_types pela atividade
   const suggestedNrIds = request.activity_nr_type_id
     ? String(request.activity_nr_type_id).split(',').map(Number).filter(Boolean)
     : [];
@@ -164,24 +178,27 @@ export default function RequestDetailPage() {
             </Card.Body>
           </Card>
 
-          {/* Documentos obrigatórios definidos pela Segurança do Trabalho */}
-          {request.requiredDocuments && request.requiredDocuments.length > 0 && (
+          {/* Documentos obrigatórios definidos pela Segurança do Trabalho, por categoria */}
+          {requiredDocGroups.length > 0 && (
             <Card>
               <Card.Body>
                 <h3 className={styles.sectionTitle}>
                   <LuFileText aria-hidden="true" />
                   Documentos obrigatórios
                 </h3>
-                <ul className={styles.reqList}>
-                  {request.requiredDocuments.map((doc) => (
-                    <li key={doc.id} className={styles.reqItem}>
-                      <span className={styles.reqName}>{doc.document_type_name}</span>
-                      <span className={styles.reqMeta}>
-                        {DOCUMENT_SCOPE[doc.scope]?.label ?? ''}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                {requiredDocGroups.map((group) => (
+                  <div key={group.category} className={styles.reqGroup}>
+                    <p className={styles.reqGroupTitle}>{group.label}</p>
+                    <ul className={styles.reqList}>
+                      {group.items.map((doc) => (
+                        <li key={doc.id} className={styles.reqItem}>
+                          <span className={styles.reqName}>{doc.document_type_name}</span>
+                          {doc.has_expiration && <span className={styles.reqMeta}>tem validade</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </Card.Body>
             </Card>
           )}

@@ -163,35 +163,3 @@ export async function approveRequest(req, res) {
         return res.status(500).json({ success: false, body: { message: "Erro interno do servidor." } });
     }
 }
-
-/**
- * Segurança do Trabalho atualiza os documentos obrigatórios de uma solicitação aprovada.
- * POST /laborRequest/updateDocsRequired
- *
- * Body: { laborRequestId, documentTypeIds[] }
- */
-export async function updateDocsRequired(req, res) {
-    try {
-        const { laborRequestId, documentTypeIds } = req.body;
-        const userId = req.usuario.id;
-
-        if (!laborRequestId || !documentTypeIds) {
-            return res.status(400).json({ success: false, body: { message: "laborRequestId e documentTypeIds são obrigatórios." } });
-        }
-
-        const result = await laborRequestService.updateDocsRequired(
-            Number(laborRequestId),
-            userId,
-            documentTypeIds
-        );
-
-        if (result.success) {
-            return res.status(200).json({ success: true, body: result.body });
-        } else {
-            return res.status(400).json({ success: false, body: { message: result.body.message } });
-        }
-    } catch (error) {
-        console.error('Erro no updateDocsRequired controller:', error);
-        return res.status(500).json({ success: false, body: { message: "Erro interno do servidor." } });
-    }
-}

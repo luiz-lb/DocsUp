@@ -39,6 +39,21 @@ export async function getDocumentTypes() {
     return result.recordset;
 }
 
+// Tipos de documento do colaborador ativos, básicos (categoria 1) e outros (categoria 3).
+// As NRs (categoria 2) vêm de getNrTypes.
+export async function getEmployeeDocumentTypes() {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT id, [name], [description], category, has_expiration, validity_days
+            FROM document_types
+            WHERE is_active = 1 AND category IN (1, 3)
+            ORDER BY category, [name]
+        `);
+
+    return result.recordset;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Regiões (tabela regions) — usada no cadastro de fornecedor
 // ─────────────────────────────────────────────────────────────────────────────

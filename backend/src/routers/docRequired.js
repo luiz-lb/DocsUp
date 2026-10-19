@@ -8,6 +8,8 @@ const router = express.Router();
 router.get('/activity_types',  verificarToken, docRequired.activityTypes);
 router.get('/nr_types',        verificarToken, docRequired.nr_types);
 router.get('/document_types',  verificarToken, docRequired.document_types);
+// Básicos e outros do colaborador (painel de aprovação da Segurança do Trabalho)
+router.get('/employee_document_types', verificarToken, docRequired.employee_document_types);
 
 // ── Rotas públicas (portal do fornecedor — sem JWT interno) ────────────────
 // Atividades: usadas no step "Atuação" do cadastro de fornecedor

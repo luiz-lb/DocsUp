@@ -45,6 +45,21 @@ export async function document_types(req,res) {
     }
 }
 
+export async function employee_document_types(req, res) {
+    try {
+        const result = await docRequiredService.employeeDocumentTypes();
+
+        if(result.success){
+            return res.status(200).json({success: true, body: result.body})
+        }else{
+            return res.status(500).json({success: false, body: result.body})
+        }
+    } catch (error) {
+        console.error('Erro no employee_document_types controller:', error);
+        return res.status(500).json({ success: false, body: { message: "Erro interno do servidor." } });
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Endpoints públicos para o portal do fornecedor (sem autenticação interna)
 // ─────────────────────────────────────────────────────────────────────────────

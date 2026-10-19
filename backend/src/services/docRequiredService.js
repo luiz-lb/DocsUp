@@ -54,6 +54,17 @@ export async function documentTypes() {
     }
 }
 
+// Básicos e outros do colaborador (lista vazia não é erro: pode não haver "outros" ativos)
+export async function employeeDocumentTypes() {
+    try {
+        const result = await docRequiredModel.getEmployeeDocumentTypes();
+        return {success: true, body: { message: "Tipos de documento do colaborador buscados com sucesso.", result }}
+    } catch (error) {
+        console.error('Erro no employeeDocumentTypes service:', error);
+        return {success: false, body: { message: "Erro ao buscar os tipos de documento do colaborador." }}
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Regiões — usadas no cadastro de fornecedor (sem autenticação)
 // ─────────────────────────────────────────────────────────────────────────────

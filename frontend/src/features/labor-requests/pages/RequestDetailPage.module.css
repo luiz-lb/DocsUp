@@ -89,6 +89,19 @@
   white-space: nowrap;
 }
 
+.reqGroup + .reqGroup {
+  margin-top: 0.9rem;
+}
+
+.reqGroupTitle {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-textMuted, #6b7280);
+}
+
 .reqName {
   flex: 1;
   font-weight: 500;

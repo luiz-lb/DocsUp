@@ -232,10 +232,20 @@ export async function setDocumentTypeActive(transaction, id, isActive) {
 // Fase 2 (portal do fornecedor)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Ids dos tipos de documento ATIVOS de uma categoria (ex.: os básicos, na aprovação). */
+export async function getActiveDocumentTypeIdsByCategory(category) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('category', sql.TinyInt, category)
+        .query('SELECT id FROM document_types WHERE category = @category AND is_active = 1 ORDER BY id');
+    return result.recordset.map((row) => row.id);
+}
+
 /**
  * Tipos ATIVOS de documento de colaborador (categorias 1, 2 e 3), com `required`:
- * básico (categoria 1) é exigido de todo colaborador; os demais, quando a NR está em
- * labor_request_NRs ou o tipo está em labor_request_documents da solicitação.
+ * a NR está em labor_request_NRs ou o tipo está em labor_request_documents da
+ * solicitação. Os básicos são gravados em labor_request_documents na aprovação da
+ * Segurança do Trabalho (os do momento da aprovação).
  */
 export async function getEmployeeDocumentTypesForRequest(laborRequestId) {
     const pool = await poolPromise;
@@ -251,7 +261,6 @@ export async function getEmployeeDocumentTypesForRequest(laborRequestId) {
                 dt.validity_days,
                 nr.code,
                 CAST(CASE
-                    WHEN dt.category = 1 THEN 1
                     WHEN dt.nr_type_id IS NOT NULL AND EXISTS (
                         SELECT 1 FROM labor_request_NRs AS lrn
                         WHERE lrn.labor_request_id = @labor_request_id

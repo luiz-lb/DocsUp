@@ -14,7 +14,6 @@ router.get('/list', verificarToken, laborRequest.listLaborRequest);
 router.get('/listById/:id', verificarToken, laborRequest.listLaborRequestById);
 
 // aprovação e documentos exigidos do fornecedor: Segurança do Trabalho
-router.post('/updateDocsRequired', verificarToken, requireRole(...ACCESS.REQUIRED_DOCUMENTS), laborRequest.updateDocsRequired)
 router.post('/approveRequest', verificarToken, requireRole(...ACCESS.REQUIRED_DOCUMENTS), laborRequest.approveRequest)
 router.get('/listApprovals/:id', verificarToken, laborRequest.listApprovals)
 
