@@ -68,7 +68,8 @@ export default function ResetPasswordModal({ open, user, onClose, onSuccess }) {
     >
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         <p className={styles.subtitle}>
-          Nova senha de <strong>{user?.name}</strong>. Passe a senha para a pessoa por um canal seguro.
+          Nova senha de <strong>{user?.name}</strong>. As sessões abertas dessa pessoa são encerradas.
+          Passe a senha para ela por um canal seguro.
         </p>
 
         <FormField label="Nova senha" required hint={PASSWORD_RULE_HINT}>

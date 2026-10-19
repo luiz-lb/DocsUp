@@ -28,7 +28,7 @@ const EM_ANDAMENTO_STATUS = '3,5';
 
 export default function DashboardPage() {
   const { user, departmentLabel } = useAuth();
-  const { data, isLoading } = useDashboardSummary();
+  const { data, isLoading } = useDashboardSummary(user.department);
   const navigate = useNavigate();
 
   if (isLoading || !data) return null;
@@ -70,6 +70,7 @@ export default function DashboardPage() {
       value: data.docsNeedingAttention,
       to: ROUTES.documents.supplierDocs,
       tone: 'danger',
+      visible: data.canSeeDocuments,
     },
     {
       key: 'suppliers',
@@ -78,8 +79,9 @@ export default function DashboardPage() {
       value: data.activeSuppliers,
       to: ROUTES.suppliers.list,
       tone: 'teal',
+      visible: data.canSeeSuppliers,
     },
-  ];
+  ].filter((metric) => metric.visible !== false); // só as áreas que o perfil acessa
 
   // Séries de distribuição (status e urgência) resolvidas com labels/tons dos enums
   const statusSeries = buildSeries(data.statusDistribution, LABOR_REQUEST_STATUS);
@@ -131,20 +133,22 @@ export default function DashboardPage() {
       </div>
 
       <div className={styles.chartsGrid}>
-        {/* Documentos por status */}
-        <Card>
-          <Card.Body>
-            <h3 className={styles.cardTitle}>
-              Documentos dos fornecedores
-              <span className={styles.cardSub}>{data.totalDocuments} no total</span>
-            </h3>
-            {docSeries.length === 0 ? (
-              <p className={styles.emptyMsg}>Nenhum documento entregue ainda.</p>
-            ) : (
-              <DistributionList series={docSeries} />
-            )}
-          </Card.Body>
-        </Card>
+        {/* Documentos por status (só para quem acessa os documentos dos fornecedores) */}
+        {data.canSeeDocuments && (
+          <Card>
+            <Card.Body>
+              <h3 className={styles.cardTitle}>
+                Documentos dos fornecedores
+                <span className={styles.cardSub}>{data.totalDocuments} no total</span>
+              </h3>
+              {docSeries.length === 0 ? (
+                <p className={styles.emptyMsg}>Nenhum documento entregue ainda.</p>
+              ) : (
+                <DistributionList series={docSeries} />
+              )}
+            </Card.Body>
+          </Card>
+        )}
 
         {/* Solicitações recentes */}
         <Card>

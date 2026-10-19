@@ -15,14 +15,21 @@ export async function login(email, password) {
             return { success: false, message: 'Senha incorreta.' };
         }
 
-        // type 'user' separa o token de colaborador do token de fornecedor (type 'supplier')
-        const token = jwt.sign({ type: 'user', email, id, name, department, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = signUserToken({ id, email, name, department, role });
 
         return { success: true, token, id, name, department, role };
     } catch (error) {
         console.error('Erro no login service:', error);
         throw error;
     }
+}
+
+/**
+ * Emite o JWT de colaborador (1h). O type 'user' separa este token do token de
+ * fornecedor (type 'supplier').
+ */
+export function signUserToken({ id, email, name, department, role }) {
+    return jwt.sign({ type: 'user', email, id, name, department, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 }
 
 /**

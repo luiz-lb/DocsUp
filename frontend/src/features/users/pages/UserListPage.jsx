@@ -83,7 +83,12 @@ export default function UserListPage() {
 
   const handlePasswordSuccess = (target) => {
     setPasswordTarget(null);
-    setFeedback({ tone: 'success', message: `Senha de ${target.name} redefinida.` });
+    setFeedback({
+      tone: 'success',
+      message: isSelf(target)
+        ? 'Sua senha foi redefinida. Suas outras sessões abertas foram encerradas.'
+        : `Senha de ${target.name} redefinida. As sessões abertas dele foram encerradas.`,
+    });
   };
 
   const confirmStatusChange = async () => {

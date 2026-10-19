@@ -7,7 +7,7 @@ import { ROUTES } from '../constants/routes.js';
 import RequireAuth from '../features/auth/collaborator/RequireAuth.jsx';
 import RequireDepartment from '../features/auth/collaborator/RequireDepartment.jsx';
 import RequireSupplierAuth from '../features/suppliers/RequireSupplierAuth.jsx';
-import { DEPARTMENT_ID } from '../constants/enums.js';
+import { ACCESS } from '../constants/access.js';
 
 // Cada pagina e' code-split via React.lazy: rotas pouco usadas (fase 2,
 // cadastro de fornecedor) nao engordam o bundle inicial do painel interno.
@@ -44,6 +44,7 @@ const PurchaseOrderListPage = lazy(() => import('../features/purchase-orders/pag
 const PaymentTrackingPage = lazy(() => import('../features/purchase-orders/pages/PaymentTrackingPage.jsx'));
 
 const UserListPage = lazy(() => import('../features/users/pages/UserListPage.jsx'));
+const AuditLogPage = lazy(() => import('../features/audit/pages/AuditLogPage.jsx'));
 
 function SuspendedOutlet() {
   return (
@@ -72,14 +73,28 @@ export const router = createBrowserRouter([
 
               { path: ROUTES.quotations.round(), element: <QuotationRoundPage /> },
 
-              { path: ROUTES.suppliers.list, element: <SupplierListPage /> },
-              { path: ROUTES.suppliers.profile(), element: <SupplierProfilePage /> },
-
-              { path: ROUTES.documents.center, element: <DocumentCenterPage /> },
-              { path: ROUTES.documents.review, element: <DocumentReviewPage /> },
-              { path: ROUTES.documents.supplierDocs, element: <SupplierDocumentsPage /> },
-
-              { path: ROUTES.employees.list, element: <EmployeeListPage /> },
+              // Rotas por perfil: mesma regra do backend (constants/access.js)
+              {
+                element: <RequireDepartment allowed={ACCESS.suppliers} />,
+                children: [
+                  { path: ROUTES.suppliers.list, element: <SupplierListPage /> },
+                  { path: ROUTES.suppliers.profile(), element: <SupplierProfilePage /> },
+                ],
+              },
+              {
+                element: <RequireDepartment allowed={ACCESS.supplierDocuments} />,
+                children: [
+                  { path: ROUTES.documents.center, element: <DocumentCenterPage /> },
+                  { path: ROUTES.documents.review, element: <DocumentReviewPage /> },
+                  { path: ROUTES.documents.supplierDocs, element: <SupplierDocumentsPage /> },
+                ],
+              },
+              {
+                element: <RequireDepartment allowed={ACCESS.employees} />,
+                children: [
+                  { path: ROUTES.employees.list, element: <EmployeeListPage /> },
+                ],
+              },
 
               { path: ROUTES.scoring.evaluate(), element: <SupplierEvaluationPage /> },
               { path: ROUTES.scoring.board, element: <ScoreboardPage /> },
@@ -89,9 +104,10 @@ export const router = createBrowserRouter([
 
               // Administração: só Admin
               {
-                element: <RequireDepartment allowed={[DEPARTMENT_ID.ADMIN]} />,
+                element: <RequireDepartment allowed={ACCESS.admin} />,
                 children: [
                   { path: ROUTES.users.list, element: <UserListPage /> },
+                  { path: ROUTES.audit.list, element: <AuditLogPage /> },
                 ],
               },
             ],

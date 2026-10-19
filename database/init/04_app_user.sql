@@ -53,3 +53,7 @@ GO
 -- O controle de migrações é só leitura para a aplicação
 DENY INSERT, UPDATE, DELETE ON dbo.schema_migrations TO [$(APP_USER)];
 GO
+
+-- Auditoria: a aplicação só acrescenta registros, nunca altera nem apaga
+DENY UPDATE, DELETE ON dbo.audit_log TO [$(APP_USER)];
+GO

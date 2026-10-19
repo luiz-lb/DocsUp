@@ -1,12 +1,5 @@
 import * as authService from '../services/authService.js';
-
-// Opções do cookie do JWT de colaborador. O logout usa as mesmas para conseguir apagá-lo.
-const COLLABORATOR_COOKIE_OPTIONS = {
-    httpOnly: true,  // Impede acesso via JavaScript (Protege contra XSS)
-    secure: process.env.NODE_ENV === 'production', // true em produção (exige HTTPS)
-    sameSite: 'Lax', // Protege contra CSRF (Cross-Site Request Forgery)
-    maxAge: 3600000 // 1 hora em milissegundos
-};
+import { COLLABORATOR_COOKIE_OPTIONS } from '../config/authCookies.js';
 
 export async function login(req, res, next) {
     try {

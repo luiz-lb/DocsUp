@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { LuShieldAlert } from 'react-icons/lu';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
-import { DEPARTMENT_ID } from '../../../constants/enums.js';
+import { canAccess } from '../../../constants/access.js';
 import EmptyState from '../../../components/ui/EmptyState/index.js';
 
 /**
@@ -11,9 +11,8 @@ import EmptyState from '../../../components/ui/EmptyState/index.js';
  */
 export default function RequireDepartment({ allowed = [] }) {
   const { user } = useAuth();
-  const canAccess = user.department === DEPARTMENT_ID.ADMIN || allowed.includes(user.department);
 
-  if (!canAccess) {
+  if (!canAccess(user.department, allowed)) {
     return (
       <EmptyState
         icon={LuShieldAlert}

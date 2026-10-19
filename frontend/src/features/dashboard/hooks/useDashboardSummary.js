@@ -1,4 +1,5 @@
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
+import { ACCESS, canAccess } from '../../../constants/access.js';
 import { listLaborRequests } from '../../labor-requests/api/laborRequestsApi.js';
 import { listDeliveredDocuments } from '../../documents/api/documentsRealApi.js';
 import { listSuppliers } from '../../suppliers/api/suppliersApi.js';
@@ -19,13 +20,19 @@ const SUPPLIER_ACTIVE = 1;
  * Agrega indicadores reais para o painel inicial a partir de três fontes:
  * solicitações, documentos entregues e fornecedores. Tudo resiliente — se uma
  * fonte falhar, os demais indicadores continuam preenchidos.
+ *
+ * Documentos e fornecedores só são buscados por quem tem acesso a essas áreas
+ * (o backend recusa os demais); `canSeeDocuments` / `canSeeSuppliers` dizem à tela o que mostrar.
  */
-export function useDashboardSummary() {
+export function useDashboardSummary(department) {
   return useAsyncData(async () => {
+    const canSeeDocuments = canAccess(department, ACCESS.supplierDocuments);
+    const canSeeSuppliers = canAccess(department, ACCESS.suppliers);
+
     const [requestsResult, documents, suppliers] = await Promise.all([
       listLaborRequests({ limit: 200 }).catch(() => ({ body: [] })),
-      listDeliveredDocuments({}).catch(() => []),
-      listSuppliers().catch(() => []),
+      canSeeDocuments ? listDeliveredDocuments({}).catch(() => []) : [],
+      canSeeSuppliers ? listSuppliers().catch(() => []) : [],
     ]);
 
     const laborRequests = Array.isArray(requestsResult?.body) ? requestsResult.body : [];
@@ -57,6 +64,8 @@ export function useDashboardSummary() {
     const totalSuppliers = supplierList.length;
 
     return {
+      canSeeDocuments,
+      canSeeSuppliers,
       openLaborRequests,
       pendingApprovals,
       emCotacao,
@@ -71,7 +80,7 @@ export function useDashboardSummary() {
       activeSuppliers,
       totalSuppliers,
     };
-  }, []);
+  }, [department]);
 }
 
 /** Conta ocorrências por chave; retorna { [key]: count }. */

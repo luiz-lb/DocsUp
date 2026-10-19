@@ -71,6 +71,7 @@ services:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Defina WEBHOOK_SECRET no .env}
       FRONTEND_URL: ${FRONTEND_URL:?Defina FRONTEND_URL no .env}
       UPLOAD_DIR: /app/uploads
+      TRUST_PROXY: ${TRUST_PROXY:-}
       USER_ADMIN: ${USER_ADMIN:-}
       SENHA_ADMIN: ${SENHA_ADMIN:-}
       SMTP_HOST: ${SMTP_HOST:-}

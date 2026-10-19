@@ -51,4 +51,8 @@ export const ROUTES = {
   users: {
     list: '/usuarios',
   },
+
+  audit: {
+    list: '/auditoria',
+  },
 };

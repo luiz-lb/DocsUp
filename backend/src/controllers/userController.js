@@ -1,10 +1,21 @@
 import * as userService from '../services/userService.js';
+import * as authService from '../services/authService.js';
+import { COLLABORATOR_COOKIE_OPTIONS } from '../config/authCookies.js';
 
 const ALLOWED_PAGE_SIZES = [10, 25, 50, 100];
 
 function parseId(value) {
     const id = Number(value);
     return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+// Quem fez a ação e de onde, para a auditoria. Atrás de proxy, req.ip depende do TRUST_PROXY.
+function auditContext(req) {
+    return {
+        actorId: req.usuario?.id ?? null,
+        ipAddress: req.ip ? req.ip.replace(/^::ffff:/, '') : null,
+        userAgent: req.headers['user-agent'] ?? null,
+    };
 }
 
 // Converte o resultado do service em resposta HTTP (o service informa o status do erro)
@@ -56,7 +67,7 @@ export async function listUsers(req, res) {
 export async function createUser(req, res) {
     try {
         const { name, email, department, password } = req.body ?? {};
-        const result = await userService.createUser({ name, email, department, password });
+        const result = await userService.createUser({ name, email, department, password }, auditContext(req));
         return sendResult(res, result, 201);
     } catch (error) {
         console.error('Erro no createUser controller:', error);
@@ -73,7 +84,7 @@ export async function updateUser(req, res) {
         }
 
         const { name, email, department } = req.body ?? {};
-        const result = await userService.updateUser(id, { name, email, department });
+        const result = await userService.updateUser(id, { name, email, department }, auditContext(req));
         return sendResult(res, result);
     } catch (error) {
         console.error('Erro no updateUser controller:', error);
@@ -89,7 +100,7 @@ export async function setUserStatus(req, res) {
             return res.status(400).json({ success: false, body: { message: 'Id de usuário inválido.' } });
         }
 
-        const result = await userService.setUserStatus(id, req.body?.isActive);
+        const result = await userService.setUserStatus(id, req.body?.isActive, auditContext(req));
         return sendResult(res, result);
     } catch (error) {
         console.error('Erro no setUserStatus controller:', error);
@@ -105,7 +116,14 @@ export async function resetUserPassword(req, res) {
             return res.status(400).json({ success: false, body: { message: 'Id de usuário inválido.' } });
         }
 
-        const result = await userService.resetUserPassword(id, req.body?.password);
+        const result = await userService.resetUserPassword(id, req.body?.password, auditContext(req));
+
+        // A redefinição encerra as sessões do usuário. Se o Admin redefiniu a própria senha,
+        // emite um cookie novo: esta sessão continua e as outras dele caem.
+        if (result.success && id === req.usuario.id) {
+            res.cookie('token', authService.signUserToken(req.usuario), COLLABORATOR_COOKIE_OPTIONS);
+        }
+
         return sendResult(res, result);
     } catch (error) {
         console.error('Erro no resetUserPassword controller:', error);

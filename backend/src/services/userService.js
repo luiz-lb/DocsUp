@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import * as userModel from '../models/userModel.js';
+import * as auditModel from '../models/auditModel.js';
+import * as trasaction from '../models/trasaction.js';
 import { DEPARTMENT_IDS } from '../constants/departments.js';
+import { AUDIT_ACTIONS, AUDIT_ACTOR_TYPES, AUDIT_ENTITIES } from '../constants/audit.js';
 import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
 
 const NAME_MAX_LENGTH = 200;
@@ -37,6 +40,55 @@ function validateUserData({ name, email, department } = {}) {
     return { data: { name: cleanName, email: cleanEmail, department: departmentId } };
 }
 
+// ─────────────────────────────────────────────
+// Auditoria
+// ─────────────────────────────────────────────
+
+// Campos do usuário que entram na auditoria (nunca senha nem hash)
+function auditSnapshot(user) {
+    return {
+        name: user.name,
+        email: user.email,
+        department: user.department,
+        is_active: Boolean(user.is_active),
+    };
+}
+
+// Só os campos que mudaram: { oldValues, newValues }, ou null se nada mudou
+function changedFields(before, after) {
+    const oldValues = {};
+    const newValues = {};
+    for (const key of Object.keys(after)) {
+        if (before[key] !== after[key]) {
+            oldValues[key] = before[key];
+            newValues[key] = after[key];
+        }
+    }
+    return Object.keys(newValues).length > 0 ? { oldValues, newValues } : null;
+}
+
+/**
+ * Monta o registro de auditoria de uma ação do Admin sobre um usuário.
+ * `context` vem do controller: { actorId, ipAddress, userAgent }.
+ */
+function userAuditEntry(context, action, userId, oldValues, newValues) {
+    return {
+        actorType: AUDIT_ACTOR_TYPES.COLLABORATOR,
+        actorId: context.actorId ?? null,
+        action,
+        entityType: AUDIT_ENTITIES.USER,
+        entityId: userId,
+        oldValues,
+        newValues,
+        ipAddress: context.ipAddress ?? null,
+        userAgent: context.userAgent ?? null,
+    };
+}
+
+// ─────────────────────────────────────────────
+// Casos de uso
+// ─────────────────────────────────────────────
+
 export async function listUsers({ page = 1, limit = 10, search = '', department, isActive } = {}) {
     try {
         const { rows, total } = await userModel.listUsers({ page, limit, search, department, isActive });
@@ -56,7 +108,7 @@ export async function listUsers({ page = 1, limit = 10, search = '', department,
     }
 }
 
-export async function createUser(payload = {}) {
+export async function createUser(payload = {}, context = {}) {
     const { data, error } = validateUserData(payload);
     if (error) return { success: false, status: 400, message: error };
 
@@ -67,9 +119,17 @@ export async function createUser(payload = {}) {
         if (await userModel.getUserIdByEmail(data.email)) return EMAIL_IN_USE;
 
         const passwordHash = await bcrypt.hash(payload.password, 10);
-        const id = await userModel.insertUser({ ...data, passwordHash });
-        const user = await userModel.getUserById(id);
 
+        // Usuário e auditoria na mesma transação: sem auditoria, sem usuário
+        const id = await trasaction.executarEmTransacao(async (transaction) => {
+            const newId = await userModel.insertUser(transaction, { ...data, passwordHash });
+            await auditModel.insertAuditLog(transaction, userAuditEntry(
+                context, AUDIT_ACTIONS.USER_CREATE, newId, null, { ...data, is_active: true },
+            ));
+            return newId;
+        });
+
+        const user = await userModel.getUserById(id);
         console.log(`Usuário ${id} criado.`);
         return { success: true, body: { message: 'Usuário criado com sucesso.', user } };
     } catch (error) {
@@ -79,19 +139,30 @@ export async function createUser(payload = {}) {
     }
 }
 
-export async function updateUser(id, payload = {}) {
+export async function updateUser(id, payload = {}, context = {}) {
     const { data, error } = validateUserData(payload);
     if (error) return { success: false, status: 400, message: error };
 
     try {
-        if (!(await userModel.getUserById(id))) return USER_NOT_FOUND;
+        const before = await userModel.getUserById(id);
+        if (!before) return USER_NOT_FOUND;
 
         const emailOwnerId = await userModel.getUserIdByEmail(data.email);
         if (emailOwnerId && emailOwnerId !== id) return EMAIL_IN_USE;
 
-        await userModel.updateUser(id, data);
-        const user = await userModel.getUserById(id);
+        const changes = changedFields(auditSnapshot(before), { ...auditSnapshot(before), ...data });
+        if (!changes) {
+            return { success: true, body: { message: 'Nenhuma alteração para salvar.', user: before } };
+        }
 
+        await trasaction.executarEmTransacao(async (transaction) => {
+            await userModel.updateUser(transaction, id, data);
+            await auditModel.insertAuditLog(transaction, userAuditEntry(
+                context, AUDIT_ACTIONS.USER_UPDATE, id, changes.oldValues, changes.newValues,
+            ));
+        });
+
+        const user = await userModel.getUserById(id);
         console.log(`Usuário ${id} atualizado.`);
         return { success: true, body: { message: 'Usuário atualizado com sucesso.', user } };
     } catch (error) {
@@ -105,18 +176,31 @@ export async function updateUser(id, payload = {}) {
  * Ativa ou inativa um usuário. Inativo não consegue logar, e as sessões abertas
  * caem na próxima requisição (o verificarToken confere is_active no banco).
  */
-export async function setUserStatus(id, isActive) {
+export async function setUserStatus(id, isActive, context = {}) {
     if (typeof isActive !== 'boolean') {
         return { success: false, status: 400, message: 'Informe se o usuário fica ativo (true) ou inativo (false).' };
     }
 
     try {
-        if (!(await userModel.getUserById(id))) return USER_NOT_FOUND;
+        const before = await userModel.getUserById(id);
+        if (!before) return USER_NOT_FOUND;
 
-        await userModel.setUserActive(id, isActive);
+        // Já está no status pedido: nada a gravar nem auditar
+        if (Boolean(before.is_active) !== isActive) {
+            await trasaction.executarEmTransacao(async (transaction) => {
+                await userModel.setUserActive(transaction, id, isActive);
+                await auditModel.insertAuditLog(transaction, userAuditEntry(
+                    context,
+                    isActive ? AUDIT_ACTIONS.USER_ACTIVATE : AUDIT_ACTIONS.USER_INACTIVATE,
+                    id,
+                    { is_active: !isActive },
+                    { is_active: isActive },
+                ));
+            });
+            console.log(`Usuário ${id} ${isActive ? 'ativado' : 'inativado'}.`);
+        }
+
         const user = await userModel.getUserById(id);
-
-        console.log(`Usuário ${id} ${isActive ? 'ativado' : 'inativado'}.`);
         return {
             success: true,
             body: { message: isActive ? 'Usuário ativado.' : 'Usuário inativado.', user },
@@ -127,18 +211,33 @@ export async function setUserStatus(id, isActive) {
     }
 }
 
-export async function resetUserPassword(id, password) {
+/**
+ * Redefine a senha e encerra as sessões abertas do usuário (sessions_valid_after).
+ * O instante é alinhado ao segundo porque o iat do JWT tem precisão de segundo:
+ * um token emitido logo depois, no mesmo segundo, continua valendo.
+ */
+export async function resetUserPassword(id, password, context = {}) {
     const passwordError = getPasswordPolicyError(password);
     if (passwordError) return { success: false, status: 400, message: passwordError };
 
     try {
         if (!(await userModel.getUserById(id))) return USER_NOT_FOUND;
 
+        const sessionsValidAfter = new Date(Math.floor(Date.now() / 1000) * 1000);
         const passwordHash = await bcrypt.hash(password, 10);
-        await userModel.updateUserPassword(id, passwordHash);
 
-        console.log(`Senha do usuário ${id} redefinida.`);
-        return { success: true, body: { message: 'Senha redefinida com sucesso.' } };
+        await trasaction.executarEmTransacao(async (transaction) => {
+            await userModel.updateUserPassword(transaction, id, passwordHash, sessionsValidAfter);
+            await auditModel.insertAuditLog(transaction, userAuditEntry(
+                context, AUDIT_ACTIONS.USER_PASSWORD_RESET, id, null, { sessions_ended: true },
+            ));
+        });
+
+        console.log(`Senha do usuário ${id} redefinida (sessões encerradas).`);
+        return {
+            success: true,
+            body: { message: 'Senha redefinida. As sessões abertas desse usuário foram encerradas.' },
+        };
     } catch (error) {
         console.error('Erro no resetUserPassword service:', error);
         return { success: false, status: 500, message: 'Erro ao redefinir a senha.' };

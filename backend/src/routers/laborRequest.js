@@ -1,6 +1,8 @@
 import express from 'express';
 import * as laborRequest from '../controllers/laborRequestController.js';
 import { verificarToken } from '../middleware/authMiddleware.js';
+import { requireRole } from '../middleware/roleMiddleware.js';
+import { ACCESS } from '../constants/access.js';
 
 const router = express.Router();
 
@@ -11,8 +13,9 @@ router.get('/list', verificarToken, laborRequest.listLaborRequest);
 // lista uma solicitação especifica detalhada
 router.get('/listById/:id', verificarToken, laborRequest.listLaborRequestById);
 
-router.post('/updateDocsRequired', verificarToken, laborRequest.updateDocsRequired)
-router.post('/approveRequest', verificarToken, laborRequest.approveRequest)
+// aprovação e documentos exigidos do fornecedor: Segurança do Trabalho
+router.post('/updateDocsRequired', verificarToken, requireRole(...ACCESS.REQUIRED_DOCUMENTS), laborRequest.updateDocsRequired)
+router.post('/approveRequest', verificarToken, requireRole(...ACCESS.REQUIRED_DOCUMENTS), laborRequest.approveRequest)
 router.get('/listApprovals/:id', verificarToken, laborRequest.listApprovals)
 
 export default router;

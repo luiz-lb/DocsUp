@@ -17,12 +17,13 @@ export async function getPasswordHashAndIdByEmail(email) {
     };
 }
 
-// Usuário ativo pelo id (usado pelo verificarToken a cada requisição)
+// Usuário ativo pelo id (usado pelo verificarToken a cada requisição).
+// sessions_valid_after: tokens emitidos antes desse instante não valem (senha redefinida).
 export async function getActiveUserById(id) {
     const pool = await poolPromise;
     const result = await pool.request()
         .input('id', sql.Int, id)
-        .query('SELECT id, name, email, department, role FROM users WHERE id = @id AND is_active = 1');
+        .query('SELECT id, name, email, department, role, sessions_valid_after FROM users WHERE id = @id AND is_active = 1');
     return result.recordset[0] ?? null;
 }
 

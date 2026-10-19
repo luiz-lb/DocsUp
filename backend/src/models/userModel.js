@@ -83,13 +83,14 @@ export async function getUserIdByEmail(email) {
     return result.recordset[0]?.id ?? null;
 }
 
+// As escritas abaixo recebem a transação: a auditoria é gravada junto (auditModel.insertAuditLog)
+
 /**
  * Insere um usuário ativo. Sem `role`, vale o default da coluna ('SOLICITANTE').
  * Retorna o id gerado.
  */
-export async function insertUser({ name, email, department, role, passwordHash }) {
-    const pool = await poolPromise;
-    const request = pool.request()
+export async function insertUser(transaction, { name, email, department, role, passwordHash }) {
+    const request = new sql.Request(transaction)
         .input('name', sql.NVarChar(200), name)
         .input('email', sql.NVarChar(200), email)
         .input('department', sql.TinyInt, department)
@@ -112,9 +113,8 @@ export async function insertUser({ name, email, department, role, passwordHash }
     return result.recordset[0].id;
 }
 
-export async function updateUser(id, { name, email, department }) {
-    const pool = await poolPromise;
-    const result = await pool.request()
+export async function updateUser(transaction, id, { name, email, department }) {
+    const result = await new sql.Request(transaction)
         .input('id', sql.Int, id)
         .input('name', sql.NVarChar(200), name)
         .input('email', sql.NVarChar(200), email)
@@ -127,20 +127,27 @@ export async function updateUser(id, { name, email, department }) {
     return result.rowsAffected[0] > 0;
 }
 
-export async function setUserActive(id, isActive) {
-    const pool = await poolPromise;
-    const result = await pool.request()
+export async function setUserActive(transaction, id, isActive) {
+    const result = await new sql.Request(transaction)
         .input('id', sql.Int, id)
         .input('is_active', sql.Bit, isActive)
         .query('UPDATE users SET is_active = @is_active WHERE id = @id');
     return result.rowsAffected[0] > 0;
 }
 
-export async function updateUserPassword(id, passwordHash) {
-    const pool = await poolPromise;
-    const result = await pool.request()
+/**
+ * Troca a senha e encerra as sessões abertas: tokens emitidos antes de
+ * `sessionsValidAfter` passam a ser recusados pelo verificarToken.
+ */
+export async function updateUserPassword(transaction, id, passwordHash, sessionsValidAfter) {
+    const result = await new sql.Request(transaction)
         .input('id', sql.Int, id)
         .input('password_hash', sql.VarChar(255), passwordHash)
-        .query('UPDATE users SET password_hash = @password_hash WHERE id = @id');
+        .input('sessions_valid_after', sql.DateTime2(0), sessionsValidAfter)
+        .query(`
+            UPDATE users
+            SET password_hash = @password_hash, sessions_valid_after = @sessions_valid_after
+            WHERE id = @id
+        `);
     return result.rowsAffected[0] > 0;
 }

@@ -36,8 +36,18 @@ export async function verificarToken(req, res, next) {
     return res.status(401).json({ success: false, body: { message: 'Usuário inativo ou não encontrado.' } });
   }
 
+  // Tokens emitidos antes de sessions_valid_after não valem mais (ex.: senha redefinida).
+  // O iat do JWT tem precisão de segundo, então a comparação é feita em segundos.
+  const { sessions_valid_after: sessionsValidAfter, ...dadosUsuario } = usuario;
+  if (sessionsValidAfter) {
+    const validAfterSeconds = Math.floor(new Date(sessionsValidAfter).getTime() / 1000);
+    if (!decodificado.iat || decodificado.iat < validAfterSeconds) {
+      return res.status(401).json({ success: false, body: { message: 'Sessão encerrada. Faça login novamente.' } });
+    }
+  }
+
   // Anexa as informações do usuário à requisição para usar nos controllers
-  req.usuario = usuario;
+  req.usuario = dadosUsuario;
 
   // Passa para a próxima função (o controller da rota)
   next();

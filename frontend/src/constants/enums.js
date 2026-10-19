@@ -188,6 +188,22 @@ export const REFRESH_STATUS = {
   2: { label: 'Expirado', tone: 'danger' },
 };
 
+// audit_log.actor_type
+export const AUDIT_ACTOR_TYPE = {
+  0: { label: 'Colaborador', tone: 'info' },
+  1: { label: 'Fornecedor', tone: 'indigo' },
+  2: { label: 'Sistema', tone: 'neutral' },
+};
+
+// audit_log.action (texto, não TINYINT)
+export const AUDIT_ACTION = {
+  'user.create': { label: 'Usuário criado', tone: 'success' },
+  'user.update': { label: 'Usuário editado', tone: 'info' },
+  'user.activate': { label: 'Usuário reativado', tone: 'success' },
+  'user.inactivate': { label: 'Usuário inativado', tone: 'danger' },
+  'user.password_reset': { label: 'Senha redefinida', tone: 'warning' },
+};
+
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */
 export function resolveEnum(enumMap, value) {
   return enumMap[value] ?? { label: 'Desconhecido', tone: 'neutral' };

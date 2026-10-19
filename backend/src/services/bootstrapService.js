@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import * as userModel from '../models/userModel.js';
+import * as auditModel from '../models/auditModel.js';
+import * as trasaction from '../models/trasaction.js';
 import { DEPARTMENTS } from '../constants/departments.js';
+import { AUDIT_ACTIONS, AUDIT_ACTOR_TYPES, AUDIT_ENTITIES } from '../constants/audit.js';
 import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
 
 const ADMIN_ROLE = 'ADMIN';
@@ -73,12 +76,25 @@ export async function ensureInitialAdmin() {
     }
 
     try {
-        const id = await userModel.insertUser({
-            name: ADMIN_NAME,
-            email,
-            department: DEPARTMENTS.ADMIN,
-            role: ADMIN_ROLE,
-            passwordHash,
+        // Admin e auditoria (autor: o próprio sistema) na mesma transação
+        const id = await trasaction.executarEmTransacao(async (transaction) => {
+            const newId = await userModel.insertUser(transaction, {
+                name: ADMIN_NAME,
+                email,
+                department: DEPARTMENTS.ADMIN,
+                role: ADMIN_ROLE,
+                passwordHash,
+            });
+            await auditModel.insertAuditLog(transaction, {
+                actorType: AUDIT_ACTOR_TYPES.SYSTEM,
+                actorId: null,
+                action: AUDIT_ACTIONS.USER_CREATE,
+                entityType: AUDIT_ENTITIES.USER,
+                entityId: newId,
+                oldValues: null,
+                newValues: { name: ADMIN_NAME, email, department: DEPARTMENTS.ADMIN, is_active: true },
+            });
+            return newId;
         });
         console.log(`[Bootstrap] Admin inicial criado (id ${id}).`);
     } catch (error) {

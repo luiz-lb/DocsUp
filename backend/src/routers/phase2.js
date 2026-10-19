@@ -2,6 +2,8 @@ import express from 'express';
 import * as phase2Controller from '../controllers/phase2Controller.js';
 import { verificarToken } from '../middleware/authMiddleware.js';
 import { verificarTokenFornecedor } from '../middleware/supplierAuthMiddleware.js';
+import { requireRole } from '../middleware/roleMiddleware.js';
+import { ACCESS } from '../constants/access.js';
 
 const router = express.Router();
 
@@ -24,7 +26,7 @@ router.post(
     phase2Controller.addCompanyDocuments,
 );
 
-// Painel interno — lista todos os funcionários enviados (exige JWT colaborador)
-router.get('/employees/list', verificarToken, phase2Controller.listEmployees);
+// Painel interno — lista todos os funcionários enviados (RH, Segurança do Trabalho e Obra)
+router.get('/employees/list', verificarToken, requireRole(...ACCESS.EMPLOYEES), phase2Controller.listEmployees);
 
 export default router;

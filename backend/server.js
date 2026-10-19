@@ -26,6 +26,14 @@ const app = express();
 const port = process.env.PORT || 3000;
 const ambiente = process.env.NODE_ENV || 'production';
 
+// Atrás de proxy reverso (HTTPS em produção): TRUST_PROXY = nº de proxies na frente (ex.: 1).
+// Com isso req.ip (auditoria) e req.secure (cookie da sessão) passam a ler os cabeçalhos
+// X-Forwarded-*. Vazio = desligado: sem proxy, esses cabeçalhos poderiam ser forjados.
+if (process.env.TRUST_PROXY) {
+    const hops = Number(process.env.TRUST_PROXY);
+    app.set('trust proxy', Number.isInteger(hops) ? hops : process.env.TRUST_PROXY);
+}
+
 app.use(cors({
     origin: process.env.FRONTEND_URL, // A URL exata do seu frontend
     credentials: true,               // Permite o envio/recebimento de cookies
@@ -39,11 +47,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// Sessão: só guarda o OTP pendente do login do fornecedor (fica em memória)
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
-    saveUninitialized: true,
-    cookie: { maxAge: 1000 * 60 * 60 } // 1 hora
+    // Só cria sessão quando há algo para guardar (o login do fornecedor), não a cada requisição
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 1000 * 60 * 60, // 1 hora
+        httpOnly: true,
+        sameSite: 'lax',
+        // Secure quando a requisição chega por HTTPS (atrás de proxy, depende do TRUST_PROXY)
+        secure: 'auto',
+    },
 }));
 
 // Routes
