@@ -17,8 +17,23 @@ const upload = multer({
 
 export const uploadMiddleware = upload.array('files', 20); // máximo 20 arquivos por chamada
 
+/**
+ * Campo de multipart com JSON (ex.: '[1,2]'). Vazio ou ausente = undefined. Se o campo
+ * vier repetido, o multer já entrega um array. JSON inválido volta como texto e o
+ * service recusa (não é array).
+ */
+function parseJsonField(value) {
+    if (value === undefined || value === '') return undefined;
+    if (typeof value !== 'string') return value;
+    try {
+        return JSON.parse(value);
+    } catch {
+        return value;
+    }
+}
+
 // ─────────────────────────────────────────────
-// GET /phase2/:token  (público — fornecedor acessa pelo link)
+// GET /phase2/:token  (requer JWT de fornecedor — só o fornecedor dono do link)
 // ─────────────────────────────────────────────
 export async function getPhase2(req, res) {
     try {
@@ -27,9 +42,9 @@ export async function getPhase2(req, res) {
             return res.status(400).json({ success: false, body: { message: 'Token é obrigatório.' } });
         }
 
-        const result = await phase2Service.getPhase2ByToken(token);
+        const result = await phase2Service.getPhase2ByToken(token, req.fornecedor.supplierId);
         if (!result.success) {
-            return res.status(404).json({ success: false, body: { message: result.message } });
+            return res.status(result.status ?? 404).json({ success: false, body: { message: result.message } });
         }
 
         return res.status(200).json({ success: true, body: result.body });
@@ -42,25 +57,25 @@ export async function getPhase2(req, res) {
 // ─────────────────────────────────────────────
 // POST /phase2/:token/employee  (requer JWT de fornecedor)
 // Body: multipart/form-data
-//   fields: fullName, cpf, rg?, roleFunction, nrTypeIds (JSON array string)
-//   files:  files[]
+//   fields: fullName, cpf, rg?, roleFunction?, documentTypeId, expiresAt? ('YYYY-MM-DD')
+//   files:  files[] (exatamente 1)
 // ─────────────────────────────────────────────
 export async function addEmployee(req, res) {
     try {
         const { token } = req.params;
         const supplierId = req.fornecedor.supplierId;
 
-        const { fullName, cpf, rg, roleFunction, nrTypeId } = req.body;
+        const { fullName, cpf, rg, roleFunction, documentTypeId, expiresAt } = req.body ?? {};
 
         const result = await phase2Service.addEmployee(
             token,
             supplierId,
-            { fullName, cpf, rg, roleFunction, nrTypeId: nrTypeId ? Number(nrTypeId) : null },
+            { fullName, cpf, rg, roleFunction, documentTypeId, expiresAt },
             req.files ?? [],
         );
 
         if (!result.success) {
-            return res.status(400).json({ success: false, body: { message: result.message } });
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
         }
 
         return res.status(201).json({ success: true, body: result.body });
@@ -73,7 +88,8 @@ export async function addEmployee(req, res) {
 // ─────────────────────────────────────────────
 // POST /phase2/:token/company-documents  (requer JWT de fornecedor)
 // Body: multipart/form-data
-//   fields: documentTypeIds (JSON array string, paralelo a files — opcional)
+//   fields: documentTypeIds (JSON array, obrigatório, paralelo a files)
+//           expiresAt       (JSON array de 'YYYY-MM-DD' ou null, opcional, paralelo a files)
 //   files:  files[]
 // ─────────────────────────────────────────────
 export async function addCompanyDocuments(req, res) {
@@ -81,23 +97,18 @@ export async function addCompanyDocuments(req, res) {
         const { token } = req.params;
         const supplierId = req.fornecedor.supplierId;
 
-        // documentTypeIds pode vir como string JSON ou array (1:1 com os arquivos)
-        let documentTypeIds = [];
-        try {
-            documentTypeIds = JSON.parse(req.body.documentTypeIds ?? '[]');
-        } catch {
-            documentTypeIds = [];
-        }
-
         const result = await phase2Service.addCompanyDocuments(
             token,
             supplierId,
-            { documentTypeIds },
+            {
+                documentTypeIds: parseJsonField(req.body?.documentTypeIds),
+                expiresAt: parseJsonField(req.body?.expiresAt),
+            },
             req.files ?? [],
         );
 
         if (!result.success) {
-            return res.status(400).json({ success: false, body: { message: result.message } });
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
         }
 
         return res.status(201).json({ success: true, body: result.body });

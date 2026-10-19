@@ -1,0 +1,23 @@
+.description {
+    max-width: 420px;
+    margin-top: 0.15em;
+    font-size: 0.78rem;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.muted {
+    color: var(--color-textMuted, #6b7280);
+}
+
+.docCount {
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+    cursor: help;
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.35em;
+}

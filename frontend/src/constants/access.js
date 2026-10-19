@@ -9,7 +9,7 @@ export const ACCESS = {
   employees: [DEPARTMENT_ID.RH, DEPARTMENT_ID.SEGURANCA_TRABALHO, DEPARTMENT_ID.OBRA],
   // Base de fornecedores
   suppliers: [DEPARTMENT_ID.SUPRIMENTOS],
-  // Administração (usuários e auditoria): só Admin
+  // Administração (usuários, parâmetros e auditoria): só Admin
   admin: [],
 };
 

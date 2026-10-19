@@ -100,7 +100,7 @@ export default function AuditLogPage() {
         isLoading={isLoading}
         onRowClick={setSelected}
         emptyTitle="Nenhum registro de auditoria"
-        emptyDescription="As ações feitas na tela de Usuários aparecem aqui."
+        emptyDescription="As ações feitas nas telas de Usuários e de Parâmetros aparecem aqui."
       />
 
       <Pagination

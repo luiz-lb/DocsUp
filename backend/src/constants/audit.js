@@ -14,9 +14,19 @@ export const AUDIT_ACTIONS = Object.freeze({
     USER_ACTIVATE: 'user.activate',
     USER_INACTIVATE: 'user.inactivate',
     USER_PASSWORD_RESET: 'user.password_reset',
+    DOCUMENT_TYPE_CREATE: 'document_type.create',
+    DOCUMENT_TYPE_UPDATE: 'document_type.update',
+    DOCUMENT_TYPE_ACTIVATE: 'document_type.activate',
+    DOCUMENT_TYPE_INACTIVATE: 'document_type.inactivate',
+    ACTIVITY_CREATE: 'activity.create',
+    ACTIVITY_UPDATE: 'activity.update',
+    ACTIVITY_ACTIVATE: 'activity.activate',
+    ACTIVITY_INACTIVATE: 'activity.inactivate',
 });
 
 // audit_log.entity_type
 export const AUDIT_ENTITIES = Object.freeze({
     USER: 'user',
+    DOCUMENT_TYPE: 'document_type',
+    ACTIVITY: 'activity',
 });

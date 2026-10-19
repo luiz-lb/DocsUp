@@ -55,4 +55,8 @@ export const ROUTES = {
   audit: {
     list: '/auditoria',
   },
+
+  parameters: {
+    list: '/parametros',
+  },
 };

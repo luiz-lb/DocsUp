@@ -103,8 +103,26 @@ export async function getLaborRequestById(id) {
                 u.[name] as requester_name,
                 r.activity_type_id,
                 at.[name] as activity_type_name,
-                at.document_type_id as activity_doc_type_id,
-                at.nr_type_id as activity_nr_type_id,
+                -- Sugestões da atividade (activity_type_documents), no formato antigo ("1,2,3"):
+                -- tipos da empresa (categoria 0) e, das NRs (categoria 2), o nr_type_id. Só ativos.
+                (
+                    Select STRING_AGG(CAST(atd.document_type_id AS VARCHAR(10)), ',')
+                           WITHIN GROUP (ORDER BY atd.document_type_id)
+                    from activity_type_documents as atd
+                    Inner join document_types as dt on dt.id = atd.document_type_id
+                    Where atd.activity_type_id = r.activity_type_id
+                      And dt.category = 0
+                      And dt.is_active = 1
+                ) as activity_doc_type_id,
+                (
+                    Select STRING_AGG(CAST(dt.nr_type_id AS VARCHAR(10)), ',')
+                           WITHIN GROUP (ORDER BY dt.nr_type_id)
+                    from activity_type_documents as atd
+                    Inner join document_types as dt on dt.id = atd.document_type_id
+                    Where atd.activity_type_id = r.activity_type_id
+                      And dt.category = 2
+                      And dt.is_active = 1
+                ) as activity_nr_type_id,
                 r.title,
                 r.[description],
                 r.[location],
@@ -258,6 +276,9 @@ export async function getLaborRequestDocuments(laborRequestId) {
                 dt.[name]  AS document_type_name,
                 dt.scope,
                 dt.description,
+                dt.category,
+                dt.has_expiration,
+                dt.validity_days,
                 lrd.notes,
                 lrd.added_by,
                 u.[name]   AS added_by_name
@@ -336,7 +357,7 @@ export async function getLaborRequestNrs(laborRequestId) {
 }
 
 /**
- * Busca a query getLaborRequestById com o campo nr_type_id da activity_types
- * para pré-selecionar as NRs sugeridas no painel de aprovação.
- * (Já incluído na query principal via getLaborRequestById — aqui apenas documentado.)
+ * As NRs e os documentos sugeridos pela atividade (activity_type_documents), usados para
+ * pré-selecionar o painel de aprovação, vêm em getLaborRequestById
+ * (activity_nr_type_id / activity_doc_type_id) — aqui apenas documentado.
  */

@@ -48,6 +48,22 @@ export const DOCUMENT_SCOPE = {
   1: { label: 'Colaborador', tone: 'info' },
 };
 
+// document_types.category (o scope é derivado dela: 0 = empresa; 1, 2 e 3 = colaborador)
+export const DOCUMENT_CATEGORY = {
+  0: { label: 'Documentos da empresa', tone: 'indigo' },
+  1: { label: 'Básicos do colaborador', tone: 'info' },
+  2: { label: 'NRs do colaborador', tone: 'warning' },
+  3: { label: 'Outros do colaborador', tone: 'neutral' },
+};
+
+// Ids do DOCUMENT_CATEGORY por nome (mesmos valores do backend)
+export const DOCUMENT_CATEGORY_ID = {
+  EMPRESA: 0,
+  BASICO: 1,
+  NR: 2,
+  OUTRO: 3,
+};
+
 export const VALIDATION_METHOD = {
   0: { label: 'API Pública', tone: 'success' },
   1: { label: 'IA', tone: 'indigo' },
@@ -202,6 +218,14 @@ export const AUDIT_ACTION = {
   'user.activate': { label: 'Usuário reativado', tone: 'success' },
   'user.inactivate': { label: 'Usuário inativado', tone: 'danger' },
   'user.password_reset': { label: 'Senha redefinida', tone: 'warning' },
+  'document_type.create': { label: 'Tipo de documento criado', tone: 'success' },
+  'document_type.update': { label: 'Tipo de documento editado', tone: 'info' },
+  'document_type.activate': { label: 'Tipo de documento reativado', tone: 'success' },
+  'document_type.inactivate': { label: 'Tipo de documento inativado', tone: 'danger' },
+  'activity.create': { label: 'Atividade criada', tone: 'success' },
+  'activity.update': { label: 'Atividade editada', tone: 'info' },
+  'activity.activate': { label: 'Atividade reativada', tone: 'success' },
+  'activity.inactivate': { label: 'Atividade inativada', tone: 'danger' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */

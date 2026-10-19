@@ -100,9 +100,17 @@
     margin-bottom: 0.25em;
 }
 
-.perEmployeeTag {
-    opacity: 0.7;
-    font-size: 0.75rem;
+.requiredGroup + .requiredGroup {
+    margin-top: 0.6em;
+}
+
+.requiredGroupTitle {
+    margin-top: 0.5em;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.75;
 }
 
 .tabs {
@@ -144,4 +152,84 @@
     display: flex;
     flex-direction: column;
     gap: 0.75em;
+}
+
+/* Arquivo + tipo de documento e, quando o tipo tem validade, a data ao lado */
+.typedRow {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75em;
+    align-items: end;
+}
+
+.typedRowWithDate {
+    grid-template-columns: minmax(0, 1fr) 200px;
+}
+
+.fileLabel {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.fieldNote {
+    margin-top: -0.25em;
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* Colaboradores enviados, com os documentos de cada um */
+.employeeCard {
+    padding: 0.85em 1em;
+    border-radius: var(--radius-md, 10px);
+    background: rgba(255, 255, 255, 0.06);
+    margin-bottom: 0.6em;
+}
+
+.employeeHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+}
+
+.employeeDocs {
+    list-style: none;
+    margin-top: 0.7em;
+    padding-top: 0.6em;
+    border-top: 1px solid rgba(255, 250, 228, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45em;
+}
+
+.employeeDoc {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    font-size: 0.85rem;
+}
+
+.employeeDocMeta {
+    opacity: 0.7;
+    font-size: 0.78rem;
+}
+
+.employeeDocsEmpty {
+    margin-top: 0.6em;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+@media (max-width: 700px) {
+    .typedRowWithDate {
+        grid-template-columns: 1fr;
+    }
+
+    .employeeHeader,
+    .employeeDoc {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4em;
+    }
 }

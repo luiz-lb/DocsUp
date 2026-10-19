@@ -45,6 +45,7 @@ const PaymentTrackingPage = lazy(() => import('../features/purchase-orders/pages
 
 const UserListPage = lazy(() => import('../features/users/pages/UserListPage.jsx'));
 const AuditLogPage = lazy(() => import('../features/audit/pages/AuditLogPage.jsx'));
+const ParametersPage = lazy(() => import('../features/parameters/pages/ParametersPage.jsx'));
 
 function SuspendedOutlet() {
   return (
@@ -108,6 +109,7 @@ export const router = createBrowserRouter([
                 children: [
                   { path: ROUTES.users.list, element: <UserListPage /> },
                   { path: ROUTES.audit.list, element: <AuditLogPage /> },
+                  { path: ROUTES.parameters.list, element: <ParametersPage /> },
                 ],
               },
             ],

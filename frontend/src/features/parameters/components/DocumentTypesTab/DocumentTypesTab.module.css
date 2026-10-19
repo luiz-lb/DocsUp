@@ -1,0 +1,21 @@
+.nrTitle {
+    font-weight: 400;
+}
+
+.description {
+    display: block;
+    max-width: 420px;
+    font-size: 0.85rem;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.muted {
+    color: var(--color-textMuted, #6b7280);
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.35em;
+}

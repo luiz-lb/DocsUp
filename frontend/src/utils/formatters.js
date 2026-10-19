@@ -14,6 +14,28 @@ export function formatDateTime(value) {
   return formatDate(value, { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/**
+ * Data sem hora ('AAAA-MM-DD', ou o início de um ISO) como 'DD/MM/AAAA', sem conversão
+ * de fuso: uma validade 2026-12-31 não pode virar 30/12 no horário de Brasília.
+ */
+export function formatDateOnly(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value ?? ''));
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '-';
+}
+
+/** Data no horário local no formato do <input type="date"> ('AAAA-MM-DD'). */
+export function toDateInputValue(date = new Date()) {
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Hoje + N dias, no formato do <input type="date">. */
+export function addDaysToToday(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + Number(days));
+  return toDateInputValue(date);
+}
+
 export function formatCnpj(value) {
   const digits = String(value ?? '').replace(/\D/g, '').slice(0, 14);
   return digits

@@ -1,4 +1,4 @@
-import { AUDIT_ACTOR_TYPE, DEPARTMENT } from '../../constants/enums.js';
+import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, RISK_LEVEL } from '../../constants/enums.js';
 
 // Nome dos campos gravados em old_values / new_values
 const FIELD_LABELS = {
@@ -7,7 +7,17 @@ const FIELD_LABELS = {
   department: 'Departamento',
   is_active: 'Ativo',
   sessions_ended: 'Sessões encerradas',
+  description: 'Descrição',
+  category: 'Categoria',
+  has_expiration: 'Tem validade',
+  validity_days: 'Prazo padrão (dias)',
+  code: 'Código',
+  risk_level: 'Risco',
+  document_type_ids: 'Documentos sugeridos',
 };
+
+// Campos sim/não: podem vir como boolean ou como 1/0 (BIT do banco)
+const BOOLEAN_FIELDS = new Set(['is_active', 'has_expiration']);
 
 /** Quem fez a ação: { title, subtitle }. */
 export function describeActor(row) {
@@ -22,6 +32,12 @@ export function describeTarget(row) {
   if (row.entity_type === 'user') {
     if (row.target_name) return { title: row.target_name, subtitle: row.target_email };
     return { title: `Usuário #${row.entity_id}`, subtitle: null };
+  }
+  if (row.entity_type === 'document_type') {
+    return { title: row.target_name ?? `Tipo de documento #${row.entity_id}`, subtitle: 'Tipo de documento' };
+  }
+  if (row.entity_type === 'activity') {
+    return { title: row.target_name ?? `Atividade #${row.entity_id}`, subtitle: 'Atividade' };
   }
   return { title: `${row.entity_type} #${row.entity_id ?? '-'}`, subtitle: null };
 }
@@ -38,6 +54,12 @@ function parseJson(value) {
 function formatValue(field, value) {
   if (value === undefined || value === null) return '—';
   if (field === 'department') return DEPARTMENT[value]?.label ?? String(value);
+  if (field === 'category') return DOCUMENT_CATEGORY[value]?.label ?? String(value);
+  if (field === 'risk_level') return RISK_LEVEL[value]?.label ?? String(value);
+  if (field === 'document_type_ids' && Array.isArray(value)) {
+    return value.length > 0 ? value.map((id) => `#${id}`).join(', ') : 'Nenhum';
+  }
+  if (BOOLEAN_FIELDS.has(field) && (value === 0 || value === 1)) return value ? 'Sim' : 'Não';
   if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
   return typeof value === 'object' ? JSON.stringify(value) : String(value);
 }

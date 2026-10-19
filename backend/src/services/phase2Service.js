@@ -6,12 +6,61 @@ import * as quotationModel from '../models/quotationModel.js';
 import * as employeeModel from '../models/employeeModel.js';
 import * as laborRequestModel from '../models/laborRequestModel.js';
 import * as supplierModel from '../models/supplierModel.js';
+import * as documentTypeModel from '../models/documentTypeModel.js';
 import * as trasaction from '../models/trasaction.js';
 import { triggerDocumentValidation } from './documentValidationService.js';
+import { DOCUMENT_CATEGORIES, EMPLOYEE_DOCUMENT_CATEGORIES } from '../constants/documentCategories.js';
+import { isBlank, toInteger } from '../utils/parse.js';
+
+const COMPANY_DOCUMENT_CHOICE_ERROR =
+    'Escolha, para cada arquivo, um dos documentos da empresa exigidos nesta solicitação.';
 
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
+
+const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * 'YYYY-MM-DD' → Date à meia-noite no horário LOCAL, ou null se a data for inválida.
+ * O pool usa useUTC = false: o sql.Date grava os componentes locais do Date. Passar a
+ * string ou um Date.parse (meia-noite UTC = 21h do dia anterior aqui) gravaria um dia antes.
+ */
+function parseLocalDate(value) {
+    if (typeof value !== 'string') return null;
+    const match = ISO_DATE_PATTERN.exec(value.trim());
+    if (!match) return null;
+
+    const [year, month, day] = match.slice(1).map(Number);
+    const date = new Date(year, month - 1, day);
+    // O Date "corrige" datas inexistentes (2026-02-30 vira 02/03): essas são inválidas
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return null;
+    }
+    return date;
+}
+
+/** Hoje à meia-noite, no horário local. */
+function startOfToday() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+}
+
+/**
+ * Validade de um documento conforme o tipo. Com validade (has_expiration): a data é
+ * obrigatória, tem de ser válida e não pode ser passada. Sem validade: é ignorada (NULL).
+ * Retorna { value } (Date local ou null) ou { error }.
+ */
+function resolveExpiration(documentType, expiresAt) {
+    if (!documentType.has_expiration) return { value: null };
+    if (isBlank(expiresAt)) return { error: 'Informe a validade do documento.' };
+
+    const date = parseLocalDate(expiresAt);
+    if (!date) return { error: 'Data de validade inválida.' };
+    if (date < startOfToday()) return { error: 'A validade não pode ser uma data passada.' };
+    return { value: date };
+}
 
 function createMailTransport() {
     // TODO: SMTP desativado temporariamente (Gmail recusando credenciais — 535 BadCredentials).
@@ -92,11 +141,12 @@ function buildUploadDir(scope, supplierId, supplierName) {
  * @param {object}   transaction
  * @param {string}   scope         — 'employees' | 'company'
  * @param {object}   file          — item de req.files (multer memoryStorage)
- * @param {object}   docData       — { supplierId, supplierName, documentTypeId, laborRequestId, employeeId }
+ * @param {object}   docData       — { supplierId, supplierName, documentTypeId, laborRequestId, employeeId, expiresAt }
+ *                                   (expiresAt: Date local ou null)
  * @param {string[]} savedPaths    — acumulador para rollback de arquivos
  */
 async function persistFile(transaction, scope, file, docData, savedPaths) {
-    const { supplierId, supplierName, documentTypeId, laborRequestId, employeeId = null } = docData;
+    const { supplierId, supplierName, documentTypeId, laborRequestId, employeeId = null, expiresAt = null } = docData;
 
     const { absDir, baseDir } = buildUploadDir(scope, supplierId, supplierName);
 
@@ -119,6 +169,7 @@ async function persistFile(transaction, scope, file, docData, savedPaths) {
         fileSizeBytes: file.size,
         mimeType: file.mimetype,
         fileHash,
+        expiresAt,
     });
 
     return docId;
@@ -129,30 +180,41 @@ async function persistFile(transaction, scope, file, docData, savedPaths) {
 // ─────────────────────────────────────────────
 
 /**
- * Retorna o deadline, funcionários já enviados e documentos da empresa.
+ * Retorna o deadline, funcionários já enviados (com NRs e documentos atuais), documentos
+ * enviados, exigências da solicitação e os tipos de documento que o fornecedor pode enviar.
+ * O link só abre para o fornecedor dono dele (supplierId vem do JWT do fornecedor).
  */
-export async function getPhase2ByToken(token) {
+export async function getPhase2ByToken(token, supplierId) {
     try {
         const deadline = await quotationModel.getPhase2DeadlineByToken(token);
         if (!deadline) {
-            return { success: false, message: 'Link da Fase 2 inválido.' };
+            return { success: false, status: 404, message: 'Link da Fase 2 inválido.' };
+        }
+        if (deadline.supplier_id !== Number(supplierId)) {
+            return { success: false, status: 403, message: 'Este link é de outro fornecedor.' };
         }
 
-        const employees = await employeeModel.getEmployeesBySupplierAndRequest(
-            deadline.supplier_id,
-            deadline.labor_request_id,
-        );
+        const laborRequestId = deadline.labor_request_id;
 
-        const documents = await employeeModel.getDocumentsBySupplierAndRequest(
-            deadline.supplier_id,
-            deadline.labor_request_id,
-        );
-
-        // Documentos obrigatórios definidos por Segurança do Trabalho
-        const requiredDocs = await laborRequestModel.getLaborRequestDocuments(deadline.labor_request_id);
-
-        // NRs obrigatórias definidas por Segurança do Trabalho para a atividade
-        const requiredNrTypes = await laborRequestModel.getLaborRequestNrs(deadline.labor_request_id);
+        const [
+            employees,
+            documents,
+            requiredDocs,
+            requiredNrTypes,
+            employeeDocumentTypes,
+            companyDocumentTypes,
+        ] = await Promise.all([
+            employeeModel.getEmployeesBySupplierAndRequest(deadline.supplier_id, laborRequestId),
+            employeeModel.getDocumentsBySupplierAndRequest(deadline.supplier_id, laborRequestId),
+            // Documentos obrigatórios definidos por Segurança do Trabalho
+            laborRequestModel.getLaborRequestDocuments(laborRequestId),
+            // NRs obrigatórias definidas por Segurança do Trabalho para a atividade
+            laborRequestModel.getLaborRequestNrs(laborRequestId),
+            // Tipos ativos de documento de colaborador, com `required` para esta solicitação
+            documentTypeModel.getEmployeeDocumentTypesForRequest(laborRequestId),
+            // Tipos de documento da empresa exigidos nesta solicitação
+            documentTypeModel.getRequiredCompanyDocumentTypes(laborRequestId),
+        ]);
 
         const now = new Date();
         const expiresAt = new Date(deadline.expires_at);
@@ -166,11 +228,13 @@ export async function getPhase2ByToken(token) {
                 documents,
                 requiredDocuments: requiredDocs,
                 requiredNrTypes,
+                employeeDocumentTypes,
+                companyDocumentTypes,
             },
         };
     } catch (error) {
         console.error('getPhase2ByToken error:', error);
-        return { success: false, message: 'Erro ao buscar Fase 2.' };
+        return { success: false, status: 500, message: 'Erro ao buscar Fase 2.' };
     }
 }
 
@@ -179,34 +243,36 @@ export async function getPhase2ByToken(token) {
 // ─────────────────────────────────────────────
 
 /**
- * Cadastra um funcionário com UMA NR e o respectivo certificado (um PDF).
+ * Cadastra um funcionário com UM documento (um arquivo) de um tipo de colaborador
+ * (básico, NR ou outros).
  *
- * Modelo "uma NR por vez": cada envio associa um colaborador a uma única NR e
- * ao documento comprobatório daquela NR — assim conseguimos saber exatamente
- * qual PDF pertence a qual NR (employee_nrs.certificate_doc_id) e, mais tarde,
- * descobrir qual NR está faltando.
+ * Modelo "um documento por vez": cada envio associa o colaborador a um único tipo de
+ * documento — assim sabemos exatamente qual arquivo é de qual documento e, mais tarde,
+ * qual está faltando. Se o tipo é uma NR (categoria 2), a NR também é vinculada ao
+ * colaborador em employee_nrs (certificate_doc_id = documento enviado, expiration_date
+ * = validade).
  *
  * Se o colaborador já existir (mesmo CPF no mesmo fornecedor/solicitação),
- * reaproveitamos o registro e apenas adicionamos a nova NR + certificado.
+ * reaproveitamos o registro e apenas adicionamos o novo documento.
  *
  * @param {string}   token      — link_token do phase2_deadline
  * @param {number}   supplierId — extraído do JWT do fornecedor
- * @param {object}   data       — { fullName, cpf, rg, roleFunction, nrTypeId }
+ * @param {object}   data       — { fullName, cpf, rg, roleFunction, documentTypeId, expiresAt ('YYYY-MM-DD') }
  * @param {File[]}   files      — arquivos enviados via multer (espera-se exatamente 1)
  */
 export async function addEmployee(token, supplierId, data, files = []) {
-    const { fullName, cpf, rg, roleFunction, nrTypeId } = data;
+    const { fullName, cpf, rg, roleFunction, documentTypeId, expiresAt } = data;
 
     if (!fullName || !cpf) {
         return { success: false, message: 'Nome completo e CPF são obrigatórios.' };
     }
 
-    if (!nrTypeId) {
-        return { success: false, message: 'Selecione a NR deste certificado.' };
+    if (isBlank(documentTypeId)) {
+        return { success: false, message: 'Selecione qual documento é este arquivo.' };
     }
 
     if (!files || files.length !== 1) {
-        return { success: false, message: 'Envie exatamente um arquivo (o certificado desta NR).' };
+        return { success: false, message: 'Envie exatamente um arquivo (o documento selecionado).' };
     }
 
     // Valida deadline
@@ -223,6 +289,23 @@ export async function addEmployee(token, supplierId, data, files = []) {
     if (deadline.supplier_id !== supplierId) {
         return { success: false, message: 'Sem permissão para este deadline.' };
     }
+
+    // Tipo de documento: ativo e de colaborador (básico, NR ou outros)
+    const typeId = toInteger(documentTypeId);
+    const documentType = Number.isInteger(typeId) && typeId > 0
+        ? await documentTypeModel.getDocumentTypeById(typeId)
+        : null;
+    if (!documentType || !documentType.is_active || !EMPLOYEE_DOCUMENT_CATEGORIES.includes(documentType.category)) {
+        return { success: false, message: 'Documento de colaborador inválido.' };
+    }
+
+    // Validade: obrigatória quando o tipo tem validade; senão é ignorada (NULL)
+    const expiration = resolveExpiration(documentType, expiresAt);
+    if (expiration.error) {
+        return { success: false, message: expiration.error };
+    }
+
+    const isNr = documentType.category === DOCUMENT_CATEGORIES.EMPLOYEE_NR;
 
     let transaction;
     let transactionDone = false;
@@ -257,40 +340,42 @@ export async function addEmployee(token, supplierId, data, files = []) {
             return { success: false, message: 'Erro ao cadastrar funcionário.' };
         }
 
-        // 2. Salva o único arquivo (certificado da NR) organizado por fornecedor e data
+        // 2. Salva o único arquivo, com o tipo escolhido e a validade, organizado por fornecedor e data
         //    uploads/employees/<supplierId>-<razaoSocial>/<YYYY-MM-DD>/<hash>.<ext>
-        //    document_type_id=8 (Certificado de Treinamento de NR)
-        const certDocId = await persistFile(
+        const docId = await persistFile(
             transaction,
             'employees',
             files[0],
             {
                 supplierId,
                 supplierName: deadline.supplier_name,
-                documentTypeId: 8,
+                documentTypeId: documentType.id,
                 laborRequestId: deadline.labor_request_id,
                 employeeId,
+                expiresAt: expiration.value,
             },
             savedPaths,
         );
 
-        // 3. Vincula a NR ao colaborador COM o certificado (mapeia qual PDF é de qual NR)
-        await employeeModel.insertEmployeeNr(
-            transaction,
-            employeeId,
-            Number(nrTypeId),
-            certDocId,
-            null,
-        );
+        // 3. NR: vincula a NR ao colaborador COM o certificado (mapeia qual arquivo é de qual NR)
+        if (isNr) {
+            await employeeModel.insertEmployeeNr(
+                transaction,
+                employeeId,
+                documentType.nr_type_id,
+                docId,
+                expiration.value,
+            );
+        }
 
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
 
-        // Dispara validação assíncrona do certificado (fora da transação)
-        setImmediate(() => triggerDocumentValidation(certDocId, supplierId));
+        // Dispara validação assíncrona do documento (fora da transação)
+        setImmediate(() => triggerDocumentValidation(docId, supplierId));
 
-        console.log(`Colaborador ${employeeId} + NR ${nrTypeId} (doc ${certDocId}) na Fase 2 (supplier ${supplierId}).`);
-        return { success: true, body: { employeeId, nrTypeId: Number(nrTypeId), documentId: certDocId } };
+        console.log(`Colaborador ${employeeId} + documento tipo ${documentType.id} (doc ${docId}) na Fase 2 (supplier ${supplierId}).`);
+        return { success: true, body: { employeeId, documentTypeId: documentType.id, documentId: docId } };
     } catch (error) {
         if (transaction && !transactionDone) {
             await trasaction.finalizarTransacao(transaction, false);
@@ -309,12 +394,15 @@ export async function addEmployee(token, supplierId, data, files = []) {
 // ─────────────────────────────────────────────
 
 /**
- * Processa o upload de documentos da empresa (escopo 0 — não vinculados a colaborador).
+ * Processa o upload de documentos da empresa (categoria 0 — não vinculados a colaborador).
+ * Cada arquivo tem de ser de um dos tipos de empresa exigidos na solicitação; a validade
+ * segue as mesmas regras do envio de colaborador, por arquivo.
  * Os arquivos são organizados em uploads/company/<supplierId>-<razaoSocial>/<YYYY-MM-DD>/.
  *
  * @param {string} token       — link_token do phase2_deadline
  * @param {number} supplierId  — extraído do JWT do fornecedor
- * @param {object} data        — { documentTypeIds: number[] } paralelo a files (opcional)
+ * @param {object} data        — { documentTypeIds: number[] (obrigatório), expiresAt?: (string|null)[] },
+ *                               ambos paralelos a files (mesmo tamanho)
  * @param {File[]} files       — arquivos enviados via multer (req.files)
  */
 export async function addCompanyDocuments(token, supplierId, data, files = []) {
@@ -322,7 +410,16 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
         return { success: false, message: 'Envie ao menos um documento da empresa.' };
     }
 
-    const { documentTypeIds = [] } = data;
+    const { documentTypeIds, expiresAt } = data;
+
+    if (!Array.isArray(documentTypeIds) || documentTypeIds.length !== files.length) {
+        return { success: false, message: COMPANY_DOCUMENT_CHOICE_ERROR };
+    }
+
+    const hasExpiresAt = expiresAt !== undefined && expiresAt !== null;
+    if (hasExpiresAt && (!Array.isArray(expiresAt) || expiresAt.length !== files.length)) {
+        return { success: false, message: 'Data de validade inválida.' };
+    }
 
     // Valida deadline
     const deadline = await quotationModel.getPhase2DeadlineByToken(token);
@@ -339,6 +436,25 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
         return { success: false, message: 'Sem permissão para este deadline.' };
     }
 
+    // Cada arquivo: um dos tipos de empresa exigidos na solicitação (ativos), com a validade dele
+    const requiredTypes = await documentTypeModel.getRequiredCompanyDocumentTypes(deadline.labor_request_id);
+    const requiredById = new Map(requiredTypes.map((type) => [type.id, type]));
+
+    const uploads = [];
+    for (let i = 0; i < files.length; i++) {
+        const documentType = requiredById.get(toInteger(documentTypeIds[i]));
+        if (!documentType) {
+            return { success: false, message: COMPANY_DOCUMENT_CHOICE_ERROR };
+        }
+
+        const expiration = resolveExpiration(documentType, hasExpiresAt ? expiresAt[i] : null);
+        if (expiration.error) {
+            return { success: false, message: expiration.error };
+        }
+
+        uploads.push({ file: files[i], documentTypeId: documentType.id, expiresAt: expiration.value });
+    }
+
     let transaction;
     let transactionDone = false;
     const savedPaths = [];
@@ -347,21 +463,18 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
         transaction = await trasaction.iniciarTransacao();
 
         const documentIds = [];
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            // documentTypeIds pode mapear 1:1 com os arquivos; fallback = 1 (Contrato Social)
-            const documentTypeId = Number(documentTypeIds[i]) || 1;
-
+        for (const upload of uploads) {
             const docId = await persistFile(
                 transaction,
                 'company',
-                file,
+                upload.file,
                 {
                     supplierId,
                     supplierName: deadline.supplier_name,
-                    documentTypeId,
+                    documentTypeId: upload.documentTypeId,
                     laborRequestId: deadline.labor_request_id,
                     employeeId: null, // documento da empresa não tem colaborador
+                    expiresAt: upload.expiresAt,
                 },
                 savedPaths,
             );

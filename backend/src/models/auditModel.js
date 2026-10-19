@@ -29,7 +29,8 @@ export async function insertAuditLog(transaction, {
 }
 
 /**
- * Lista a auditoria, mais recente primeiro, com quem fez e o usuário alvo.
+ * Lista a auditoria, mais recente primeiro, com quem fez e o alvo. target_name é o nome
+ * do alvo (usuário, tipo de documento ou atividade); target_email só existe para usuário.
  *
  * @param {object} options
  * @param {number} options.page     - Página (1-based).
@@ -37,7 +38,7 @@ export async function insertAuditLog(transaction, {
  * @param {string} [options.action] - Filtra por ação (ex.: 'user.update').
  * @param {string} [options.from]   - Data inicial 'YYYY-MM-DD' (inclusiva).
  * @param {string} [options.to]     - Data final 'YYYY-MM-DD' (inclusiva).
- * @param {string} [options.search] - Nome ou e-mail de quem fez ou do alvo.
+ * @param {string} [options.search] - Nome ou e-mail de quem fez, ou nome / e-mail do alvo.
  * @returns {Promise<{rows: object[], total: number}>}
  */
 export async function listAuditLogs({ page = 1, limit = 25, action, from, to, search = '' } = {}) {
@@ -66,7 +67,9 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
     if (search) {
         request.input('search', sql.NVarChar(210), `%${search}%`);
         conditions.push(`(actor.[name] LIKE @search OR actor.email LIKE @search
-                          OR target.[name] LIKE @search OR target.email LIKE @search)`);
+                          OR target.[name] LIKE @search OR target.email LIKE @search
+                          OR target_document_type.[name] LIKE @search
+                          OR target_activity.[name] LIKE @search)`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -81,7 +84,7 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
             a.[action],
             a.entity_type,
             a.entity_id,
-            target.[name] AS target_name,
+            COALESCE(target.[name], target_document_type.[name], target_activity.[name]) AS target_name,
             target.email  AS target_email,
             a.old_values,
             a.new_values,
@@ -92,6 +95,10 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
         FROM audit_log AS a
         LEFT JOIN users AS actor  ON a.actor_type = 0 AND actor.id = a.actor_id
         LEFT JOIN users AS target ON a.entity_type = 'user' AND target.id = a.entity_id
+        LEFT JOIN document_types AS target_document_type
+            ON a.entity_type = 'document_type' AND target_document_type.id = a.entity_id
+        LEFT JOIN activity_types AS target_activity
+            ON a.entity_type = 'activity' AND target_activity.id = a.entity_id
         ${whereClause}
         ORDER BY a.created_at DESC, a.id DESC
         OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY

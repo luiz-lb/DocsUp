@@ -9,6 +9,7 @@ import {
   LuFolderCheck,
   LuUserCog,
   LuHistory,
+  LuSettings,
 } from 'react-icons/lu';
 import { ROUTES } from './routes.js';
 import { DEPARTMENT_ID } from './enums.js';
@@ -28,6 +29,7 @@ export const NAV_ITEMS = [
   { label: 'Avaliação de Fornecedores', to: ROUTES.scoring.board, icon: LuStar, department: [0, 2, 5] },
   { label: 'Pedidos & Pagamentos', to: ROUTES.purchaseOrders.list, icon: LuReceipt, department: [3, 4, 2] },
   { label: 'Usuários', to: ROUTES.users.list, icon: LuUserCog, department: ACCESS.admin },
+  { label: 'Parâmetros', to: ROUTES.parameters.list, icon: LuSettings, department: ACCESS.admin },
   { label: 'Auditoria', to: ROUTES.audit.list, icon: LuHistory, department: ACCESS.admin },
 ];
 

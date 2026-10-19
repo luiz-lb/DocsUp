@@ -71,7 +71,8 @@ export async function insertEmployeeNr(transaction, employeeId, nrTypeId, certif
 }
 
 /**
- * Lista os funcionários de um fornecedor em uma solicitação.
+ * Lista os funcionários de um fornecedor em uma solicitação, cada um com as NRs
+ * (`nrs`) e os documentos atuais (`documents`, is_current = 1).
  */
 export async function getEmployeesBySupplierAndRequest(supplierId, laborRequestId) {
     const pool = await poolPromise;
@@ -107,6 +108,39 @@ export async function getEmployeesBySupplierAndRequest(supplierId, laborRequestI
                 WHERE en.employee_id = @employee_id
             `);
         emp.nrs = nrResult.recordset;
+    }
+
+    // Documentos atuais de todos os funcionários numa consulta só, agrupados por funcionário
+    const documentsResult = await pool.request()
+        .input('supplier_id', sql.Int, supplierId)
+        .input('labor_request_id', sql.Int, laborRequestId)
+        .query(`
+            SELECT
+                d.employee_id,
+                d.id,
+                d.document_type_id,
+                dt.[name]   AS document_type_name,
+                dt.category,
+                d.[status],
+                d.expires_at,
+                d.file_name,
+                d.uploaded_at
+            FROM documents AS d
+            INNER JOIN employees      AS e  ON e.id  = d.employee_id
+            INNER JOIN document_types AS dt ON dt.id = d.document_type_id
+            WHERE e.supplier_id      = @supplier_id
+              AND e.labor_request_id = @labor_request_id
+              AND d.is_current       = 1
+            ORDER BY dt.category ASC, dt.[name] ASC, d.uploaded_at DESC
+        `);
+
+    const documentsByEmployee = new Map();
+    for (const { employee_id: employeeId, ...document } of documentsResult.recordset) {
+        if (!documentsByEmployee.has(employeeId)) documentsByEmployee.set(employeeId, []);
+        documentsByEmployee.get(employeeId).push(document);
+    }
+    for (const emp of employees) {
+        emp.documents = documentsByEmployee.get(emp.id) ?? [];
     }
 
     return employees;

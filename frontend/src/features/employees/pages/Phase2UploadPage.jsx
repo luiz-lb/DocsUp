@@ -1,49 +1,79 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LuUserPlus, LuLogIn, LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
+import { LuLogIn, LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
 import { Card, Button, FormField, FileDropzone, StatusBadge, Banner } from '../../../components/ui/index.js';
-import { EMPLOYEE_STATUS, DOCUMENT_STATUS } from '../../../constants/enums.js';
+import { EMPLOYEE_STATUS, DOCUMENT_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { getPhase2ByToken, addEmployee, uploadCompanyDocuments } from '../api/employeesApi.js';
 import Phase2CountdownBanner from '../components/Phase2CountdownBanner/index.js';
-import NrBadgeList from '../components/NrBadgeList/index.js';
-import NrSearchSelect from '../components/NrSearchSelect/index.js';
 import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
 import { ROUTES } from '../../../constants/routes.js';
 import { cn } from '../../../utils/cn.js';
+import { addDaysToToday, formatDateOnly, toDateInputValue } from '../../../utils/formatters.js';
 import authStyles from '../../../styles/authCard.module.css';
 import styles from './Phase2UploadPage.module.css';
 
-const EMPTY_EMPLOYEE = { fullName: '', cpf: '', rg: '', roleFunction: '', nrTypeId: null };
+const EMPTY_EMPLOYEE = { fullName: '', cpf: '', rg: '', roleFunction: '', documentTypeId: '', expiresAt: '' };
 
 const TABS = {
   COMPANY: 'company',
   EMPLOYEES: 'employees',
 };
 
+// Categorias dos documentos do colaborador, na ordem de exibição (básicos primeiro)
+const EMPLOYEE_CATEGORIES = [DOCUMENT_CATEGORY_ID.BASICO, DOCUMENT_CATEGORY_ID.NR, DOCUMENT_CATEGORY_ID.OUTRO];
+
+/** Validade sugerida pelo prazo padrão do tipo (hoje + validity_days), ou vazio. */
+function suggestedExpiry(documentType) {
+  return documentType?.has_expiration && documentType.validity_days ? addDaysToToday(documentType.validity_days) : '';
+}
+
+/** Tipos agrupados por categoria (básicos, NRs, outros), com os exigidos primeiro em cada grupo. */
+function groupByCategory(documentTypes) {
+  return EMPLOYEE_CATEGORIES.map((category) => ({
+    category,
+    label: DOCUMENT_CATEGORY[category].label,
+    items: documentTypes
+      .filter((type) => type.category === category)
+      .sort((a, b) => Number(Boolean(b.required)) - Number(Boolean(a.required))),
+  })).filter((group) => group.items.length > 0);
+}
+
+/** Nota sob a data sugerida: o prazo padrão é só um ponto de partida. */
+function ExpiryNote({ documentType }) {
+  if (!documentType?.validity_days) return null;
+  return (
+    <p className={styles.fieldNote}>
+      Sugerida pelo prazo padrão de {documentType.validity_days} {Number(documentType.validity_days) === 1 ? 'dia' : 'dias'}.
+      Confira a data no documento.
+    </p>
+  );
+}
+
 export default function Phase2UploadPage() {
   const { token } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated: isSupplierAuth, isLoading: isAuthLoading } = useSupplierAuth();
 
-  const { data, isLoading, reload } = useAsyncData(() => getPhase2ByToken(token), [token]);
+  const { data: response, isLoading, reload } = useAsyncData(() => getPhase2ByToken(token), [token]);
 
   const [tab, setTab] = useState(TABS.COMPANY);
 
-  // Documentos da empresa: cada item = { file, documentTypeId }
+  // Documentos da empresa: cada item = { file, documentTypeId, expiresAt }
   const [companyItems, setCompanyItems] = useState([]);
   const [isSavingCompany, setIsSavingCompany] = useState(false);
   const [companyError, setCompanyError] = useState('');
   const [companySuccess, setCompanySuccess] = useState('');
 
-  // Colaboradores (uma NR + um arquivo por vez)
+  // Colaboradores (um documento + um arquivo por vez)
   const [form, setForm] = useState(EMPTY_EMPLOYEE);
   const [file, setFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState('');
 
-  // Aguarda validação de autenticação
-  if (isAuthLoading || isLoading) return null;
+  // Aguarda validação de autenticação (nos recarregamentos, mantém a tela com os dados atuais)
+  if (isAuthLoading || (isLoading && !response)) return null;
 
   // Fornecedor não autenticado
   if (!isSupplierAuth) {
@@ -71,70 +101,94 @@ export default function Phase2UploadPage() {
     );
   }
 
-  if (!data) {
+  // Link inválido, expirado ou de outro fornecedor: mostra a mensagem do backend
+  if (!response?.success) {
     return (
       <Card tone="dark" className={cn(authStyles.card, authStyles.wide)}>
         <Card.Body>
-          <h1 className={authStyles.title}>Link inválido</h1>
+          <p className={authStyles.eyebrow}>Fase 2 — Documentação</p>
+          <h1 className={authStyles.title}>Não foi possível abrir este link</h1>
           <p className={authStyles.subtitle}>
-            O link da Fase 2 é inválido, expirado ou já foi utilizado.
+            {response?.message ?? 'O link da Fase 2 é inválido, expirado ou já foi utilizado.'}
           </p>
         </Card.Body>
       </Card>
     );
   }
 
-  const { deadline, employees, documents, requiredDocuments, requiredNrTypes } = data;
+  const phase2 = response.body;
+  const { deadline } = phase2;
+  const employees = phase2.employees ?? [];
+  const employeeDocumentTypes = phase2.employeeDocumentTypes ?? [];
+  const companyDocumentTypes = phase2.companyDocumentTypes ?? [];
+  const today = toDateInputValue();
 
-  const companyRequiredDocs = (requiredDocuments ?? []).filter((doc) => doc.scope === 0);
-  const employeeRequiredDocs = (requiredDocuments ?? []).filter((doc) => doc.scope === 1);
+  const companyRequiredDocs = (phase2.requiredDocuments ?? []).filter((doc) => doc.scope === 0);
+  const companyDocuments = (phase2.documents ?? []).filter((doc) => !doc.employee_id);
 
-  // Opções de tipo de documento da empresa (o técnico de segurança já definiu quais são exigidos)
-  const companyDocTypeOptions = companyRequiredDocs.map((doc) => ({
-    id: doc.document_type_id,
-    name: doc.document_type_name,
-  }));
+  // Tipos por id (o <select> trabalha com string)
+  const companyTypeById = new Map(companyDocumentTypes.map((type) => [String(type.id), type]));
+  const employeeTypeById = new Map(employeeDocumentTypes.map((type) => [String(type.id), type]));
 
-  // NRs exigidas para a atividade (definidas por Segurança do Trabalho) → select pesquisável
-  const nrOptions = (requiredNrTypes ?? []).map((nr) => ({
-    id: nr.nr_type_id,
-    code: nr.nr_code,
-    name: nr.nr_name,
-    description: nr.description,
-  }));
-
-  const companyDocuments = (documents ?? []).filter((doc) => !doc.employee_id);
+  // Select do colaborador (todos os tipos) e lista dos exigidos, agrupados por categoria
+  const employeeTypeGroups = groupByCategory(employeeDocumentTypes);
+  const requiredEmployeeGroups = groupByCategory(employeeDocumentTypes.filter((type) => type.required));
 
   // ── Documentos da empresa ────────────────────────────────────────────────
+  const companyItemNeedsExpiry = (item) => Boolean(companyTypeById.get(String(item.documentTypeId))?.has_expiration);
+
   const handleCompanyFilesChange = (nextFiles) => {
-    // mantém o tipo já escolhido para arquivos que continuam na lista
+    // mantém o tipo e a validade já escolhidos para arquivos que continuam na lista
     setCompanyItems((prev) => {
-      const byName = new Map(prev.map((item) => [item.file, item]));
-      return nextFiles.map((f) => byName.get(f) ?? { file: f, documentTypeId: '' });
+      const byFile = new Map(prev.map((item) => [item.file, item]));
+      return nextFiles.map((f) => byFile.get(f) ?? { file: f, documentTypeId: '', expiresAt: '' });
     });
   };
 
   const setCompanyItemType = (index, documentTypeId) => {
     setCompanyItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, documentTypeId } : item)),
+      prev.map((item, i) =>
+        i === index
+          ? { ...item, documentTypeId, expiresAt: suggestedExpiry(companyTypeById.get(documentTypeId)) }
+          : item,
+      ),
     );
+  };
+
+  const setCompanyItemExpiry = (index, expiresAt) => {
+    setCompanyItems((prev) => prev.map((item, i) => (i === index ? { ...item, expiresAt } : item)));
   };
 
   const companyFiles = companyItems.map((item) => item.file);
   const allCompanyTyped = companyItems.length > 0 && companyItems.every((item) => item.documentTypeId);
+  const anyCompanySuggestion = companyItems.some(
+    (item) => companyItemNeedsExpiry(item) && companyTypeById.get(String(item.documentTypeId))?.validity_days,
+  );
+
+  const validateCompany = () => {
+    if (!allCompanyTyped) return 'Selecione o tipo de cada documento antes de enviar.';
+    for (const item of companyItems) {
+      if (!companyItemNeedsExpiry(item)) continue;
+      if (!item.expiresAt) return `Informe a validade de "${item.file.name}".`;
+      if (item.expiresAt < today) return `A validade de "${item.file.name}" não pode ser anterior a hoje.`;
+    }
+    return null;
+  };
 
   const handleUploadCompany = async () => {
     setCompanyError('');
     setCompanySuccess('');
 
-    if (!allCompanyTyped) {
-      setCompanyError('Selecione o tipo de cada documento antes de enviar.');
+    const validationError = validateCompany();
+    if (validationError) {
+      setCompanyError(validationError);
       return;
     }
 
     setIsSavingCompany(true);
     const documentTypeIds = companyItems.map((item) => Number(item.documentTypeId));
-    const result = await uploadCompanyDocuments(token, companyFiles, documentTypeIds);
+    const expiresAt = companyItems.map((item) => (companyItemNeedsExpiry(item) ? item.expiresAt : null));
+    const result = await uploadCompanyDocuments(token, companyFiles, documentTypeIds, expiresAt);
     setIsSavingCompany(false);
 
     if (!result.success) {
@@ -148,30 +202,60 @@ export default function Phase2UploadPage() {
   };
 
   // ── Colaboradores ─────────────────────────────────────────────────────────
+  const selectedEmployeeType = employeeTypeById.get(String(form.documentTypeId));
+  const employeeNeedsExpiry = Boolean(selectedEmployeeType?.has_expiration);
+
+  const setEmployeeDocumentType = (documentTypeId) => {
+    setForm((prev) => ({
+      ...prev,
+      documentTypeId,
+      expiresAt: suggestedExpiry(employeeTypeById.get(documentTypeId)),
+    }));
+  };
+
+  const validateEmployee = () => {
+    if (!form.fullName.trim() || !form.cpf.trim()) return 'Informe o nome completo e o CPF do colaborador.';
+    if (!form.documentTypeId) return 'Selecione qual documento é este arquivo.';
+    if (employeeNeedsExpiry && !form.expiresAt) return 'Informe a validade do documento.';
+    if (employeeNeedsExpiry && form.expiresAt < today) return 'A validade do documento não pode ser anterior a hoje.';
+    if (!file) return 'Envie o arquivo deste documento.';
+    return null;
+  };
+
   const handleAddEmployee = async () => {
     setSaveError('');
+    setSaveSuccess('');
 
-    if (!form.nrTypeId) {
-      setSaveError('Selecione a NR deste certificado.');
-      return;
-    }
-    if (!file) {
-      setSaveError('Envie o certificado (um arquivo) desta NR.');
+    const validationError = validateEmployee();
+    if (validationError) {
+      setSaveError(validationError);
       return;
     }
 
     setIsSaving(true);
-    const result = await addEmployee(token, form, file);
+    const result = await addEmployee(
+      token,
+      {
+        fullName: form.fullName,
+        cpf: form.cpf,
+        rg: form.rg,
+        roleFunction: form.roleFunction,
+        documentTypeId: Number(form.documentTypeId),
+        expiresAt: employeeNeedsExpiry ? form.expiresAt : null,
+      },
+      file,
+    );
     setIsSaving(false);
 
     if (!result.success) {
-      setSaveError(result.body?.message ?? 'Erro ao cadastrar colaborador.');
+      setSaveError(result.body?.message ?? 'Erro ao enviar o documento do colaborador.');
       return;
     }
 
-    // Mantém os dados do colaborador para facilitar adicionar outra NR do mesmo,
-    // mas limpa a NR e o arquivo (um por vez).
-    setForm((prev) => ({ ...prev, nrTypeId: null }));
+    // Mantém os dados do colaborador para facilitar enviar outro documento dele,
+    // mas limpa o documento, a validade e o arquivo (um por vez).
+    setSaveSuccess(`Documento enviado: ${selectedEmployeeType?.name ?? 'documento'} de ${form.fullName}.`);
+    setForm((prev) => ({ ...prev, documentTypeId: '', expiresAt: '' }));
     setFile(null);
     reload();
   };
@@ -183,7 +267,7 @@ export default function Phase2UploadPage() {
         <h1 className={authStyles.title}>Envio de documentação — Fase 2</h1>
         <p className={authStyles.subtitle}>
           Envie os documentos da empresa e cadastre os colaboradores que atuarão nesta obra.
-          Para cada colaborador, envie uma NR por vez com o certificado correspondente.
+          Para cada colaborador, envie um documento por vez (ASO, certificados de NR, Ficha de EPI…).
         </p>
 
         {/* Banner de countdown com expiração automática */}
@@ -237,24 +321,46 @@ export default function Phase2UploadPage() {
                   />
                 </div>
 
-                {/* Para cada arquivo, selecionar o tipo de documento
-                    (mesmo padrão de select do restante do sistema: FormField + <select>) */}
+                {/* Para cada arquivo: o tipo de documento e, se o tipo tem validade, a data */}
                 {companyItems.length > 0 && (
                   <div className={styles.typedList}>
                     <p className={styles.groupLabel}>Classifique cada arquivo:</p>
-                    {companyItems.map((item, index) => (
-                      <FormField key={`${item.file.name}-${index}`} label={item.file.name}>
-                        <select
-                          value={item.documentTypeId}
-                          onChange={(e) => setCompanyItemType(index, e.target.value)}
+                    {companyItems.map((item, index) => {
+                      const needsExpiry = companyItemNeedsExpiry(item);
+                      return (
+                        <div
+                          key={`${item.file.name}-${index}`}
+                          className={cn(styles.typedRow, needsExpiry && styles.typedRowWithDate)}
                         >
-                          <option value="">Selecione o tipo…</option>
-                          {companyDocTypeOptions.map((opt) => (
-                            <option key={opt.id} value={opt.id}>{opt.name}</option>
-                          ))}
-                        </select>
-                      </FormField>
-                    ))}
+                          <FormField label={item.file.name} className={styles.fileLabel}>
+                            <select
+                              value={item.documentTypeId}
+                              onChange={(e) => setCompanyItemType(index, e.target.value)}
+                            >
+                              <option value="">Selecione o tipo…</option>
+                              {companyDocumentTypes.map((type) => (
+                                <option key={type.id} value={type.id}>{type.name}</option>
+                              ))}
+                            </select>
+                          </FormField>
+                          {needsExpiry && (
+                            <FormField label="Validade" required>
+                              <input
+                                type="date"
+                                value={item.expiresAt}
+                                min={today}
+                                onChange={(e) => setCompanyItemExpiry(index, e.target.value)}
+                              />
+                            </FormField>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {anyCompanySuggestion && (
+                      <p className={styles.fieldNote}>
+                        Algumas validades foram sugeridas pelo prazo padrão do tipo. Confira a data em cada documento.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -281,7 +387,10 @@ export default function Phase2UploadPage() {
                   <div key={doc.id} className={styles.employeeRow}>
                     <div>
                       <strong>{doc.document_type_name}</strong>
-                      <div className={styles.employeeRole}>{doc.file_name}</div>
+                      <div className={styles.employeeRole}>
+                        {doc.file_name}
+                        {doc.expires_at && ` · válido até ${formatDateOnly(doc.expires_at)}`}
+                      </div>
                     </div>
                     <StatusBadge enumMap={DOCUMENT_STATUS} value={doc.status} />
                   </div>
@@ -294,21 +403,25 @@ export default function Phase2UploadPage() {
         {/* ── Aba: Documentos dos colaboradores ──────────────────────── */}
         {tab === TABS.EMPLOYEES && (
           <div className={styles.tabPanel}>
-            {employeeRequiredDocs.length > 0 && (
+            {requiredEmployeeGroups.length > 0 && (
               <div className={styles.requiredDocs}>
                 <p className={styles.groupLabel}>Documentos por colaborador exigidos:</p>
-                <ul className={styles.docList}>
-                  {employeeRequiredDocs.map((doc) => (
-                    <li key={doc.id} className={styles.docListItem}>
-                      {doc.document_type_name}
-                      <span className={styles.perEmployeeTag}> (por colaborador)</span>
-                    </li>
-                  ))}
-                </ul>
+                {requiredEmployeeGroups.map((group) => (
+                  <div key={group.category} className={styles.requiredGroup}>
+                    <p className={styles.requiredGroupTitle}>{group.label}</p>
+                    <ul className={styles.docList}>
+                      {group.items.map((type) => (
+                        <li key={type.id} className={styles.docListItem}>
+                          {type.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
             )}
 
-            {/* Formulário de colaborador — uma NR + um certificado por vez */}
+            {/* Formulário de colaborador — um documento + um arquivo por vez */}
             {!deadline.isExpired && (
               <div className={styles.formSection}>
                 <div className={styles.grid}>
@@ -334,56 +447,106 @@ export default function Phase2UploadPage() {
                   </FormField>
                 </div>
 
-                {/* Select pesquisável — UMA NR por vez (vem do banco) */}
-                <NrSearchSelect
-                  label="NR deste certificado"
-                  single
-                  options={nrOptions}
-                  value={form.nrTypeId}
-                  onChange={(id) => setForm((prev) => ({ ...prev, nrTypeId: id }))}
-                  placeholder="Pesquisar a NR deste certificado…"
-                />
+                {/* Qual documento é o arquivo (básicos, NRs e outros) e, se tiver validade, a data */}
+                <div className={cn(styles.typedRow, employeeNeedsExpiry && styles.typedRowWithDate)}>
+                  <FormField label="Qual documento é este arquivo?" required>
+                    <select value={form.documentTypeId} onChange={(e) => setEmployeeDocumentType(e.target.value)}>
+                      <option value="">Selecione o documento…</option>
+                      {employeeTypeGroups.map((group) => (
+                        <optgroup key={group.category} label={group.label}>
+                          {group.items.map((type) => (
+                            <option key={type.id} value={type.id}>
+                              {`${type.name}${type.required ? ' (exigido)' : ''}`}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </FormField>
+                  {employeeNeedsExpiry && (
+                    <FormField label="Validade do documento" required>
+                      <input
+                        type="date"
+                        value={form.expiresAt}
+                        min={today}
+                        onChange={(e) => setForm((prev) => ({ ...prev, expiresAt: e.target.value }))}
+                      />
+                    </FormField>
+                  )}
+                </div>
+                {employeeNeedsExpiry && <ExpiryNote documentType={selectedEmployeeType} />}
 
-                {/* Um único arquivo — o certificado da NR selecionada */}
+                {/* Um único arquivo — o documento selecionado */}
                 <div className={styles.dropzoneSpacer}>
                   <FileDropzone
                     files={file ? [file] : []}
                     onFilesChange={(fs) => setFile(fs[fs.length - 1] ?? null)}
                     multiple={false}
-                    label="Envie o certificado desta NR (um arquivo)"
-                    hint="Certificado de NR / ASO (PDF, JPG ou PNG)"
+                    label="Envie o arquivo deste documento (um arquivo)"
+                    hint="ASO, certificado de NR, Ficha de EPI… (PDF, JPG ou PNG)"
                   />
                 </div>
 
                 {saveError && <Banner tone="danger" description={saveError} />}
+                {saveSuccess && <Banner tone="success" description={saveSuccess} />}
 
                 <Button
-                  icon={LuUserPlus}
+                  icon={LuUpload}
                   onClick={handleAddEmployee}
                   isLoading={isSaving}
-                  disabled={!form.fullName || !form.cpf || !form.nrTypeId || !file}
+                  disabled={
+                    !form.fullName ||
+                    !form.cpf ||
+                    !form.documentTypeId ||
+                    (employeeNeedsExpiry && !form.expiresAt) ||
+                    !file
+                  }
                 >
-                  Adicionar NR do colaborador
+                  Enviar documento do colaborador
                 </Button>
               </div>
             )}
 
-            {/* Lista de colaboradores já enviados */}
+            {/* Lista de colaboradores já enviados, com os documentos de cada um */}
             {employees.length > 0 && (
               <div className={styles.employeeList}>
                 <h3 className={styles.sectionTitle}>
                   Colaboradores enviados ({employees.length})
                 </h3>
-                {employees.map((employee) => (
-                  <div key={employee.id} className={styles.employeeRow}>
-                    <div>
-                      <strong>{employee.full_name}</strong>
-                      <div className={styles.employeeRole}>{employee.role_function}</div>
+                {employees.map((employee) => {
+                  const employeeDocuments = employee.documents ?? [];
+                  return (
+                    <div key={employee.id} className={styles.employeeCard}>
+                      <div className={styles.employeeHeader}>
+                        <div>
+                          <strong>{employee.full_name}</strong>
+                          {employee.role_function && <div className={styles.employeeRole}>{employee.role_function}</div>}
+                        </div>
+                        <StatusBadge enumMap={EMPLOYEE_STATUS} value={employee.status} />
+                      </div>
+
+                      {employeeDocuments.length > 0 ? (
+                        <ul className={styles.employeeDocs}>
+                          {employeeDocuments.map((doc) => (
+                            <li key={doc.id} className={styles.employeeDoc}>
+                              <span>
+                                {doc.document_type_name}
+                                {doc.expires_at && (
+                                  <span className={styles.employeeDocMeta}>
+                                    {' '}· válido até {formatDateOnly(doc.expires_at)}
+                                  </span>
+                                )}
+                              </span>
+                              <StatusBadge enumMap={DOCUMENT_STATUS} value={doc.status} />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className={styles.employeeDocsEmpty}>Nenhum documento enviado.</p>
+                      )}
                     </div>
-                    <NrBadgeList nrs={employee.nrs ?? []} />
-                    <StatusBadge enumMap={EMPLOYEE_STATUS} value={employee.status} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
