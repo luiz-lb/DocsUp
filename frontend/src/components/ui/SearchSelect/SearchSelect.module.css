@@ -1,0 +1,117 @@
+.wrapper {
+    position: relative;
+    width: 100%;
+    font-weight: 400;
+}
+
+.control {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* O FormField já dá borda, fundo e foco ao input; aqui só sobra espaço para o ícone */
+.wrapper .input {
+    padding-right: 2.4em;
+    text-overflow: ellipsis;
+}
+
+.chevron,
+.clear {
+    position: absolute;
+    right: 0.75em;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.chevron {
+    pointer-events: none;
+}
+
+.clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+
+.clear:hover {
+    background: rgba(17, 24, 39, 0.08);
+    color: var(--color-textDark, #111827);
+}
+
+/* ── Lista de opções ── */
+.dropdown {
+    position: absolute;
+    top: calc(100% + 0.3em);
+    left: 0;
+    right: 0;
+    z-index: 30;
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.3em 0;
+    list-style: none;
+    background: var(--color-white, #fff);
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: var(--radius-md, 10px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+    color: var(--color-textDark, #111827);
+    text-align: left;
+}
+
+.group {
+    padding: 0.6em 0.9em 0.25em;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-textMuted, #6b7280);
+}
+
+.option {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0.55em 0.9em;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.optionActive {
+    background: rgba(79, 70, 229, 0.1);
+}
+
+.optionSelected {
+    font-weight: 600;
+}
+
+.optionLabel {
+    flex: 1;
+    min-width: 0;
+}
+
+.hint {
+    flex-shrink: 0;
+    padding: 0.05em 0.5em;
+    border-radius: 999px;
+    background: rgba(229, 72, 77, 0.12);
+    color: var(--color-danger, #c2272d);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.check {
+    flex-shrink: 0;
+    color: var(--color-indigo, #4f46e5);
+}
+
+.message {
+    padding: 0.75em 0.9em;
+    font-size: 0.85rem;
+    color: var(--color-textMuted, #6b7280);
+}

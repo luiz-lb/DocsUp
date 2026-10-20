@@ -14,7 +14,17 @@ const FIELD_LABELS = {
   code: 'Código',
   risk_level: 'Risco',
   document_type_ids: 'Documentos sugeridos',
+  file_name: 'Arquivo',
+  document_type: 'Tipo de documento',
+  supplier: 'Fornecedor',
+  employee: 'Colaborador',
+  document_ids: 'Documentos baixados',
+  missing_document_ids: 'Não encontrados no servidor',
+  zip_name: 'Arquivo ZIP',
 };
+
+// Campos com lista de ids, mostrados como '#1, #2'
+const ID_LIST_FIELDS = new Set(['document_type_ids', 'document_ids', 'missing_document_ids']);
 
 // Campos sim/não: podem vir como boolean ou como 1/0 (BIT do banco)
 const BOOLEAN_FIELDS = new Set(['is_active', 'has_expiration']);
@@ -39,6 +49,14 @@ export function describeTarget(row) {
   if (row.entity_type === 'activity') {
     return { title: row.target_name ?? `Atividade #${row.entity_id}`, subtitle: 'Atividade' };
   }
+  if (row.entity_type === 'document') {
+    // ZIP: um registro só, com a lista de documentos (sem entity_id)
+    if (!row.entity_id) {
+      const count = parseJson(row.new_values)?.document_ids?.length ?? 0;
+      return { title: `${count} documento${count === 1 ? '' : 's'}`, subtitle: 'Download em ZIP' };
+    }
+    return { title: row.target_name ?? `Documento #${row.entity_id}`, subtitle: 'Documento' };
+  }
   return { title: `${row.entity_type} #${row.entity_id ?? '-'}`, subtitle: null };
 }
 
@@ -56,7 +74,7 @@ function formatValue(field, value) {
   if (field === 'department') return DEPARTMENT[value]?.label ?? String(value);
   if (field === 'category') return DOCUMENT_CATEGORY[value]?.label ?? String(value);
   if (field === 'risk_level') return RISK_LEVEL[value]?.label ?? String(value);
-  if (field === 'document_type_ids' && Array.isArray(value)) {
+  if (ID_LIST_FIELDS.has(field) && Array.isArray(value)) {
     return value.length > 0 ? value.map((id) => `#${id}`).join(', ') : 'Nenhum';
   }
   if (BOOLEAN_FIELDS.has(field) && (value === 0 || value === 1)) return value ? 'Sim' : 'Não';

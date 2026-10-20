@@ -37,7 +37,9 @@ if (process.env.TRUST_PROXY) {
 app.use(cors({
     origin: process.env.FRONTEND_URL, // A URL exata do seu frontend
     credentials: true,               // Permite o envio/recebimento de cookies
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] // Métodos permitidos
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Métodos permitidos
+    // O front (outra porta) precisa ler o nome do arquivo nos downloads
+    exposedHeaders: ['Content-Disposition'],
 }));
 
 // Middleware

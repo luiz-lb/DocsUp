@@ -51,6 +51,34 @@
   font-size: 1.1rem;
 }
 
+/* ── Download (seleção e botões) ── */
+.downloadBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.selectionInfo {
+  font-size: 0.85rem;
+  color: var(--color-textMuted, #6b7280);
+}
+
+.downloadActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.checkbox {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: var(--color-indigo, #4f46e5);
+}
+
 .drillHeader {
   display: flex;
   align-items: center;

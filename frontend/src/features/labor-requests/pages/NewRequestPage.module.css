@@ -12,10 +12,6 @@
     width: 100%;
 }
 
-.checklistSpacer {
-    margin-top: 1.25em;
-}
-
 .review {
     display: flex;
     flex-direction: column;

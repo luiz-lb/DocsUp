@@ -226,6 +226,8 @@ export const AUDIT_ACTION = {
   'activity.update': { label: 'Atividade editada', tone: 'info' },
   'activity.activate': { label: 'Atividade reativada', tone: 'success' },
   'activity.inactivate': { label: 'Atividade inativada', tone: 'danger' },
+  'document.download': { label: 'Documento baixado', tone: 'neutral' },
+  'document.download_zip': { label: 'Documentos baixados (ZIP)', tone: 'neutral' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */

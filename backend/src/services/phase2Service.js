@@ -11,6 +11,7 @@ import * as trasaction from '../models/trasaction.js';
 import { triggerDocumentValidation } from './documentValidationService.js';
 import { DOCUMENT_CATEGORIES, EMPLOYEE_DOCUMENT_CATEGORIES } from '../constants/documentCategories.js';
 import { isBlank, toInteger } from '../utils/parse.js';
+import { getUploadBaseDir } from '../utils/uploadPaths.js';
 
 const COMPANY_DOCUMENT_CHOICE_ERROR =
     'Escolha, para cada arquivo, um dos documentos da empresa exigidos nesta solicitação.';
@@ -78,6 +79,17 @@ function createMailTransport() {
     };
 }
 
+/**
+ * Nome original do arquivo enviado. O multer 1.x lê o nome como Latin-1, mas o navegador
+ * envia em UTF-8: sem isto, 'Relatório.pdf' seria gravado como 'RelatÃ³rio.pdf'. Se a
+ * conversão não der um UTF-8 válido, mantém o nome como veio.
+ */
+function originalFileName(file) {
+    const name = file.originalname ?? '';
+    const utf8Name = Buffer.from(name, 'latin1').toString('utf8');
+    return utf8Name.includes('�') ? name : utf8Name;
+}
+
 /** Gera hash SHA-256 de um Buffer. */
 function hashBuffer(buffer) {
     return crypto.createHash('sha256').update(buffer).digest('hex');
@@ -88,12 +100,6 @@ function ensureUploadDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
     }
-}
-
-/** Diretório raiz de uploads (absoluto). */
-function getUploadBaseDir() {
-    const configured = process.env.UPLOAD_DIR ?? 'uploads';
-    return path.isAbsolute(configured) ? configured : path.join(process.cwd(), configured);
 }
 
 /** Data de hoje no formato YYYY-MM-DD para organizar pastas por dia de upload. */
@@ -150,8 +156,9 @@ async function persistFile(transaction, scope, file, docData, savedPaths) {
 
     const { absDir, baseDir } = buildUploadDir(scope, supplierId, supplierName);
 
+    const originalName = originalFileName(file);
     const fileHash = hashBuffer(file.buffer);
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = path.extname(originalName).toLowerCase();
     const savedFileName = `${fileHash}${ext}`;
     const savedFilePath = path.join(absDir, savedFileName);
     const relPath = path.relative(baseDir, savedFilePath);
@@ -164,7 +171,7 @@ async function persistFile(transaction, scope, file, docData, savedPaths) {
         documentTypeId,
         laborRequestId,
         employeeId,
-        fileName: file.originalname,
+        fileName: originalName,
         filePath: relPath,
         fileSizeBytes: file.size,
         mimeType: file.mimetype,

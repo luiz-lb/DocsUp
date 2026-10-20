@@ -95,8 +95,11 @@ export default function QuotationSubmitPage() {
     );
   }
 
-  // IDs dos documentos obrigatórios para o checklist da empresa
-  const requiredDocIds = (laborRequest.requiredDocuments ?? []).map((d) => d.document_type_id);
+  // Documentos obrigatórios para o checklist (id e nome vêm do backend)
+  const requiredDocs = (laborRequest.requiredDocuments ?? []).map((d) => ({
+    id: d.document_type_id,
+    name: d.document_type_name,
+  }));
 
   // NRs exigidas para a atividade (vêm do backend, não de mock),
   // ordenadas pelo número da NR (NR-6 antes de NR-10, etc.)
@@ -176,11 +179,11 @@ export default function QuotationSubmitPage() {
         </div>
 
         {/* Checklist da empresa */}
-        {requiredDocIds.length > 0 && (
+        {requiredDocs.length > 0 && (
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>Checklist de documentação da empresa</h2>
+            <h2 className={styles.sectionTitle}>Checklist de documentação exigida</h2>
             <CompanyChecklistForm
-              documentTypeIds={requiredDocIds}
+              documents={requiredDocs}
               values={checklistValues}
               onChange={setChecklistValues}
             />

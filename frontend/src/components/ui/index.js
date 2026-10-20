@@ -10,6 +10,7 @@ export { default as Modal } from './Modal/index.js';
 export { default as ConfirmDialog } from './ConfirmDialog/index.js';
 export { default as ErrorDialog } from './ErrorDialog/index.js';
 export { default as FormField } from './FormField/index.js';
+export { default as SearchSelect } from './SearchSelect/index.js';
 export { default as FileDropzone } from './FileDropzone/index.js';
 export { default as ScoreGauge } from './ScoreGauge/index.js';
 export { default as CountdownTimer } from './CountdownTimer/index.js';

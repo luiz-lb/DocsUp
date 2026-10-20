@@ -6,10 +6,13 @@ import { ACCESS } from '../constants/access.js';
 
 const router = express.Router();
 
-// Painel interno: documentos dos fornecedores (RH e Segurança do Trabalho)
+// Painel interno: documentos dos fornecedores (RH e Segurança do Trabalho; Admin passa sempre)
 const podeVerDocumentos = requireRole(...ACCESS.SUPPLIER_DOCUMENTS);
 
 router.get('/', verificarToken, podeVerDocumentos, documentController.listDocuments);
+// Download: um arquivo, ou vários num ZIP (body { documentIds })
+router.get('/:id/download', verificarToken, podeVerDocumentos, documentController.downloadDocument);
+router.post('/download', verificarToken, podeVerDocumentos, documentController.downloadDocuments);
 router.get('/review-queue', verificarToken, podeVerDocumentos, documentController.listReviewQueue);
 router.post('/review', verificarToken, podeVerDocumentos, documentController.reviewDocument);
 router.post('/set-status', verificarToken, podeVerDocumentos, documentController.setStatus);

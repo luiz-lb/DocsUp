@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { LuSave, LuArrowLeft, LuChevronRight } from 'react-icons/lu';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { LuSave, LuArrowLeft, LuChevronRight, LuDownload } from 'react-icons/lu';
 import {
   PageHeader,
   DataTable,
@@ -11,7 +11,7 @@ import {
 import { DOCUMENT_STATUS, DOCUMENT_SCOPE } from '../../../constants/enums.js';
 import { formatDate } from '../../../utils/formatters.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
-import { listDeliveredDocuments, setDocumentStatus } from '../api/documentsRealApi.js';
+import { downloadDocumentFiles, listDeliveredDocuments, setDocumentStatus } from '../api/documentsRealApi.js';
 import styles from './SupplierDocumentsPage.module.css';
 
 // Opções de status que o RH / Segurança pode aplicar (0..5)
@@ -42,6 +42,24 @@ const GROUP_BY = {
 // Ordem/campos do resumo de contagem por status
 const SUMMARY_STATUSES = [0, 1, 2, 3, 4, 5];
 
+// Caixa "selecionar todos": marcada, desmarcada ou parcial (indeterminate)
+function SelectAllCheckbox({ total, selected, onChange }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = selected > 0 && selected < total;
+  }, [selected, total]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className={styles.checkbox}
+      checked={total > 0 && selected === total}
+      onChange={(event) => onChange(event.target.checked)}
+      aria-label="Selecionar todos os documentos do grupo"
+    />
+  );
+}
+
 export default function SupplierDocumentsPage() {
   const [groupBy, setGroupBy] = useState('supplier');
   const [openGroupKey, setOpenGroupKey] = useState(null);
@@ -54,6 +72,11 @@ export default function SupplierDocumentsPage() {
   const [pending, setPending] = useState({});
   const [savingId, setSavingId] = useState(null);
   const [feedback, setFeedback] = useState(null);
+
+  // Download: documentos marcados no grupo aberto e o que está baixando agora
+  // ('selected', 'all' ou o id do documento da linha)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [downloading, setDownloading] = useState(null);
 
   // Agrupa os documentos conforme o modo selecionado
   const groups = useMemo(() => {
@@ -74,9 +97,48 @@ export default function SupplierDocumentsPage() {
 
   const openGroup = groups.find((g) => g.key === openGroupKey) ?? null;
 
+  // Ao trocar de grupo (ou de agrupamento), a seleção começa vazia
+  const openGroupWith = (key) => {
+    setOpenGroupKey(key);
+    setSelectedIds(new Set());
+  };
+
   const changeGroupBy = (mode) => {
     setGroupBy(mode);
-    setOpenGroupKey(null);
+    openGroupWith(null);
+  };
+
+  // ── Download (um arquivo ou ZIP) ─────────────────────────────────────────
+  const groupDocIds = openGroup ? openGroup.docs.map((doc) => doc.id) : [];
+  const selectedInGroup = groupDocIds.filter((docId) => selectedIds.has(docId));
+
+  const toggleSelected = (docId) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+
+  const selectAll = (checked) => setSelectedIds(checked ? new Set(groupDocIds) : new Set());
+
+  const handleDownload = async (documentIds, key) => {
+    if (documentIds.length === 0) return;
+    setDownloading(key);
+    setFeedback(null);
+    const result = await downloadDocumentFiles(documentIds);
+    setDownloading(null);
+
+    if (!result.success) {
+      setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao baixar os documentos.' });
+      return;
+    }
+    setFeedback({
+      tone: 'success',
+      message: documentIds.length === 1
+        ? `Download iniciado: ${result.fileName}.`
+        : `Download iniciado: ${result.fileName} (${documentIds.length} documentos).`,
+    });
   };
 
   // ── Edição de status (na visão detalhada do grupo) ──────────────────────
@@ -127,6 +189,22 @@ export default function SupplierDocumentsPage() {
 
   // ── Colunas da tabela de documentos (visão detalhada) ───────────────────
   const docColumns = [
+    {
+      key: 'select',
+      width: '2.5rem',
+      header: (
+        <SelectAllCheckbox total={groupDocIds.length} selected={selectedInGroup.length} onChange={selectAll} />
+      ),
+      render: (row) => (
+        <input
+          type="checkbox"
+          className={styles.checkbox}
+          checked={selectedIds.has(row.id)}
+          onChange={() => toggleSelected(row.id)}
+          aria-label={`Selecionar ${row.document_type_name}`}
+        />
+      ),
+    },
     {
       key: 'document_type_name',
       header: 'Documento',
@@ -190,6 +268,22 @@ export default function SupplierDocumentsPage() {
         </div>
       ),
     },
+    {
+      key: 'download',
+      header: '',
+      render: (row) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={LuDownload}
+          isLoading={downloading === row.id}
+          disabled={downloading !== null && downloading !== row.id}
+          onClick={() => handleDownload([row.id], row.id)}
+        >
+          Baixar
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -216,13 +310,43 @@ export default function SupplierDocumentsPage() {
       {openGroup ? (
         <>
           <div className={styles.drillHeader}>
-            <Button variant="ghost" size="sm" icon={LuArrowLeft} onClick={() => setOpenGroupKey(null)}>
+            <Button variant="ghost" size="sm" icon={LuArrowLeft} onClick={() => openGroupWith(null)}>
               Voltar
             </Button>
             <h3 className={styles.drillTitle}>
               {GROUP_BY[groupBy].label}: {openGroup.title}
               <span className={styles.drillCount}>{openGroup.docs.length} documento(s)</span>
             </h3>
+          </div>
+
+          {/* Download: os marcados ou o grupo inteiro (mais de um arquivo vai num ZIP) */}
+          <div className={styles.downloadBar}>
+            <span className={styles.selectionInfo}>
+              {selectedInGroup.length === 0
+                ? 'Marque os documentos para baixar só alguns.'
+                : `${selectedInGroup.length} de ${groupDocIds.length} selecionado(s)`}
+            </span>
+            <div className={styles.downloadActions}>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={LuDownload}
+                isLoading={downloading === 'selected'}
+                disabled={selectedInGroup.length === 0 || (downloading !== null && downloading !== 'selected')}
+                onClick={() => handleDownload(selectedInGroup, 'selected')}
+              >
+                Baixar selecionados{selectedInGroup.length > 0 ? ` (${selectedInGroup.length})` : ''}
+              </Button>
+              <Button
+                size="sm"
+                icon={LuDownload}
+                isLoading={downloading === 'all'}
+                disabled={groupDocIds.length === 0 || (downloading !== null && downloading !== 'all')}
+                onClick={() => handleDownload(groupDocIds, 'all')}
+              >
+                Baixar todos do grupo ({groupDocIds.length})
+              </Button>
+            </div>
           </div>
           <DataTable
             columns={docColumns}
@@ -237,7 +361,7 @@ export default function SupplierDocumentsPage() {
           rows={groups}
           isLoading={isLoading}
           getRowKey={(g) => g.key}
-          onRowClick={(g) => setOpenGroupKey(g.key)}
+          onRowClick={(g) => openGroupWith(g.key)}
           emptyTitle="Nenhum documento encontrado"
           emptyDescription="Ainda não há documentos entregues pelos fornecedores."
         />

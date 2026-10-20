@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LuLogIn, LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
-import { Card, Button, FormField, FileDropzone, StatusBadge, Banner } from '../../../components/ui/index.js';
+import { Card, Button, FormField, FileDropzone, StatusBadge, Banner, SearchSelect } from '../../../components/ui/index.js';
 import { EMPLOYEE_STATUS, DOCUMENT_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { getPhase2ByToken, addEmployee, uploadCompanyDocuments } from '../api/employeesApi.js';
@@ -131,7 +131,15 @@ export default function Phase2UploadPage() {
   const employeeTypeById = new Map(employeeDocumentTypes.map((type) => [String(type.id), type]));
 
   // Select do colaborador (todos os tipos) e lista dos exigidos, agrupados por categoria
-  const employeeTypeGroups = groupByCategory(employeeDocumentTypes);
+  const employeeTypeOptions = groupByCategory(employeeDocumentTypes).flatMap((group) =>
+    group.items.map((type) => ({
+      value: String(type.id),
+      label: type.name,
+      group: group.label,
+      hint: type.required ? 'exigido' : null,
+      searchText: type.description ?? '',
+    })),
+  );
   const requiredEmployeeGroups = groupByCategory(employeeDocumentTypes.filter((type) => type.required));
 
   // ── Documentos da empresa ────────────────────────────────────────────────
@@ -450,18 +458,13 @@ export default function Phase2UploadPage() {
                 {/* Qual documento é o arquivo (básicos, NRs e outros) e, se tiver validade, a data */}
                 <div className={cn(styles.typedRow, employeeNeedsExpiry && styles.typedRowWithDate)}>
                   <FormField label="Qual documento é este arquivo?" required>
-                    <select value={form.documentTypeId} onChange={(e) => setEmployeeDocumentType(e.target.value)}>
-                      <option value="">Selecione o documento…</option>
-                      {employeeTypeGroups.map((group) => (
-                        <optgroup key={group.category} label={group.label}>
-                          {group.items.map((type) => (
-                            <option key={type.id} value={type.id}>
-                              {`${type.name}${type.required ? ' (exigido)' : ''}`}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+                    <SearchSelect
+                      options={employeeTypeOptions}
+                      value={form.documentTypeId}
+                      onChange={setEmployeeDocumentType}
+                      placeholder="Selecione ou pesquise o documento…"
+                      emptyMessage="Nenhum documento encontrado."
+                    />
                   </FormField>
                   {employeeNeedsExpiry && (
                     <FormField label="Validade do documento" required>

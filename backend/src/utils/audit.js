@@ -25,6 +25,18 @@ export function changedFields(before, after) {
 }
 
 /**
+ * Quem fez a ação e de onde, a partir da requisição de um colaborador logado.
+ * Atrás de proxy, req.ip depende do TRUST_PROXY.
+ */
+export function requestAuditContext(req) {
+    return {
+        actorId: req.usuario?.id ?? null,
+        ipAddress: req.ip ? req.ip.replace(/^::ffff:/, '') : null,
+        userAgent: req.headers['user-agent'] ?? null,
+    };
+}
+
+/**
  * Monta o registro de auditoria de uma ação de um colaborador (Admin).
  * `context` vem do controller: { actorId, ipAddress, userAgent }.
  */

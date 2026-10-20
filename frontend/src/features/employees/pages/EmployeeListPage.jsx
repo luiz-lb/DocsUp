@@ -2,7 +2,6 @@ import { PageHeader, DataTable, StatusBadge } from '../../../components/ui/index
 import { EMPLOYEE_STATUS } from '../../../constants/enums.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { listEmployees } from '../api/employeesApi.js';
-import NrBadgeList from '../components/NrBadgeList/index.js';
 
 const COLUMNS = [
   { key: 'full_name', header: 'Colaborador' },

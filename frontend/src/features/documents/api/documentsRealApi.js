@@ -1,5 +1,6 @@
 import { api } from '../../../utils/api.js';
 import { toErrorResult } from '../../../utils/apiError.js';
+import { blobErrorMessage, fileNameFromDisposition, saveBlob } from '../../../utils/download.js';
 
 // ─────────────────────────────────────────────
 // Central de documentos (dados reais do backend)
@@ -22,6 +23,33 @@ export async function listDeliveredDocuments(filters = {}) {
   } catch (error) {
     console.error('listDeliveredDocuments error:', error);
     return [];
+  }
+}
+
+/**
+ * Baixa os arquivos de documentos e salva no computador.
+ * Um documento: GET /documents/:id/download (arquivo original).
+ * Vários: POST /documents/download → um ZIP organizado por fornecedor, solicitação e colaborador.
+ *
+ * @param {number[]} documentIds
+ * @returns {Promise<{ success: true, fileName } | { success: false, body: { message } }>}
+ */
+export async function downloadDocumentFiles(documentIds) {
+  try {
+    const isSingle = documentIds.length === 1;
+    const result = isSingle
+      ? await api.get(`/documents/${documentIds[0]}/download`, { responseType: 'blob' })
+      : await api.post('/documents/download', { documentIds }, { responseType: 'blob' });
+
+    const fileName = fileNameFromDisposition(
+      result.headers['content-disposition'],
+      isSingle ? 'documento' : 'documentos.zip',
+    );
+    saveBlob(result.data, fileName);
+    return { success: true, fileName };
+  } catch (error) {
+    console.error('downloadDocumentFiles error:', error);
+    return { success: false, body: { message: await blobErrorMessage(error, 'Erro ao baixar os documentos.') } };
   }
 }
 

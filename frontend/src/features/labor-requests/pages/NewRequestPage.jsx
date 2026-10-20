@@ -4,7 +4,6 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { LuArrowLeft, LuArrowRight, LuSend } from 'react-icons/lu';
 import { ErrorDialog, Card, PageHeader, Button, FormField, WizardStepper, Banner } from '../../../components/ui/index.js';
-import DocumentChecklistPicker from '../components/DocumentChecklistPicker.jsx';
 import { createLaborRequest, getActivityTypes } from '../api/laborRequestsApi.js';
 import { ROUTES } from '../../../constants/routes.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
@@ -19,7 +18,6 @@ const INITIAL_FORM = {
   urgency: 1,
   startDate: null,
   description: '',
-  requiredDocumentIds: [],
 };
 
 export default function NewRequestPage() {
@@ -41,17 +39,9 @@ export default function NewRequestPage() {
     () => activityOptions.find((item) => item.id === Number(form.activityTypeId)),
     [activityOptions, form.activityTypeId],
   );
-  const suggestedDocumentIds = activity?.document_type_id ?? [];
-
   const updateField = (field) => (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
 
-  const goToDocumentsStep = () => {
-    setForm((prev) => ({
-      ...prev,
-      requiredDocumentIds: prev.requiredDocumentIds.length ? prev.requiredDocumentIds : suggestedDocumentIds,
-    }));
-    setStep(1);
-  };
+  const goToReviewStep = () => setStep(1);
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -127,24 +117,6 @@ export default function NewRequestPage() {
             </div>
           )}
 
-          {/*{step === 1 && (
-            <div>
-              {activity && (
-                <Banner
-                  tone="info"
-                  title={`Sugestao para "${activity.name}"`}
-                  description="Pre-selecionamos os documentos usualmente exigidos para esse tipo de atividade. Ajuste conforme necessario."
-                />
-              )}
-              <div className={styles.checklistSpacer}>
-                <DocumentChecklistPicker
-                  selectedIds={form.requiredDocumentIds}
-                  suggestedIds={suggestedDocumentIds}
-                  onChange={(ids) => setForm((prev) => ({ ...prev, requiredDocumentIds: ids }))}
-                />
-              </div>
-            </div>
-          )}*/}
 
           {step === 1 && (
             <div className={styles.review}>
@@ -155,9 +127,6 @@ export default function NewRequestPage() {
                 <dd>{activity?.name ?? '-'}</dd>
                 <dt>Local</dt>
                 <dd>{form.location || '-'}</dd>
-                {/*<dt>Efetivo</dt>
-                <dt>Documentos exigidos</dt>
-                <dd>{form.requiredDocumentIds.length} documento(s) selecionado(s)</dd>*/}
               </dl>
               <Banner
                 tone="success"
@@ -174,15 +143,10 @@ export default function NewRequestPage() {
             </Button>
           )}
           {step === 0 && (
-            <Button icon={LuArrowRight} iconPosition="right" onClick={goToDocumentsStep} disabled={!form.title || !form.activityTypeId || !form.location}>
+            <Button icon={LuArrowRight} iconPosition="right" onClick={goToReviewStep} disabled={!form.title || !form.activityTypeId || !form.location}>
               Continuar
             </Button>
           )}
-          {/*{step === 1 && (
-            <Button icon={LuArrowRight} iconPosition="right" onClick={() => setStep(2)}>
-              Continuar
-            </Button>
-          )}*/}
           {step === 1 && (
             <Button icon={LuSend} onClick={handleSubmit} isLoading={isSubmitting}>
               Enviar solicitação
