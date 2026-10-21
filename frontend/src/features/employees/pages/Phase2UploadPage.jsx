@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LuLogIn, LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
 import { Card, Button, FormField, FileDropzone, StatusBadge, Banner, SearchSelect } from '../../../components/ui/index.js';
-import { EMPLOYEE_STATUS, DOCUMENT_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
+import { EMPLOYEE_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
-import { getPhase2ByToken, addEmployee, uploadCompanyDocuments } from '../api/employeesApi.js';
+import { getPhase2ByToken, addEmployee, uploadCompanyDocuments, downloadPhase2Document } from '../api/employeesApi.js';
 import Phase2CountdownBanner from '../components/Phase2CountdownBanner/index.js';
+import SupplierDocumentItem from '../components/SupplierDocumentItem/index.js';
+import ResendDocumentModal from '../components/ResendDocumentModal/index.js';
 import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
 import { ROUTES } from '../../../constants/routes.js';
 import { cn } from '../../../utils/cn.js';
-import { addDaysToToday, formatDateOnly, toDateInputValue } from '../../../utils/formatters.js';
+import { addDaysToToday, toDateInputValue } from '../../../utils/formatters.js';
 import authStyles from '../../../styles/authCard.module.css';
 import styles from './Phase2UploadPage.module.css';
 
@@ -19,6 +21,9 @@ const TABS = {
   COMPANY: 'company',
   EMPLOYEES: 'employees',
 };
+
+// Status em que o RH devolveu o documento (dá para reenviar mesmo depois do prazo)
+const RESENDABLE_STATUSES = [3, 4];
 
 // Categorias dos documentos do colaborador, na ordem de exibição (básicos primeiro)
 const EMPLOYEE_CATEGORIES = [DOCUMENT_CATEGORY_ID.BASICO, DOCUMENT_CATEGORY_ID.NR, DOCUMENT_CATEGORY_ID.OUTRO];
@@ -71,6 +76,11 @@ export default function Phase2UploadPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState('');
+
+  // Documentos enviados: download, reenvio (modal) e o aviso de cada ação
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [resendTarget, setResendTarget] = useState(null);
+  const [docFeedback, setDocFeedback] = useState(null);
 
   // Aguarda validação de autenticação (nos recarregamentos, mantém a tela com os dados atuais)
   if (isAuthLoading || (isLoading && !response)) return null;
@@ -126,6 +136,30 @@ export default function Phase2UploadPage() {
   const companyRequiredDocs = (phase2.requiredDocuments ?? []).filter((doc) => doc.scope === 0);
   const companyDocuments = (phase2.documents ?? []).filter((doc) => !doc.employee_id);
 
+  // Reenvio: antes do prazo, qualquer documento (troca o arquivo); depois, só o que o RH
+  // devolveu (reprovado ou reenvio necessário). O tipo precisa continuar disponível.
+  const canResend = (doc, documentType) =>
+    Boolean(documentType) && (!deadline.isExpired || RESENDABLE_STATUSES.includes(doc.status));
+
+  const returnedCount = [...companyDocuments, ...employees.flatMap((employee) => employee.documents ?? [])]
+    .filter((doc) => RESENDABLE_STATUSES.includes(doc.status)).length;
+
+  const handleDownload = async (delivery) => {
+    setDownloadingId(delivery.id);
+    setDocFeedback(null);
+    const result = await downloadPhase2Document(token, delivery.id);
+    setDownloadingId(null);
+    if (!result.success) {
+      setDocFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao baixar o arquivo.' });
+    }
+  };
+
+  const handleResendSuccess = (message) => {
+    setResendTarget(null);
+    setDocFeedback({ tone: 'success', message });
+    reload();
+  };
+
   // Tipos por id (o <select> trabalha com string)
   const companyTypeById = new Map(companyDocumentTypes.map((type) => [String(type.id), type]));
   const employeeTypeById = new Map(employeeDocumentTypes.map((type) => [String(type.id), type]));
@@ -175,6 +209,12 @@ export default function Phase2UploadPage() {
 
   const validateCompany = () => {
     if (!allCompanyTyped) return 'Selecione o tipo de cada documento antes de enviar.';
+    // Uma entrega por documento: o mesmo tipo em dois arquivos não pode
+    const typeIds = companyItems.map((item) => String(item.documentTypeId));
+    const repeated = typeIds.find((typeId, index) => typeIds.indexOf(typeId) !== index);
+    if (repeated) {
+      return `Envie um arquivo para cada documento: "${companyTypeById.get(repeated)?.name ?? 'documento'}" foi escolhido mais de uma vez.`;
+    }
     for (const item of companyItems) {
       if (!companyItemNeedsExpiry(item)) continue;
       if (!item.expiresAt) return `Informe a validade de "${item.file.name}".`;
@@ -280,6 +320,21 @@ export default function Phase2UploadPage() {
 
         {/* Banner de countdown com expiração automática */}
         <Phase2CountdownBanner deadline={deadline} />
+
+        {deadline.isExpired && (
+          <Banner
+            tone="info"
+            description="O prazo de envio encerrou. Você ainda pode reenviar os documentos reprovados ou com reenvio necessário (botão Reenviar em cada um)."
+          />
+        )}
+        {returnedCount > 0 && (
+          <Banner
+            tone="warning"
+            title={`${returnedCount} documento${returnedCount === 1 ? '' : 's'} para reenviar`}
+            description="O RH reprovou ou pediu o reenvio. Veja o motivo em cada documento e use o botão Reenviar."
+          />
+        )}
+        {docFeedback && <Banner tone={docFeedback.tone} description={docFeedback.message} />}
 
         {/* Abas: Documentos da empresa | Documentos dos colaboradores */}
         <div className={styles.tabs} role="tablist">
@@ -391,18 +446,19 @@ export default function Phase2UploadPage() {
                 <h3 className={styles.sectionTitle}>
                   Documentos da empresa enviados ({companyDocuments.length})
                 </h3>
-                {companyDocuments.map((doc) => (
-                  <div key={doc.id} className={styles.employeeRow}>
-                    <div>
-                      <strong>{doc.document_type_name}</strong>
-                      <div className={styles.employeeRole}>
-                        {doc.file_name}
-                        {doc.expires_at && ` · válido até ${formatDateOnly(doc.expires_at)}`}
-                      </div>
-                    </div>
-                    <StatusBadge enumMap={DOCUMENT_STATUS} value={doc.status} />
-                  </div>
-                ))}
+                {companyDocuments.map((doc) => {
+                  const documentType = companyTypeById.get(String(doc.document_type_id));
+                  return (
+                    <SupplierDocumentItem
+                      key={doc.id}
+                      document={doc}
+                      canResend={canResend(doc, documentType)}
+                      onResend={() => setResendTarget({ document: doc, documentType, employee: null })}
+                      onDownload={handleDownload}
+                      downloadingId={downloadingId}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -529,21 +585,21 @@ export default function Phase2UploadPage() {
                       </div>
 
                       {employeeDocuments.length > 0 ? (
-                        <ul className={styles.employeeDocs}>
-                          {employeeDocuments.map((doc) => (
-                            <li key={doc.id} className={styles.employeeDoc}>
-                              <span>
-                                {doc.document_type_name}
-                                {doc.expires_at && (
-                                  <span className={styles.employeeDocMeta}>
-                                    {' '}· válido até {formatDateOnly(doc.expires_at)}
-                                  </span>
-                                )}
-                              </span>
-                              <StatusBadge enumMap={DOCUMENT_STATUS} value={doc.status} />
-                            </li>
-                          ))}
-                        </ul>
+                        <div className={styles.employeeDocs}>
+                          {employeeDocuments.map((doc) => {
+                            const documentType = employeeTypeById.get(String(doc.document_type_id));
+                            return (
+                              <SupplierDocumentItem
+                                key={doc.id}
+                                document={doc}
+                                canResend={canResend(doc, documentType)}
+                                onResend={() => setResendTarget({ document: doc, documentType, employee })}
+                                onDownload={handleDownload}
+                                downloadingId={downloadingId}
+                              />
+                            );
+                          })}
+                        </div>
                       ) : (
                         <p className={styles.employeeDocsEmpty}>Nenhum documento enviado.</p>
                       )}
@@ -555,6 +611,14 @@ export default function Phase2UploadPage() {
           </div>
         )}
       </Card.Body>
+
+      <ResendDocumentModal
+        open={Boolean(resendTarget)}
+        token={token}
+        target={resendTarget}
+        onClose={() => setResendTarget(null)}
+        onSuccess={handleResendSuccess}
+      />
     </Card>
   );
 }

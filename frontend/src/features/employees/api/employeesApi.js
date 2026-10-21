@@ -1,5 +1,6 @@
 import { api } from '../../../utils/api.js';
 import { getApiErrorMessage, toErrorResult } from '../../../utils/apiError.js';
+import { blobErrorMessage, fileNameFromDisposition, saveBlob } from '../../../utils/download.js';
 
 // ─────────────────────────────────────────────
 // Phase 2 — Portal do Fornecedor
@@ -24,6 +25,23 @@ export async function getPhase2ByToken(token) {
       success: false,
       message: getApiErrorMessage(error, 'O link da Fase 2 é inválido, expirado ou já foi utilizado.'),
     };
+  }
+}
+
+/**
+ * O fornecedor baixa um arquivo que ele enviou nesta solicitação (atual ou do histórico).
+ * GET /phase2/:token/documents/:documentId/download  (exige cookie supplier_token)
+ * @returns {Promise<{ success: true, fileName } | { success: false, body: { message } }>}
+ */
+export async function downloadPhase2Document(token, documentId) {
+  try {
+    const result = await api.get(`/phase2/${token}/documents/${documentId}/download`, { responseType: 'blob' });
+    const fileName = fileNameFromDisposition(result.headers['content-disposition'], 'documento');
+    saveBlob(result.data, fileName);
+    return { success: true, fileName };
+  } catch (error) {
+    console.error('downloadPhase2Document error:', error);
+    return { success: false, body: { message: await blobErrorMessage(error, 'Erro ao baixar o arquivo.') } };
   }
 }
 

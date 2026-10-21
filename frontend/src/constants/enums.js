@@ -228,6 +228,7 @@ export const AUDIT_ACTION = {
   'activity.inactivate': { label: 'Atividade inativada', tone: 'danger' },
   'document.download': { label: 'Documento baixado', tone: 'neutral' },
   'document.download_zip': { label: 'Documentos baixados (ZIP)', tone: 'neutral' },
+  'document.status_change': { label: 'Status de documento alterado', tone: 'info' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */

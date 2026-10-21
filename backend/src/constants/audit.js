@@ -24,6 +24,7 @@ export const AUDIT_ACTIONS = Object.freeze({
     ACTIVITY_INACTIVATE: 'activity.inactivate',
     DOCUMENT_DOWNLOAD: 'document.download',
     DOCUMENT_DOWNLOAD_ZIP: 'document.download_zip',
+    DOCUMENT_STATUS_CHANGE: 'document.status_change',
 });
 
 // audit_log.entity_type

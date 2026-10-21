@@ -1,0 +1,95 @@
+/* Item sobre o card escuro da Fase 2: fundo claro translúcido, como as linhas da tela */
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 250, 228, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.itemReturned {
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.name {
+  font-size: 0.92rem;
+}
+
+.meta {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+
+.observation {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+
+.observationReturned {
+  background: rgba(248, 113, 113, 0.18);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.historyToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.historyToggle:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* Botão "ghost" sobre o card escuro: texto e borda claros (o padrão é verde, some no fundo) */
+.buttons .lightGhost {
+  color: var(--color-creamText, #fffae4);
+  border-color: rgba(255, 250, 228, 0.4);
+}
+
+.history {
+  margin-top: 0.25rem;
+}

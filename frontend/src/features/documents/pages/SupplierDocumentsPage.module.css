@@ -1,6 +1,7 @@
 .docCell {
   display: flex;
   flex-direction: column;
+  gap: 0.1rem;
   min-width: 0;
 }
 
@@ -10,22 +11,38 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 240px;
+}
+
+.meta {
+  font-size: 0.78rem;
+  color: var(--color-textMuted, #6b7280);
+}
+
+/* Status: etiqueta e, embaixo, a observação do RH (cortada em 2 linhas; inteira no title) */
+.statusCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
   max-width: 260px;
 }
 
-.actionCell {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.observation {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.78rem;
+  color: var(--color-textDark, #374151);
+  white-space: normal;
 }
 
-.statusSelect {
-  padding: 0.45em 0.6em;
-  border-radius: var(--radius-md, 10px);
-  border: 1px solid var(--color-border, #d1d5db);
-  background: #f9fafb;
-  color: var(--color-textDark, #111827);
-  font-size: 0.85rem;
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  white-space: nowrap;
 }
 
 .filterField {
@@ -61,6 +78,22 @@
   margin-bottom: 0.9rem;
 }
 
+.selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.selectAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .selectionInfo {
   font-size: 0.85rem;
   color: var(--color-textMuted, #6b7280);
@@ -82,14 +115,16 @@
 .drillHeader {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   margin-bottom: 1rem;
 }
 
 .drillTitle {
   display: flex;
   align-items: baseline;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
   margin: 0;
   font-size: 1.05rem;
 }
@@ -98,4 +133,21 @@
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-textMuted, #6b7280);
+}
+
+/* Tela estreita (cartões): textos ocupam a largura e alinham à direita */
+@media (max-width: 900px) {
+  .docCell,
+  .statusCell {
+    align-items: flex-end;
+    max-width: none;
+  }
+
+  .fileName {
+    max-width: 60vw;
+  }
+
+  .downloadActions {
+    width: 100%;
+  }
 }

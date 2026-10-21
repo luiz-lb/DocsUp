@@ -1,4 +1,4 @@
-import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, RISK_LEVEL } from '../../constants/enums.js';
+import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, RISK_LEVEL } from '../../constants/enums.js';
 
 // Nome dos campos gravados em old_values / new_values
 const FIELD_LABELS = {
@@ -21,6 +21,8 @@ const FIELD_LABELS = {
   document_ids: 'Documentos baixados',
   missing_document_ids: 'Não encontrados no servidor',
   zip_name: 'Arquivo ZIP',
+  status: 'Status',
+  observation: 'Observação',
 };
 
 // Campos com lista de ids, mostrados como '#1, #2'
@@ -73,6 +75,7 @@ function formatValue(field, value) {
   if (value === undefined || value === null) return '—';
   if (field === 'department') return DEPARTMENT[value]?.label ?? String(value);
   if (field === 'category') return DOCUMENT_CATEGORY[value]?.label ?? String(value);
+  if (field === 'status') return DOCUMENT_STATUS[value]?.label ?? String(value);
   if (field === 'risk_level') return RISK_LEVEL[value]?.label ?? String(value);
   if (ID_LIST_FIELDS.has(field) && Array.isArray(value)) {
     return value.length > 0 ? value.map((id) => `#${id}`).join(', ') : 'Nenhum';

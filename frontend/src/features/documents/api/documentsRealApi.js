@@ -54,6 +54,20 @@ export async function downloadDocumentFiles(documentIds) {
 }
 
 /**
+ * Histórico de entregas do documento (mais nova primeiro).
+ * GET /documents/:id/history → { deliveries: [...] }
+ */
+export async function getDocumentHistory(documentId) {
+  try {
+    const result = await api.get(`/documents/${documentId}/history`);
+    return { success: true, body: result.data.body?.deliveries ?? [] };
+  } catch (error) {
+    console.error('getDocumentHistory error:', error);
+    return toErrorResult(error, 'Erro ao buscar o histórico do documento.');
+  }
+}
+
+/**
  * Atualiza o status de um documento (0..5).
  * POST /documents/set-status
  * @param {number} documentId

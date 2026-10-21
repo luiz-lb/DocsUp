@@ -2,7 +2,9 @@ import crypto from 'crypto';
 import archiver from 'archiver';
 import * as documentValidationService from '../services/documentValidationService.js';
 import * as documentDownloadService from '../services/documentDownloadService.js';
+import * as deliveryService from '../services/deliveryService.js';
 import { requestAuditContext } from '../utils/audit.js';
+import { sendPrivateFile, setPrivateFileHeaders } from '../utils/fileResponse.js';
 
 /**
  * Confere o X-Webhook-Secret em tempo constante.
@@ -45,10 +47,26 @@ export async function listDocuments(req, res) {
     }
 }
 
-// Documento pessoal: o navegador não guarda em cache nem "adivinha" o tipo do arquivo
-function setPrivateFileHeaders(res) {
-    res.set('Cache-Control', 'no-store');
-    res.set('X-Content-Type-Options', 'nosniff');
+/**
+ * GET /documents/:id/history  — histórico de entregas do documento (RH, Segurança e Admin):
+ * data de entrega, validade, arquivo, status (Análise) e observação de cada entrega.
+ */
+export async function documentHistory(req, res) {
+    try {
+        const documentId = Number(req.params.id);
+        if (!Number.isInteger(documentId) || documentId <= 0) {
+            return res.status(400).json({ success: false, body: { message: 'Documento inválido.' } });
+        }
+
+        const result = await deliveryService.getDocumentHistory(documentId);
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('documentHistory controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
 }
 
 /**
@@ -67,14 +85,7 @@ export async function downloadDocument(req, res) {
             return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
         }
 
-        setPrivateFileHeaders(res);
-        return res.download(result.body.absolutePath, result.body.fileName, (error) => {
-            if (!error) return;
-            console.error('downloadDocument: erro ao enviar o arquivo:', error.message);
-            if (!res.headersSent) {
-                res.status(500).json({ success: false, body: { message: 'Erro ao enviar o arquivo.' } });
-            }
-        });
+        return sendPrivateFile(res, result.body.absolutePath, result.body.fileName, 'downloadDocument');
     } catch (error) {
         console.error('downloadDocument controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
@@ -180,12 +191,12 @@ export async function reviewDocument(req, res) {
 /**
  * POST /documents/set-status
  * Body: { documentId, status (0..5), comments? }
- * RH / Segurança do Trabalho define o status do documento diretamente.
+ * RH / Segurança do Trabalho define o status da entrega atual do documento. Reprovado (3) e
+ * Reenvio Necessário (4) exigem comments (a observação que o fornecedor vê).
  */
 export async function setStatus(req, res) {
     try {
-        const { documentId, status, comments } = req.body;
-        const reviewerId = req.usuario.id;
+        const { documentId, status, comments } = req.body ?? {};
 
         if (!documentId || status === undefined) {
             return res.status(400).json({
@@ -197,12 +208,13 @@ export async function setStatus(req, res) {
         const result = await documentValidationService.setDocumentStatus(
             Number(documentId),
             Number(status),
-            reviewerId,
+            { id: req.usuario.id, department: req.usuario.department },
             comments,
+            requestAuditContext(req),
         );
 
         if (!result.success) {
-            return res.status(400).json({ success: false, body: { message: result.message } });
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
         }
 
         return res.status(200).json({ success: true, body: result.body });

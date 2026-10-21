@@ -10,6 +10,9 @@ const router = express.Router();
 // Portal do fornecedor — busca dados da Fase 2 pelo token (exige JWT fornecedor: só o dono do link)
 router.get('/:token', verificarTokenFornecedor, phase2Controller.getPhase2);
 
+// Portal do fornecedor — baixa um arquivo que ele mesmo enviou nesta solicitação (exige JWT fornecedor)
+router.get('/:token/documents/:documentId/download', verificarTokenFornecedor, phase2Controller.downloadDocument);
+
 // Portal do fornecedor — adiciona funcionário com documentos (exige JWT fornecedor)
 router.post(
     '/:token/employee',

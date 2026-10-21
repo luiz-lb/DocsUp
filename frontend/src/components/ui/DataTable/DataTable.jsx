@@ -3,9 +3,12 @@ import EmptyState from '../EmptyState/index.js';
 import styles from './DataTable.module.css';
 
 /**
- * Tabela generica orientada a config: `columns` = [{ key, header, render?, width? }].
+ * Tabela generica orientada a config: `columns` = [{ key, header, render?, width?, label? }].
  * `getRowKey` default usa row.id. Usada por todas as telas de lista das features
  * (solicitacoes, fornecedores, cotacoes, pedidos de compra...).
+ *
+ * `stackOnMobile`: em tela estreita cada linha vira um cartão, com o nome da coluna ao lado
+ * de cada valor (`label`, ou o `header` quando é texto).
  */
 export default function DataTable({
   columns,
@@ -15,13 +18,16 @@ export default function DataTable({
   emptyTitle = 'Nenhum registro encontrado',
   emptyDescription,
   onRowClick,
+  stackOnMobile = false,
 }) {
   if (!isLoading && (!rows || rows.length === 0)) {
     return <EmptyState icon={LuInbox} title={emptyTitle} description={emptyDescription} />;
   }
 
+  const labelOf = (column) => column.label ?? (typeof column.header === 'string' ? column.header : '');
+
   return (
-    <div className={styles.tableWrapper}>
+    <div className={`${styles.tableWrapper} ${stackOnMobile ? styles.stackOnMobile : ''}`}>
       <table className={styles.table}>
         <thead>
           <tr>
@@ -51,7 +57,9 @@ export default function DataTable({
                   onClick={() => onRowClick?.(row)}
                 >
                   {columns.map((column) => (
-                    <td key={column.key}>{column.render ? column.render(row, index) : row[column.key]}</td>
+                    <td key={column.key} data-label={labelOf(column)}>
+                      {column.render ? column.render(row, index) : row[column.key]}
+                    </td>
                   ))}
                 </tr>
               ))}

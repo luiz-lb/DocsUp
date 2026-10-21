@@ -88,11 +88,13 @@ function zipArchiveName(date = new Date()) {
     return `documentos-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}.zip`;
 }
 
+// Quem baixou: colaborador (padrão) ou o próprio fornecedor (context.actorType = SUPPLIER)
 async function auditDownload(context, action, documentId, newValues) {
+    const entry = collaboratorAuditEntry(context, action, AUDIT_ENTITIES.DOCUMENT, documentId, null, newValues);
+    if (context.actorType !== undefined) entry.actorType = context.actorType;
+
     await trasaction.executarEmTransacao(async (transaction) => {
-        await auditModel.insertAuditLog(transaction, collaboratorAuditEntry(
-            context, action, AUDIT_ENTITIES.DOCUMENT, documentId, null, newValues,
-        ));
+        await auditModel.insertAuditLog(transaction, entry);
     });
 }
 
@@ -103,11 +105,18 @@ async function auditDownload(context, action, documentId, newValues) {
 /**
  * Um documento: confere o registro e o arquivo, registra na auditoria e devolve
  * o que o controller precisa para enviar ({ absolutePath, fileName }).
+ *
+ * restrictTo ({ supplierId, laborRequestId }): download do próprio fornecedor; documento de
+ * outro fornecedor ou de outra solicitação responde como inexistente.
  */
-export async function prepareDocumentDownload(documentId, context = {}) {
+export async function prepareDocumentDownload(documentId, context = {}, restrictTo = null) {
     try {
         const [document] = await documentFileModel.getDocumentFilesByIds([documentId]);
         if (!document) return DOCUMENT_NOT_FOUND;
+        if (restrictTo && (document.supplier_id !== restrictTo.supplierId
+            || document.labor_request_id !== restrictTo.laborRequestId)) {
+            return DOCUMENT_NOT_FOUND;
+        }
 
         const absolutePath = existingFilePath(document);
         if (!absolutePath) {

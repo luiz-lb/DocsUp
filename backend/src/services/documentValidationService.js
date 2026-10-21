@@ -2,6 +2,10 @@ import axios from 'axios';
 import { sql, poolPromise } from '../config/dbConfig.js';
 import * as documentValidationModel from '../models/documentValidationModel.js';
 import * as trasaction from '../models/trasaction.js';
+import * as deliveryModel from '../models/deliveryModel.js';
+import * as auditModel from '../models/auditModel.js';
+import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
+import { collaboratorAuditEntry } from '../utils/audit.js';
 
 // Score mínimo para aprovação automática por IA
 const AI_AUTO_APPROVE_THRESHOLD = 85;
@@ -316,57 +320,92 @@ export async function reviewDocument(validationId, documentId, reviewerId, decis
 // Atualização direta de status (RH / Segurança do Trabalho)
 // ─────────────────────────────────────────────
 
+// Status em que a observação é obrigatória (o fornecedor precisa saber o motivo)
+const STATUS_NEEDS_OBSERVATION = [3, 4];
+const OBSERVATION_MAX_LENGTH = 2000;
+
+// Decisão manual e final_status da análise conforme o status do documento
+function reviewDecision(status) {
+    if (status === 2) return { manualDecision: 1, finalStatus: 1 };          // Aprovado
+    if ([3, 4, 5].includes(status)) return { manualDecision: 2, finalStatus: 2 }; // Reprovado / Reenvio / Expirado
+    return { manualDecision: null, finalStatus: 0 };                        // Pendente / Validando
+}
+
 /**
- * Atualiza diretamente o status de um documento para qualquer valor válido.
+ * RH / Segurança do Trabalho muda o status da entrega ATUAL de um documento.
  * status: 0=Pendente, 1=Validando, 2=Aprovado, 3=Reprovado, 4=Reenvio Necessário, 5=Expirado
  *
- * Quando o status é uma decisão terminal (aprovado/reprovado/reenvio), registra
- * também a decisão manual na validação mais recente (para trilha de auditoria).
+ * Reprovado e Reenvio Necessário exigem observação (o fornecedor vê o motivo). Cada mudança
+ * vira uma análise manual (document_validations) e um registro na auditoria, na mesma transação.
  *
  * @param {number} documentId
  * @param {number} status
- * @param {number} reviewerId
- * @param {string} [comments]
+ * @param {{ id: number, department: number }} reviewer — colaborador logado
+ * @param {string} [comments] — observação para o fornecedor
+ * @param {object} [context]  — { actorId, ipAddress, userAgent } para a auditoria
  */
-export async function setDocumentStatus(documentId, status, reviewerId, comments) {
+export async function setDocumentStatus(documentId, status, reviewer, comments, context = {}) {
     const VALID = [0, 1, 2, 3, 4, 5];
-    if (!VALID.includes(Number(status))) {
-        return { success: false, message: 'Status inválido. Use 0..5.' };
+    if (!VALID.includes(status)) {
+        return { success: false, status: 400, message: 'Status inválido. Use 0..5.' };
     }
 
-    let transaction;
-    let transactionDone = false;
+    if (comments !== undefined && comments !== null && typeof comments !== 'string') {
+        return { success: false, status: 400, message: 'Observação inválida.' };
+    }
+    const observation = typeof comments === 'string' && comments.trim() ? comments.trim() : null;
+    if (observation && observation.length > OBSERVATION_MAX_LENGTH) {
+        return { success: false, status: 400, message: `A observação pode ter no máximo ${OBSERVATION_MAX_LENGTH} caracteres.` };
+    }
+    if (STATUS_NEEDS_OBSERVATION.includes(status) && !observation) {
+        return {
+            success: false,
+            status: 400,
+            message: 'Informe a observação: o fornecedor precisa saber o motivo da reprovação ou do reenvio.',
+        };
+    }
 
     try {
-        transaction = await trasaction.iniciarTransacao();
-
-        // Atualiza o status do documento
-        await documentValidationModel.updateDocumentStatus(transaction, documentId, Number(status));
-
-        // Registra a decisão manual quando aplicável (aprovado=2 → decision 1; reprovado=3/reenvio=4 → decision 2)
-        const latest = await documentValidationModel.getLatestValidationId(documentId);
-        if (latest) {
-            let manualDecision = null;
-            if (Number(status) === 2) manualDecision = 1;      // Aprovado
-            else if (Number(status) === 3 || Number(status) === 4) manualDecision = 2; // Reprovado / Reenvio
-
-            if (manualDecision !== null) {
-                await documentValidationModel.applyManualDecision(
-                    transaction, latest.id, reviewerId, manualDecision, comments,
-                );
-            }
+        const delivery = await deliveryModel.getDeliveryForReview(documentId);
+        if (!delivery) {
+            return { success: false, status: 404, message: 'Documento não encontrado.' };
+        }
+        if (!delivery.is_current) {
+            return {
+                success: false,
+                status: 400,
+                message: 'Esta entrega foi substituída por um envio mais novo. Altere o status da entrega atual.',
+            };
+        }
+        if (delivery.status === status && (delivery.observation ?? null) === observation) {
+            return { success: true, body: { message: 'Nenhuma alteração para salvar.' } };
         }
 
-        await trasaction.finalizarTransacao(transaction, true);
-        transactionDone = true;
+        const { manualDecision, finalStatus } = reviewDecision(status);
+        await trasaction.executarEmTransacao(async (transaction) => {
+            await documentValidationModel.updateDocumentStatus(transaction, documentId, status);
+            await documentValidationModel.insertManualReview(transaction, {
+                documentId,
+                reviewerId: reviewer.id,
+                reviewerDepartment: reviewer.department !== undefined ? String(reviewer.department) : null,
+                manualDecision,
+                finalStatus,
+                comments: observation,
+            });
+            await auditModel.insertAuditLog(transaction, collaboratorAuditEntry(
+                context,
+                AUDIT_ACTIONS.DOCUMENT_STATUS_CHANGE,
+                AUDIT_ENTITIES.DOCUMENT,
+                documentId,
+                { status: delivery.status, observation: delivery.observation ?? null },
+                { status, observation },
+            ));
+        });
 
         return { success: true, body: { message: 'Status atualizado com sucesso.' } };
     } catch (error) {
-        if (transaction && !transactionDone) {
-            await trasaction.finalizarTransacao(transaction, false);
-        }
         console.error('setDocumentStatus error:', error);
-        return { success: false, message: 'Erro ao atualizar status do documento.' };
+        return { success: false, status: 500, message: 'Erro ao atualizar status do documento.' };
     }
 }
 

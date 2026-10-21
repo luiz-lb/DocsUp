@@ -51,6 +51,64 @@
     animation: shimmer 1.4s ease infinite;
 }
 
+/* ── Cartões em tela estreita (stackOnMobile) ── */
+@media (max-width: 900px) {
+    .stackOnMobile {
+        overflow-x: visible;
+        border: none;
+        background: transparent;
+    }
+
+    .stackOnMobile .table thead {
+        display: none;
+    }
+
+    .stackOnMobile .table,
+    .stackOnMobile .table tbody,
+    .stackOnMobile .table tr {
+        display: block;
+        width: 100%;
+    }
+
+    .stackOnMobile .table tr {
+        margin-bottom: 0.75em;
+        padding: 0.4em 0;
+        border: 1px solid var(--color-border, #d1d5db);
+        border-radius: var(--radius-md, 10px);
+        background: var(--color-white, #fff);
+    }
+
+    .stackOnMobile .table td {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1em;
+        padding: 0.5em 1em;
+        border-bottom: none;
+        text-align: right;
+    }
+
+    .stackOnMobile .table td::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+        color: var(--color-textMuted, #6b7280);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        text-align: left;
+    }
+
+    /* Célula sem nome de coluna (ex.: ações): ocupa a linha toda */
+    .stackOnMobile .table td[data-label='']::before {
+        content: none;
+    }
+
+    .stackOnMobile .table td[data-label=''] {
+        justify-content: flex-end;
+    }
+}
+
 @keyframes shimmer {
     0% { background-position: 100% 50%; }
     100% { background-position: 0 50%; }

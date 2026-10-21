@@ -186,8 +186,12 @@ export async function updateEmployeeStatus(transaction, employeeId, status) {
 // ─────────────────────────────────────────────
 
 /**
- * Registra um documento enviado no banco.
- * Retorna o ID gerado.
+ * Registra uma entrega de documento no banco (status 0 = Pendente) e retorna o ID gerado.
+ *
+ * Histórico: as entregas do mesmo documento (fornecedor + solicitação + tipo + colaborador,
+ * ou empresa quando não há colaborador) ficam todas guardadas. A nova entra como atual
+ * (is_current = 1, versão seguinte) e as anteriores deixam de ser atuais. O UPDLOCK
+ * serializa dois envios do mesmo documento ao mesmo tempo.
  */
 export async function insertDocument(transaction, {
     supplierId, documentTypeId, laborRequestId, employeeId,
@@ -206,6 +210,23 @@ export async function insertDocument(transaction, {
         .input('file_hash', sql.VarChar(128), fileHash ?? null)
         .input('expires_at', sql.Date, expiresAt ?? null)
         .query(`
+            DECLARE @next_version INT = (
+                SELECT ISNULL(MAX([version]), 0) + 1
+                FROM documents WITH (UPDLOCK, HOLDLOCK)
+                WHERE supplier_id = @supplier_id
+                  AND document_type_id = @document_type_id
+                  AND ((@labor_request_id IS NULL AND labor_request_id IS NULL) OR labor_request_id = @labor_request_id)
+                  AND ((@employee_id IS NULL AND employee_id IS NULL) OR employee_id = @employee_id)
+            );
+
+            UPDATE documents
+            SET is_current = 0, updated_at = GETDATE()
+            WHERE supplier_id = @supplier_id
+              AND document_type_id = @document_type_id
+              AND ((@labor_request_id IS NULL AND labor_request_id IS NULL) OR labor_request_id = @labor_request_id)
+              AND ((@employee_id IS NULL AND employee_id IS NULL) OR employee_id = @employee_id)
+              AND is_current = 1;
+
             INSERT INTO documents
                 (supplier_id, document_type_id, labor_request_id, employee_id,
                  file_name, file_path, file_size_bytes, mime_type, file_hash,
@@ -214,7 +235,7 @@ export async function insertDocument(transaction, {
             VALUES
                 (@supplier_id, @document_type_id, @labor_request_id, @employee_id,
                  @file_name, @file_path, @file_size_bytes, @mime_type, @file_hash,
-                 1, 1, 0, @expires_at)
+                 @next_version, 1, 0, @expires_at);
         `);
     return result.recordset[0]?.id ?? null;
 }

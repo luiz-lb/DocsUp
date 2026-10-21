@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LuSave, LuArrowLeft, LuChevronRight, LuDownload } from 'react-icons/lu';
+import { LuArrowLeft, LuChevronRight, LuDownload, LuHistory, LuPencil } from 'react-icons/lu';
 import {
   PageHeader,
   DataTable,
@@ -8,17 +8,13 @@ import {
   Banner,
   FormField,
 } from '../../../components/ui/index.js';
-import { DOCUMENT_STATUS, DOCUMENT_SCOPE } from '../../../constants/enums.js';
+import { DOCUMENT_STATUS } from '../../../constants/enums.js';
 import { formatDate } from '../../../utils/formatters.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
-import { downloadDocumentFiles, listDeliveredDocuments, setDocumentStatus } from '../api/documentsRealApi.js';
+import { downloadDocumentFiles, listDeliveredDocuments } from '../api/documentsRealApi.js';
+import DocumentStatusModal from '../components/DocumentStatusModal/index.js';
+import DeliveryHistoryModal from '../components/DeliveryHistoryModal/index.js';
 import styles from './SupplierDocumentsPage.module.css';
-
-// Opções de status que o RH / Segurança pode aplicar (0..5)
-const STATUS_OPTIONS = Object.entries(DOCUMENT_STATUS).map(([value, { label }]) => ({
-  value: Number(value),
-  label,
-}));
 
 // Modos de agrupamento
 const GROUP_BY = {
@@ -49,14 +45,16 @@ function SelectAllCheckbox({ total, selected, onChange }) {
     if (ref.current) ref.current.indeterminate = selected > 0 && selected < total;
   }, [selected, total]);
   return (
-    <input
-      ref={ref}
-      type="checkbox"
-      className={styles.checkbox}
-      checked={total > 0 && selected === total}
-      onChange={(event) => onChange(event.target.checked)}
-      aria-label="Selecionar todos os documentos do grupo"
-    />
+    <label className={styles.selectAll}>
+      <input
+        ref={ref}
+        type="checkbox"
+        className={styles.checkbox}
+        checked={total > 0 && selected === total}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      Selecionar todos
+    </label>
   );
 }
 
@@ -69,9 +67,11 @@ export default function SupplierDocumentsPage() {
     [],
   );
 
-  const [pending, setPending] = useState({});
-  const [savingId, setSavingId] = useState(null);
   const [feedback, setFeedback] = useState(null);
+
+  // Modais: alterar status e histórico de entregas
+  const [statusTarget, setStatusTarget] = useState(null);
+  const [historyTarget, setHistoryTarget] = useState(null);
 
   // Download: documentos marcados no grupo aberto e o que está baixando agora
   // ('selected', 'all' ou o id do documento da linha)
@@ -141,25 +141,15 @@ export default function SupplierDocumentsPage() {
     });
   };
 
-  // ── Edição de status (na visão detalhada do grupo) ──────────────────────
-  const setRowStatus = (documentId, value) =>
-    setPending((prev) => ({ ...prev, [documentId]: value === '' ? undefined : Number(value) }));
-
-  const handleSave = async (doc) => {
-    const newStatus = pending[doc.id];
-    if (newStatus === undefined || newStatus === doc.status) return;
-
-    setSavingId(doc.id);
-    setFeedback(null);
-    const result = await setDocumentStatus(doc.id, newStatus);
-    setSavingId(null);
-
-    if (!result.success) {
-      setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao atualizar status.' });
-      return;
-    }
-    setFeedback({ tone: 'success', message: `Status de "${doc.document_type_name}" atualizado.` });
-    setPending((prev) => { const next = { ...prev }; delete next[doc.id]; return next; });
+  // ── Status (modal) ───────────────────────────────────────────────────────
+  const handleStatusSuccess = (doc, message) => {
+    setStatusTarget(null);
+    setFeedback({
+      tone: 'success',
+      message: message === 'Nenhuma alteração para salvar.'
+        ? message
+        : `Status de "${doc.document_type_name}" atualizado.`,
+    });
     reload();
   };
 
@@ -188,13 +178,27 @@ export default function SupplierDocumentsPage() {
   ];
 
   // ── Colunas da tabela de documentos (visão detalhada) ───────────────────
+  // Coluna de origem conforme o agrupamento (o que o grupo aberto ainda não diz)
+  const originColumn = {
+    supplier: { header: 'Solicitação', render: (row) => row.labor_request_title ?? '—' },
+    location: {
+      header: 'Fornecedor · Solicitação',
+      render: (row) => (
+        <div className={styles.docCell}>
+          <span>{row.supplier_name ?? '—'}</span>
+          <span className={styles.meta}>{row.labor_request_title ?? '—'}</span>
+        </div>
+      ),
+    },
+    request: { header: 'Fornecedor', render: (row) => row.supplier_name ?? '—' },
+  }[groupBy];
+
   const docColumns = [
     {
       key: 'select',
+      header: '',
+      label: 'Selecionar',
       width: '2.5rem',
-      header: (
-        <SelectAllCheckbox total={groupDocIds.length} selected={selectedInGroup.length} onChange={selectAll} />
-      ),
       render: (row) => (
         <input
           type="checkbox"
@@ -206,82 +210,71 @@ export default function SupplierDocumentsPage() {
       ),
     },
     {
-      key: 'document_type_name',
+      key: 'document',
       header: 'Documento',
       render: (row) => (
         <div className={styles.docCell}>
           <strong>{row.document_type_name}</strong>
-          <span className={styles.fileName}>{row.file_name}</span>
+          <span className={styles.fileName} title={row.file_name}>{row.file_name}</span>
+          <span className={styles.meta}>{row.employee_name ? `Colaborador: ${row.employee_name}` : 'Empresa'}</span>
         </div>
       ),
     },
-    // Colunas contextuais conforme o agrupamento
-    ...(groupBy !== 'supplier'
-      ? [{ key: 'supplier_name', header: 'Fornecedor', render: (row) => row.supplier_name ?? '—' }]
-      : []),
-    ...(groupBy !== 'request'
-      ? [{ key: 'labor_request_title', header: 'Solicitação', render: (row) => row.labor_request_title ?? '—' }]
-      : []),
-    {
-      key: 'scope',
-      header: 'Escopo',
-      render: (row) => <StatusBadge enumMap={DOCUMENT_SCOPE} value={row.scope} />,
-    },
-    {
-      key: 'employee_name',
-      header: 'Colaborador',
-      render: (row) => row.employee_name ?? '—',
-    },
+    { key: 'origin', ...originColumn },
     {
       key: 'uploaded_at',
       header: 'Enviado em',
-      render: (row) => formatDate(row.uploaded_at),
-    },
-    {
-      key: 'status',
-      header: 'Status atual',
-      render: (row) => <StatusBadge enumMap={DOCUMENT_STATUS} value={row.status} />,
-    },
-    {
-      key: 'set_status',
-      header: 'Alterar para',
       render: (row) => (
-        <div className={styles.actionCell}>
-          <select
-            className={styles.statusSelect}
-            value={pending[row.id] ?? row.status}
-            onChange={(e) => setRowStatus(row.id, e.target.value)}
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <Button
-            size="sm"
-            icon={LuSave}
-            isLoading={savingId === row.id}
-            disabled={pending[row.id] === undefined || pending[row.id] === row.status}
-            onClick={() => handleSave(row)}
-          >
-            Salvar
-          </Button>
+        <div className={styles.docCell}>
+          <span>{formatDate(row.uploaded_at)}</span>
+          {row.deliveries_count > 1 && <span className={styles.meta}>{row.deliveries_count}ª entrega</span>}
         </div>
       ),
     },
     {
-      key: 'download',
+      key: 'status',
+      header: 'Status',
+      render: (row) => (
+        <div className={styles.statusCell}>
+          <StatusBadge enumMap={DOCUMENT_STATUS} value={row.status} />
+          {row.observation && (
+            <span className={styles.observation} title={row.observation}>{row.observation}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
       header: '',
       render: (row) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          icon={LuDownload}
-          isLoading={downloading === row.id}
-          disabled={downloading !== null && downloading !== row.id}
-          onClick={() => handleDownload([row.id], row.id)}
-        >
-          Baixar
-        </Button>
+        <div className={styles.actions}>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={LuPencil}
+            onClick={() => setStatusTarget(row)}
+            title="Alterar status"
+            aria-label={`Alterar status de ${row.document_type_name}`}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={LuHistory}
+            onClick={() => setHistoryTarget(row)}
+            title="Histórico de entregas"
+            aria-label={`Histórico de entregas de ${row.document_type_name}`}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={LuDownload}
+            isLoading={downloading === row.id}
+            disabled={downloading !== null && downloading !== row.id}
+            onClick={() => handleDownload([row.id], row.id)}
+            title="Baixar arquivo"
+            aria-label={`Baixar ${row.file_name}`}
+          />
+        </div>
       ),
     },
   ];
@@ -291,7 +284,7 @@ export default function SupplierDocumentsPage() {
       <PageHeader
         eyebrow="RH & Segurança"
         title="Documentos dos fornecedores"
-        description="Documentos entregues pelos fornecedores. Organize por fornecedor, local ou solicitação e atualize o status de cada documento."
+        description="Documentos entregues pelos fornecedores. Organize por fornecedor, local ou solicitação, baixe os arquivos e atualize o status de cada documento."
         actions={
           !openGroup && (
             <FormField label="Organizar por" className={styles.filterField}>
@@ -321,11 +314,14 @@ export default function SupplierDocumentsPage() {
 
           {/* Download: os marcados ou o grupo inteiro (mais de um arquivo vai num ZIP) */}
           <div className={styles.downloadBar}>
-            <span className={styles.selectionInfo}>
-              {selectedInGroup.length === 0
-                ? 'Marque os documentos para baixar só alguns.'
-                : `${selectedInGroup.length} de ${groupDocIds.length} selecionado(s)`}
-            </span>
+            <div className={styles.selection}>
+              <SelectAllCheckbox total={groupDocIds.length} selected={selectedInGroup.length} onChange={selectAll} />
+              <span className={styles.selectionInfo}>
+                {selectedInGroup.length === 0
+                  ? 'Marque os documentos para baixar só alguns.'
+                  : `${selectedInGroup.length} de ${groupDocIds.length} selecionado(s)`}
+              </span>
+            </div>
             <div className={styles.downloadActions}>
               <Button
                 size="sm"
@@ -353,6 +349,7 @@ export default function SupplierDocumentsPage() {
             rows={openGroup.docs}
             getRowKey={(row) => row.id}
             emptyTitle="Nenhum documento neste grupo"
+            stackOnMobile
           />
         </>
       ) : (
@@ -364,8 +361,22 @@ export default function SupplierDocumentsPage() {
           onRowClick={(g) => openGroupWith(g.key)}
           emptyTitle="Nenhum documento encontrado"
           emptyDescription="Ainda não há documentos entregues pelos fornecedores."
+          stackOnMobile
         />
       )}
+
+      <DocumentStatusModal
+        open={Boolean(statusTarget)}
+        document={statusTarget}
+        onClose={() => setStatusTarget(null)}
+        onSuccess={handleStatusSuccess}
+      />
+
+      <DeliveryHistoryModal
+        open={Boolean(historyTarget)}
+        document={historyTarget}
+        onClose={() => setHistoryTarget(null)}
+      />
     </div>
   );
 }

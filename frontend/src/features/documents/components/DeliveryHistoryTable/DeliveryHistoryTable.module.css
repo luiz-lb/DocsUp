@@ -1,0 +1,135 @@
+.wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-white, #fff);
+  color: var(--color-textDark, #111827);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.table th {
+  text-align: left;
+  padding: 0.65em 0.9em;
+  background: #f8fafc;
+  color: var(--color-textMuted, #6b7280);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--color-border, #d1d5db);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.6em 0.9em;
+  border-bottom: 1px solid #eef0f2;
+  vertical-align: top;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.current {
+  background: rgba(79, 70, 229, 0.04);
+}
+
+.currentTag {
+  display: inline-block;
+  margin-left: 0.4em;
+  padding: 0 0.45em;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.12);
+  color: var(--color-indigo, #4f46e5);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.fileCell {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.fileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+.observation {
+  display: block;
+  white-space: pre-wrap;
+  min-width: 160px;
+}
+
+.reviewer {
+  display: block;
+  margin-top: 0.25em;
+  font-size: 0.72rem;
+  color: var(--color-textMuted, #6b7280);
+}
+
+.muted,
+.empty {
+  color: var(--color-textMuted, #6b7280);
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* Tela estreita: cada entrega vira um cartão */
+@media (max-width: 700px) {
+  .wrapper {
+    border: none;
+    background: transparent;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .table tr {
+    margin-bottom: 0.6em;
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: var(--radius-md, 10px);
+    background: var(--color-white, #fff);
+  }
+
+  .table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 1em;
+    border-bottom: none;
+    text-align: right;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--color-textMuted, #6b7280);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-align: left;
+  }
+
+  .observation {
+    min-width: 0;
+  }
+}

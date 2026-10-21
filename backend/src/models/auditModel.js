@@ -67,6 +67,7 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
     if (search) {
         request.input('search', sql.NVarChar(210), `%${search}%`);
         conditions.push(`(actor.[name] LIKE @search OR actor.email LIKE @search
+                          OR actor_supplier.razao_social LIKE @search
                           OR target.[name] LIKE @search OR target.email LIKE @search
                           OR target_document_type.[name] LIKE @search
                           OR target_activity.[name] LIKE @search
@@ -80,8 +81,9 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
             a.id,
             a.actor_type,
             a.actor_id,
-            actor.[name]  AS actor_name,
-            actor.email   AS actor_email,
+            -- autor: colaborador (nome / e-mail) ou fornecedor (razão social / CNPJ)
+            COALESCE(actor.[name], actor_supplier.razao_social) AS actor_name,
+            COALESCE(actor.email, actor_supplier.cnpj)          AS actor_email,
             a.[action],
             a.entity_type,
             a.entity_id,
@@ -100,6 +102,7 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
             COUNT(*) OVER() AS total_count
         FROM audit_log AS a
         LEFT JOIN users AS actor  ON a.actor_type = 0 AND actor.id = a.actor_id
+        LEFT JOIN suppliers AS actor_supplier ON a.actor_type = 1 AND actor_supplier.id = a.actor_id
         LEFT JOIN users AS target ON a.entity_type = 'user' AND target.id = a.entity_id
         LEFT JOIN document_types AS target_document_type
             ON a.entity_type = 'document_type' AND target_document_type.id = a.entity_id

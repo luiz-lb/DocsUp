@@ -1,5 +1,6 @@
 import multer from 'multer';
 import * as phase2Service from '../services/phase2Service.js';
+import { sendPrivateFile } from '../utils/fileResponse.js';
 
 // ── Configuração do multer (memória — salva em disco no service) ──────────────
 const upload = multer({
@@ -50,6 +51,37 @@ export async function getPhase2(req, res) {
         return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
         console.error('getPhase2 controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
+// GET /phase2/:token/documents/:documentId/download  (requer JWT de fornecedor)
+// O fornecedor baixa um arquivo que ele enviou nesta solicitação (atual ou do histórico)
+// ─────────────────────────────────────────────
+export async function downloadDocument(req, res) {
+    try {
+        const documentId = Number(req.params.documentId);
+        if (!Number.isInteger(documentId) || documentId <= 0) {
+            return res.status(400).json({ success: false, body: { message: 'Documento inválido.' } });
+        }
+
+        const result = await phase2Service.prepareSupplierDownload(
+            req.params.token,
+            req.fornecedor.supplierId,
+            documentId,
+            {
+                ipAddress: req.ip ? req.ip.replace(/^::ffff:/, '') : null,
+                userAgent: req.headers['user-agent'] ?? null,
+            },
+        );
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+
+        return sendPrivateFile(res, result.body.absolutePath, result.body.fileName, 'phase2 downloadDocument');
+    } catch (error) {
+        console.error('phase2 downloadDocument controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }

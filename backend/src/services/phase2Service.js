@@ -8,10 +8,22 @@ import * as laborRequestModel from '../models/laborRequestModel.js';
 import * as supplierModel from '../models/supplierModel.js';
 import * as documentTypeModel from '../models/documentTypeModel.js';
 import * as trasaction from '../models/trasaction.js';
-import { triggerDocumentValidation } from './documentValidationService.js';
+import * as deliveryModel from '../models/deliveryModel.js';
+import * as documentDownloadService from './documentDownloadService.js';
+import { groupDeliveriesBySlot, slotKey, toSupplierDelivery } from './deliveryService.js';
+import { AUDIT_ACTOR_TYPES } from '../constants/audit.js';
 import { DOCUMENT_CATEGORIES, EMPLOYEE_DOCUMENT_CATEGORIES } from '../constants/documentCategories.js';
 import { isBlank, toInteger } from '../utils/parse.js';
 import { getUploadBaseDir } from '../utils/uploadPaths.js';
+
+// Validação automática (API pública / IA via N8N) desligada por enquanto: o RH baixa o documento,
+// valida no portal externo e muda o status à mão. O documento entra como Pendente. Para voltar a
+// usar, chamar triggerDocumentValidation (documentValidationService) depois de gravar o envio.
+
+// Depois do prazo da Fase 2, só dá para reenviar o que o RH devolveu
+const RESENDABLE_STATUSES = [3, 4]; // Reprovado, Reenvio Necessário
+const DEADLINE_CLOSED_MESSAGE =
+    'O prazo da Fase 2 encerrou. Agora só dá para reenviar documentos reprovados ou com reenvio necessário.';
 
 const COMPANY_DOCUMENT_CHOICE_ERROR =
     'Escolha, para cada arquivo, um dos documentos da empresa exigidos nesta solicitação.';
@@ -39,6 +51,17 @@ function parseLocalDate(value) {
         return null;
     }
     return date;
+}
+
+/** Prazo da Fase 2 encerrado (vencido ou já marcado como expirado pelo job). */
+function isDeadlineClosed(deadline) {
+    return deadline.status === 2 || new Date() > new Date(deadline.expires_at);
+}
+
+/** Depois do prazo: o documento atual está reprovado ou com reenvio necessário? */
+async function canResendAfterDeadline({ supplierId, laborRequestId, documentTypeId, employeeId = null }) {
+    const status = await deliveryModel.getCurrentDeliveryStatus({ supplierId, laborRequestId, documentTypeId, employeeId });
+    return RESENDABLE_STATUSES.includes(status);
 }
 
 /** Hoje à meia-noite, no horário local. */
@@ -210,6 +233,7 @@ export async function getPhase2ByToken(token, supplierId) {
             requiredNrTypes,
             employeeDocumentTypes,
             companyDocumentTypes,
+            deliveries,
         ] = await Promise.all([
             employeeModel.getEmployeesBySupplierAndRequest(deadline.supplier_id, laborRequestId),
             employeeModel.getDocumentsBySupplierAndRequest(deadline.supplier_id, laborRequestId),
@@ -221,18 +245,36 @@ export async function getPhase2ByToken(token, supplierId) {
             documentTypeModel.getEmployeeDocumentTypesForRequest(laborRequestId),
             // Tipos de documento da empresa exigidos nesta solicitação
             documentTypeModel.getRequiredCompanyDocumentTypes(laborRequestId),
+            // Todas as entregas (atuais e antigas), para o histórico de cada documento
+            deliveryModel.listSupplierDeliveries(deadline.supplier_id, laborRequestId),
         ]);
 
-        const now = new Date();
-        const expiresAt = new Date(deadline.expires_at);
-        const isExpired = now > expiresAt;
+        // Cada documento atual ganha a versão, a observação do RH e o histórico de entregas
+        const deliveriesBySlot = groupDeliveriesBySlot(deliveries);
+        const withHistory = (document) => {
+            const history = (deliveriesBySlot.get(slotKey(document)) ?? []).map(toSupplierDelivery);
+            const current = history.find((delivery) => delivery.id === document.id);
+            return {
+                ...document,
+                version: current?.version ?? 1,
+                observation: current?.observation ?? null,
+                history,
+            };
+        };
+
+        // isExpired: prazo encerrado (depois dele, só reenvio de reprovado / reenvio necessário)
+        const isExpired = isDeadlineClosed(deadline);
 
         return {
             success: true,
             body: {
                 deadline: { ...deadline, isExpired },
-                employees,
-                documents,
+                employees: employees.map((employee) => ({
+                    ...employee,
+                    documents: (employee.documents ?? []).map((document) =>
+                        withHistory({ ...document, employee_id: employee.id })),
+                })),
+                documents: documents.map(withHistory),
                 requiredDocuments: requiredDocs,
                 requiredNrTypes,
                 employeeDocumentTypes,
@@ -282,20 +324,15 @@ export async function addEmployee(token, supplierId, data, files = []) {
         return { success: false, message: 'Envie exatamente um arquivo (o documento selecionado).' };
     }
 
-    // Valida deadline
+    // Valida deadline (depois do prazo, só reenvio: conferido abaixo, com o colaborador)
     const deadline = await quotationModel.getPhase2DeadlineByToken(token);
     if (!deadline) {
         return { success: false, message: 'Token da Fase 2 inválido.' };
     }
-    if (deadline.status === 2) {
-        return { success: false, message: 'O prazo da Fase 2 expirou.' };
-    }
-    if (new Date() > new Date(deadline.expires_at)) {
-        return { success: false, message: 'O prazo da Fase 2 encerrou.' };
-    }
     if (deadline.supplier_id !== supplierId) {
         return { success: false, message: 'Sem permissão para este deadline.' };
     }
+    const deadlineClosed = isDeadlineClosed(deadline);
 
     // Tipo de documento: ativo e de colaborador (básico, NR ou outros)
     const typeId = toInteger(documentTypeId);
@@ -329,6 +366,21 @@ export async function addEmployee(token, supplierId, data, files = []) {
             deadline.labor_request_id,
             cpf,
         );
+
+        // Prazo encerrado: só reenvio de documento reprovado / reenvio necessário de colaborador já enviado
+        if (deadlineClosed) {
+            const allowed = employeeId && await canResendAfterDeadline({
+                supplierId,
+                laborRequestId: deadline.labor_request_id,
+                documentTypeId: documentType.id,
+                employeeId,
+            });
+            if (!allowed) {
+                await trasaction.finalizarTransacao(transaction, false);
+                transactionDone = true;
+                return { success: false, message: DEADLINE_CLOSED_MESSAGE };
+            }
+        }
 
         if (!employeeId) {
             employeeId = await employeeModel.insertEmployee(transaction, {
@@ -378,9 +430,6 @@ export async function addEmployee(token, supplierId, data, files = []) {
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
 
-        // Dispara validação assíncrona do documento (fora da transação)
-        setImmediate(() => triggerDocumentValidation(docId, supplierId));
-
         console.log(`Colaborador ${employeeId} + documento tipo ${documentType.id} (doc ${docId}) na Fase 2 (supplier ${supplierId}).`);
         return { success: true, body: { employeeId, documentTypeId: documentType.id, documentId: docId } };
     } catch (error) {
@@ -428,20 +477,15 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
         return { success: false, message: 'Data de validade inválida.' };
     }
 
-    // Valida deadline
+    // Valida deadline (depois do prazo, só reenvio: conferido abaixo, por arquivo)
     const deadline = await quotationModel.getPhase2DeadlineByToken(token);
     if (!deadline) {
         return { success: false, message: 'Token da Fase 2 inválido.' };
     }
-    if (deadline.status === 2) {
-        return { success: false, message: 'O prazo da Fase 2 expirou.' };
-    }
-    if (new Date() > new Date(deadline.expires_at)) {
-        return { success: false, message: 'O prazo da Fase 2 encerrou.' };
-    }
     if (deadline.supplier_id !== supplierId) {
         return { success: false, message: 'Sem permissão para este deadline.' };
     }
+    const deadlineClosed = isDeadlineClosed(deadline);
 
     // Cada arquivo: um dos tipos de empresa exigidos na solicitação (ativos), com a validade dele
     const requiredTypes = await documentTypeModel.getRequiredCompanyDocumentTypes(deadline.labor_request_id);
@@ -457,6 +501,20 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
         const expiration = resolveExpiration(documentType, hasExpiresAt ? expiresAt[i] : null);
         if (expiration.error) {
             return { success: false, message: expiration.error };
+        }
+
+        // Uma entrega por documento: o mesmo tipo duas vezes no envio viraria histórico na hora
+        if (uploads.some((upload) => upload.documentTypeId === documentType.id)) {
+            return { success: false, message: `Envie um arquivo para cada documento: "${documentType.name}" foi escolhido mais de uma vez.` };
+        }
+
+        // Prazo encerrado: só reenvio de documento reprovado / reenvio necessário
+        if (deadlineClosed && !(await canResendAfterDeadline({
+            supplierId,
+            laborRequestId: deadline.labor_request_id,
+            documentTypeId: documentType.id,
+        }))) {
+            return { success: false, message: DEADLINE_CLOSED_MESSAGE };
         }
 
         uploads.push({ file: files[i], documentTypeId: documentType.id, expiresAt: expiration.value });
@@ -491,11 +549,6 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
 
-        // Dispara validação assíncrona para cada documento salvo (fora da transação)
-        for (const docId of documentIds) {
-            setImmediate(() => triggerDocumentValidation(docId, supplierId));
-        }
-
         console.log(`${documentIds.length} documento(s) da empresa enviado(s) na Fase 2 (supplier ${supplierId}).`);
         return { success: true, body: { documentIds } };
     } catch (error) {
@@ -507,6 +560,38 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
         }
         console.error('addCompanyDocuments Phase2 error:', error);
         return { success: false, message: 'Erro ao enviar documentos da empresa.' };
+    }
+}
+
+// ─────────────────────────────────────────────
+// Download do próprio fornecedor
+// ─────────────────────────────────────────────
+
+/**
+ * O fornecedor baixa um arquivo que ele mesmo enviou nesta solicitação (atual ou do histórico).
+ * Link de outro fornecedor → 403; documento de outro fornecedor ou solicitação → 404.
+ * Registra na auditoria com o fornecedor como autor.
+ *
+ * @param {object} context — { ipAddress, userAgent } da requisição
+ */
+export async function prepareSupplierDownload(token, supplierId, documentId, context = {}) {
+    try {
+        const deadline = await quotationModel.getPhase2DeadlineByToken(token);
+        if (!deadline) {
+            return { success: false, status: 404, message: 'Link da Fase 2 inválido.' };
+        }
+        if (deadline.supplier_id !== Number(supplierId)) {
+            return { success: false, status: 403, message: 'Este link é de outro fornecedor.' };
+        }
+
+        return documentDownloadService.prepareDocumentDownload(
+            documentId,
+            { ...context, actorType: AUDIT_ACTOR_TYPES.SUPPLIER, actorId: deadline.supplier_id },
+            { supplierId: deadline.supplier_id, laborRequestId: deadline.labor_request_id },
+        );
+    } catch (error) {
+        console.error('prepareSupplierDownload error:', error);
+        return { success: false, status: 500, message: 'Erro ao preparar o download do documento.' };
     }
 }
 

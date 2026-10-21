@@ -45,6 +45,18 @@ export async function listDocumentsWithValidation({ supplierId, laborRequestId, 
             d.[status],
             d.expires_at,
             d.uploaded_at,
+            d.[version],
+            /* Quantas entregas este documento já teve (histórico) */
+            (
+                SELECT COUNT(*)
+                FROM documents AS h
+                WHERE h.supplier_id = d.supplier_id
+                  AND h.document_type_id = d.document_type_id
+                  AND ((h.labor_request_id IS NULL AND d.labor_request_id IS NULL) OR h.labor_request_id = d.labor_request_id)
+                  AND ((h.employee_id IS NULL AND d.employee_id IS NULL) OR h.employee_id = d.employee_id)
+            ) AS deliveries_count,
+            /* Observação da última análise do RH (o fornecedor vê) */
+            review.manual_comments AS observation,
             d.labor_request_id,
             lr.title             AS labor_request_title,
             lr.[location]        AS labor_request_location,
@@ -67,6 +79,12 @@ export async function listDocumentsWithValidation({ supplierId, laborRequestId, 
             WHERE document_id = d.id
             ORDER BY created_at DESC
         ) AS dv
+        OUTER APPLY (
+            SELECT TOP 1 manual_comments
+            FROM document_validations
+            WHERE document_id = d.id AND validation_type = 2
+            ORDER BY id DESC
+        ) AS review
         WHERE ${where}
         ORDER BY d.uploaded_at DESC
     `);
@@ -167,6 +185,32 @@ export async function applyManualDecision(transaction, validationId, reviewerId,
  * Atualiza o status de um documento (tabela documents).
  * status: 0=Pendente, 1=Validando, 2=Aprovado, 3=Reprovado, 4=Reenvio Necessário, 5=Expirado
  */
+/**
+ * Registra uma análise manual do RH / Segurança (validation_type = 2): cada mudança de status
+ * vira um registro, com quem fez, quando e a observação que o fornecedor vê.
+ * final_status segue o enum da validação: 1 Aprovado, 2 Reprovado, 0 em análise.
+ */
+export async function insertManualReview(transaction, {
+    documentId, reviewerId, reviewerDepartment, manualDecision, finalStatus, comments,
+}) {
+    const request = new sql.Request(transaction);
+    await request
+        .input('document_id', sql.Int, documentId)
+        .input('reviewer_id', sql.Int, reviewerId)
+        .input('reviewer_department', sql.VarChar(50), reviewerDepartment ?? null)
+        .input('manual_decision', sql.TinyInt, manualDecision ?? null)
+        .input('final_status', sql.TinyInt, finalStatus)
+        .input('comments', sql.NVarChar(sql.MAX), comments ?? null)
+        .query(`
+            INSERT INTO document_validations
+                (document_id, validation_type, reviewer_id, reviewer_department,
+                 manual_decision, manual_comments, reviewed_at, final_status)
+            VALUES
+                (@document_id, 2, @reviewer_id, @reviewer_department,
+                 @manual_decision, @comments, GETDATE(), @final_status)
+        `);
+}
+
 export async function updateDocumentStatus(transaction, documentId, status) {
     const request = new sql.Request(transaction);
     await request
@@ -189,22 +233,6 @@ export async function getValidationByIdAndDocument(validationId, documentId) {
         .input('id', sql.Int, validationId)
         .input('document_id', sql.Int, documentId)
         .query('SELECT id FROM document_validations WHERE id = @id AND document_id = @document_id');
-    return result.recordset[0] ?? null;
-}
-
-/**
- * Retorna o id da validação mais recente de um documento (ou null).
- */
-export async function getLatestValidationId(documentId) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input('document_id', sql.Int, documentId)
-        .query(`
-            SELECT TOP 1 id
-            FROM document_validations
-            WHERE document_id = @document_id
-            ORDER BY created_at DESC
-        `);
     return result.recordset[0] ?? null;
 }
 
