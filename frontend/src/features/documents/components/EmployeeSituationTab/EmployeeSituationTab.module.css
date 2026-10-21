@@ -1,0 +1,92 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  flex: 1 1 300px;
+  min-width: 220px;
+  padding: 0.6em 1em;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-white, #fff);
+}
+
+.searchField:focus-within {
+  border-color: var(--color-indigo, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.searchIcon {
+  color: var(--color-textMuted, #6b7280);
+  flex-shrink: 0;
+}
+
+.searchField input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--color-textDark, #111827);
+}
+
+.filter {
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  padding: 0.6em 0.8em;
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: var(--color-white, #fff);
+  color: var(--color-textDark, #111827);
+}
+
+/* Filtro de fornecedor com busca: mesma altura e fundo dos outros filtros da barra */
+.supplierField {
+  flex: 0 1 260px;
+  min-width: 200px;
+}
+
+.toolbar .supplierField input {
+  padding: 0.6em 2.4em 0.6em 0.8em;
+  font-size: 0.88rem;
+  background: var(--color-white, #fff);
+}
+
+.cell,
+.statusCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.statusCell {
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.meta {
+  font-size: 0.78rem;
+  color: var(--color-textMuted, #6b7280);
+}
+
+.retained {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-danger, #e5484d);
+}
+
+@media (max-width: 900px) {
+  .cell,
+  .statusCell {
+    align-items: flex-end;
+  }
+}

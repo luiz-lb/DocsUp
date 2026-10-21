@@ -88,6 +88,7 @@ export async function getEmployeesBySupplierAndRequest(supplierId, laborRequestI
                 e.rg,
                 e.role_function,
                 e.[status],
+                e.integration_at,
                 e.created_at
             FROM employees AS e
             WHERE e.supplier_id      = @supplier_id

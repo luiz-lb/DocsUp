@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import routes from './src/routers/index.js';
 import cors from 'cors';
 import { processExpiredPhase2Deadlines } from './src/services/phase2Service.js';
+import { scheduleDailyDocumentCheck } from './src/services/employeeSituationService.js';
 import { ensureInitialAdmin } from './src/services/bootstrapService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -104,6 +105,10 @@ app.use((err, req, res, next) => {
                 console.error('[Phase2 Job] Erro:', err.message);
             }
         }, PHASE2_JOB_INTERVAL_MS);
+
+        // Rotina diária (00:01, horário de São Paulo): vence documentos e atualiza a situação
+        // dos colaboradores (a vencer, pendente, retido por pendência da empresa)
+        scheduleDailyDocumentCheck();
 
     } catch (err) {
         console.error('Erro ao inicializar servidor:', err.message);

@@ -1,4 +1,4 @@
-import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, RISK_LEVEL } from '../../constants/enums.js';
+import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, EMPLOYEE_STATUS, RISK_LEVEL } from '../../constants/enums.js';
 
 // Nome dos campos gravados em old_values / new_values
 const FIELD_LABELS = {
@@ -23,6 +23,7 @@ const FIELD_LABELS = {
   zip_name: 'Arquivo ZIP',
   status: 'Status',
   observation: 'Observação',
+  integration_at: 'Integração',
 };
 
 // Campos com lista de ids, mostrados como '#1, #2'
@@ -51,6 +52,9 @@ export function describeTarget(row) {
   if (row.entity_type === 'activity') {
     return { title: row.target_name ?? `Atividade #${row.entity_id}`, subtitle: 'Atividade' };
   }
+  if (row.entity_type === 'employee') {
+    return { title: row.target_name ?? `Colaborador #${row.entity_id}`, subtitle: 'Colaborador' };
+  }
   if (row.entity_type === 'document') {
     // ZIP: um registro só, com a lista de documentos (sem entity_id)
     if (!row.entity_id) {
@@ -71,8 +75,12 @@ function parseJson(value) {
   }
 }
 
-function formatValue(field, value) {
+function formatValue(field, value, entityType) {
   if (value === undefined || value === null) return '—';
+  // status: situação do colaborador ou status do documento, conforme a entidade
+  if (field === 'status' && entityType === 'employee') return EMPLOYEE_STATUS[value]?.label ?? String(value);
+  // 'AAAA-MM-DDTHH:mm' (gravado sem fuso) → 'DD/MM/AAAA HH:mm'
+  if (field === 'integration_at') return String(value).replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}).*$/, '$3/$2/$1 $4');
   if (field === 'department') return DEPARTMENT[value]?.label ?? String(value);
   if (field === 'category') return DOCUMENT_CATEGORY[value]?.label ?? String(value);
   if (field === 'status') return DOCUMENT_STATUS[value]?.label ?? String(value);
@@ -97,7 +105,7 @@ export function buildChanges(row) {
   return fields.map((field) => ({
     field,
     label: FIELD_LABELS[field] ?? field,
-    before: field in before ? formatValue(field, before[field]) : '—',
-    after: field in after ? formatValue(field, after[field]) : '—',
+    before: field in before ? formatValue(field, before[field], row.entity_type) : '—',
+    after: field in after ? formatValue(field, after[field], row.entity_type) : '—',
   }));
 }

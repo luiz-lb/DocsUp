@@ -11,7 +11,7 @@ import ResendDocumentModal from '../components/ResendDocumentModal/index.js';
 import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
 import { ROUTES } from '../../../constants/routes.js';
 import { cn } from '../../../utils/cn.js';
-import { addDaysToToday, toDateInputValue } from '../../../utils/formatters.js';
+import { addDaysToToday, formatDateTime, toDateInputValue } from '../../../utils/formatters.js';
 import authStyles from '../../../styles/authCard.module.css';
 import styles from './Phase2UploadPage.module.css';
 
@@ -24,6 +24,11 @@ const TABS = {
 
 // Status em que o RH devolveu o documento (dá para reenviar mesmo depois do prazo)
 const RESENDABLE_STATUSES = [3, 4];
+const DOCUMENT_EXPIRED = 5;
+
+// Situações do colaborador com detalhe na tela (data da integração / motivo da retenção)
+const EMPLOYEE_INTEGRATION_SCHEDULED = 2;
+const EMPLOYEE_RETAINED = 6;
 
 // Categorias dos documentos do colaborador, na ordem de exibição (básicos primeiro)
 const EMPLOYEE_CATEGORIES = [DOCUMENT_CATEGORY_ID.BASICO, DOCUMENT_CATEGORY_ID.NR, DOCUMENT_CATEGORY_ID.OUTRO];
@@ -140,6 +145,12 @@ export default function Phase2UploadPage() {
   // devolveu (reprovado ou reenvio necessário). O tipo precisa continuar disponível.
   const canResend = (doc, documentType) =>
     Boolean(documentType) && (!deadline.isExpired || RESENDABLE_STATUSES.includes(doc.status));
+
+  // Documentos da empresa vencidos: motivo do "Retido por pendência" dos colaboradores
+  const retainedBy = companyDocuments
+    .filter((doc) => doc.status === DOCUMENT_EXPIRED)
+    .map((doc) => doc.document_type_name)
+    .join(', ');
 
   const returnedCount = [...companyDocuments, ...employees.flatMap((employee) => employee.documents ?? [])]
     .filter((doc) => RESENDABLE_STATUSES.includes(doc.status)).length;
@@ -583,6 +594,14 @@ export default function Phase2UploadPage() {
                         </div>
                         <StatusBadge enumMap={EMPLOYEE_STATUS} value={employee.status} />
                       </div>
+                      {employee.status === EMPLOYEE_INTEGRATION_SCHEDULED && employee.integration_at && (
+                        <p className={styles.employeeSituation}>Integração agendada: {formatDateTime(employee.integration_at)}</p>
+                      )}
+                      {employee.status === EMPLOYEE_RETAINED && (
+                        <p className={styles.employeeRetained}>
+                          Retido por pendência da empresa{retainedBy ? `: ${retainedBy}` : ''}. Envie o documento atualizado na aba Documentos da empresa.
+                        </p>
+                      )}
 
                       {employeeDocuments.length > 0 ? (
                         <div className={styles.employeeDocs}>

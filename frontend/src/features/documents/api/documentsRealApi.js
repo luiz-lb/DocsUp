@@ -1,5 +1,5 @@
 import { api } from '../../../utils/api.js';
-import { toErrorResult } from '../../../utils/apiError.js';
+import { getApiErrorMessage, toErrorResult } from '../../../utils/apiError.js';
 import { blobErrorMessage, fileNameFromDisposition, saveBlob } from '../../../utils/download.js';
 
 // ─────────────────────────────────────────────
@@ -50,6 +50,34 @@ export async function downloadDocumentFiles(documentIds) {
   } catch (error) {
     console.error('downloadDocumentFiles error:', error);
     return { success: false, body: { message: await blobErrorMessage(error, 'Erro ao baixar os documentos.') } };
+  }
+}
+
+/**
+ * Colaboradores com a situação e o resumo dos documentos (aba Colaboradores).
+ * GET /documents/employees?search=&status=
+ */
+export async function listEmployeeSituations(params = {}) {
+  try {
+    const result = await api.get('/documents/employees', { params });
+    return { success: true, body: result.data.body?.result ?? [] };
+  } catch (error) {
+    console.error('listEmployeeSituations error:', error);
+    return { success: false, body: [], message: getApiErrorMessage(error, 'Erro ao buscar os colaboradores.') };
+  }
+}
+
+/**
+ * Muda a situação do colaborador.
+ * PUT /documents/employees/:id/status  { status, integrationAt? ('AAAA-MM-DDTHH:mm') }
+ */
+export async function setEmployeeSituation(employeeId, status, integrationAt) {
+  try {
+    const result = await api.put(`/documents/employees/${employeeId}/status`, { status, integrationAt });
+    return result.data;
+  } catch (error) {
+    console.error('setEmployeeSituation error:', error);
+    return toErrorResult(error, 'Erro ao atualizar a situação do colaborador.');
   }
 }
 

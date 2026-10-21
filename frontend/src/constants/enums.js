@@ -144,13 +144,15 @@ export const RECEIPT_TYPE = {
   2: { label: 'Fase 2', tone: 'teal' },
 };
 
+// employees.status: situação do colaborador (Fase 8). 4 e 6 vêm da rotina diária (00:01).
 export const EMPLOYEE_STATUS = {
-  0: { label: 'Pendente de Docs', tone: 'warning' },
-  1: { label: 'Docs em Validação', tone: 'info' },
-  2: { label: 'Aprovado', tone: 'success' },
-  3: { label: 'Reprovado', tone: 'danger' },
-  4: { label: 'Ativo', tone: 'success' },
+  0: { label: 'Pendente de documentos', tone: 'warning' },
+  1: { label: 'Documentação OK', tone: 'info' },
+  2: { label: 'Integração agendada', tone: 'indigo' },
+  3: { label: 'Liberado', tone: 'success' },
+  4: { label: 'Documento a vencer', tone: 'warning' },
   5: { label: 'Desligado', tone: 'neutral' },
+  6: { label: 'Retido por pendência', tone: 'danger' },
 };
 
 export const PHASE2_STATUS = {
@@ -229,6 +231,8 @@ export const AUDIT_ACTION = {
   'document.download': { label: 'Documento baixado', tone: 'neutral' },
   'document.download_zip': { label: 'Documentos baixados (ZIP)', tone: 'neutral' },
   'document.status_change': { label: 'Status de documento alterado', tone: 'info' },
+  'document.expired': { label: 'Documento vencido (rotina diária)', tone: 'danger' },
+  'employee.status_change': { label: 'Situação do colaborador alterada', tone: 'info' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */

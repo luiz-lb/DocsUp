@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LuArrowLeft, LuChevronRight, LuDownload, LuHistory, LuPencil } from 'react-icons/lu';
+import { LuArrowLeft, LuChevronRight, LuDownload, LuFileText, LuHistory, LuPencil, LuUsers } from 'react-icons/lu';
 import {
   PageHeader,
   DataTable,
@@ -14,6 +14,8 @@ import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { downloadDocumentFiles, listDeliveredDocuments } from '../api/documentsRealApi.js';
 import DocumentStatusModal from '../components/DocumentStatusModal/index.js';
 import DeliveryHistoryModal from '../components/DeliveryHistoryModal/index.js';
+import EmployeeSituationTab, { EMPTY_EMPLOYEE_FILTERS } from '../components/EmployeeSituationTab/index.js';
+import { cn } from '../../../utils/cn.js';
 import styles from './SupplierDocumentsPage.module.css';
 
 // Modos de agrupamento
@@ -34,6 +36,12 @@ const GROUP_BY = {
     titleOf: (d) => d.labor_request_title ?? 'Sem solicitação',
   },
 };
+
+// Visões da tela: documentos entregues ou situação dos colaboradores
+const VIEWS = [
+  { key: 'documents', label: 'Documentos', icon: LuFileText },
+  { key: 'employees', label: 'Colaboradores', icon: LuUsers },
+];
 
 // Ordem/campos do resumo de contagem por status
 const SUMMARY_STATUSES = [0, 1, 2, 3, 4, 5];
@@ -59,6 +67,9 @@ function SelectAllCheckbox({ total, selected, onChange }) {
 }
 
 export default function SupplierDocumentsPage() {
+  const [view, setView] = useState('documents');
+  // Filtros da aba Colaboradores: ficam aqui para continuarem ao trocar de aba (saindo da tela, voltam ao padrão)
+  const [employeeFilters, setEmployeeFilters] = useState(EMPTY_EMPLOYEE_FILTERS);
   const [groupBy, setGroupBy] = useState('supplier');
   const [openGroupKey, setOpenGroupKey] = useState(null);
 
@@ -284,9 +295,9 @@ export default function SupplierDocumentsPage() {
       <PageHeader
         eyebrow="RH & Segurança"
         title="Documentos dos fornecedores"
-        description="Documentos entregues pelos fornecedores. Organize por fornecedor, local ou solicitação, baixe os arquivos e atualize o status de cada documento."
+        description="Documentos entregues pelos fornecedores e a situação de cada colaborador. Baixe os arquivos, atualize o status dos documentos e a situação dos colaboradores."
         actions={
-          !openGroup && (
+          view === 'documents' && !openGroup && (
             <FormField label="Organizar por" className={styles.filterField}>
               <select value={groupBy} onChange={(e) => changeGroupBy(e.target.value)}>
                 {Object.entries(GROUP_BY).map(([value, { label }]) => (
@@ -298,9 +309,28 @@ export default function SupplierDocumentsPage() {
         }
       />
 
-      {feedback && <Banner tone={feedback.tone} description={feedback.message} />}
+      <div className={styles.tabs} role="tablist">
+        {VIEWS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={view === key}
+            className={cn(styles.tab, view === key && styles.tabActive)}
+            onClick={() => setView(key)}
+          >
+            <Icon aria-hidden="true" /> {label}
+          </button>
+        ))}
+      </div>
 
-      {openGroup ? (
+      {view === 'employees' && (
+        <EmployeeSituationTab filters={employeeFilters} onFiltersChange={setEmployeeFilters} />
+      )}
+
+      {view === 'documents' && feedback && <Banner tone={feedback.tone} description={feedback.message} />}
+
+      {view !== 'documents' ? null : openGroup ? (
         <>
           <div className={styles.drillHeader}>
             <Button variant="ghost" size="sm" icon={LuArrowLeft} onClick={() => openGroupWith(null)}>

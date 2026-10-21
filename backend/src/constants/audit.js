@@ -25,6 +25,8 @@ export const AUDIT_ACTIONS = Object.freeze({
     DOCUMENT_DOWNLOAD: 'document.download',
     DOCUMENT_DOWNLOAD_ZIP: 'document.download_zip',
     DOCUMENT_STATUS_CHANGE: 'document.status_change',
+    DOCUMENT_EXPIRED: 'document.expired',
+    EMPLOYEE_STATUS_CHANGE: 'employee.status_change',
 });
 
 // audit_log.entity_type
@@ -33,4 +35,5 @@ export const AUDIT_ENTITIES = Object.freeze({
     DOCUMENT_TYPE: 'document_type',
     ACTIVITY: 'activity',
     DOCUMENT: 'document',
+    EMPLOYEE: 'employee',
 });

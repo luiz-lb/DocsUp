@@ -179,6 +179,19 @@
     gap: 1em;
 }
 
+.employeeSituation,
+.employeeRetained {
+    margin: 0.5em 0 0;
+    font-size: 0.8rem;
+}
+
+.employeeRetained {
+    padding: 0.45em 0.65em;
+    border-radius: 0.45rem;
+    background: rgba(248, 113, 113, 0.18);
+    font-weight: 600;
+}
+
 .employeeDocs {
     margin-top: 0.7em;
     padding-top: 0.6em;

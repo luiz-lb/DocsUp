@@ -3,6 +3,8 @@ import archiver from 'archiver';
 import * as documentValidationService from '../services/documentValidationService.js';
 import * as documentDownloadService from '../services/documentDownloadService.js';
 import * as deliveryService from '../services/deliveryService.js';
+import * as employeeSituationService from '../services/employeeSituationService.js';
+import { EMPLOYEE_STATUS_IDS } from '../constants/employeeStatus.js';
 import { requestAuditContext } from '../utils/audit.js';
 import { sendPrivateFile, setPrivateFileHeaders } from '../utils/fileResponse.js';
 
@@ -43,6 +45,59 @@ export async function listDocuments(req, res) {
         return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
         console.error('listDocuments controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
+ * GET /documents/employees?search=&status=  — colaboradores com a situação e o resumo dos
+ * documentos (RH, Segurança e Admin; aba Colaboradores de Docs de Fornecedores).
+ */
+export async function listEmployeeSituations(req, res) {
+    try {
+        const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 200) : '';
+
+        let status;
+        if (req.query.status !== undefined && req.query.status !== '') {
+            status = Number(req.query.status);
+            if (!EMPLOYEE_STATUS_IDS.includes(status)) {
+                return res.status(400).json({ success: false, body: { message: 'Situação inválida.' } });
+            }
+        }
+
+        const result = await employeeSituationService.listEmployeeSituations({ search, status });
+        if (!result.success) {
+            return res.status(result.status ?? 500).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('listEmployeeSituations controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
+ * PUT /documents/employees/:id/status  — RH / Segurança mudam a situação do colaborador.
+ * Body: { status (0..6), integrationAt? ('YYYY-MM-DDTHH:mm', obrigatório em Integração agendada) }
+ */
+export async function setEmployeeSituation(req, res) {
+    try {
+        const employeeId = Number(req.params.id);
+        if (!Number.isInteger(employeeId) || employeeId <= 0) {
+            return res.status(400).json({ success: false, body: { message: 'Colaborador inválido.' } });
+        }
+
+        const result = await employeeSituationService.setEmployeeSituation(
+            employeeId,
+            { status: req.body?.status, integrationAt: req.body?.integrationAt },
+            requestAuditContext(req),
+        );
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('setEmployeeSituation controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }

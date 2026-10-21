@@ -10,6 +10,9 @@ const router = express.Router();
 const podeVerDocumentos = requireRole(...ACCESS.SUPPLIER_DOCUMENTS);
 
 router.get('/', verificarToken, podeVerDocumentos, documentController.listDocuments);
+// Situação dos colaboradores (aba Colaboradores de Docs de Fornecedores)
+router.get('/employees', verificarToken, podeVerDocumentos, documentController.listEmployeeSituations);
+router.put('/employees/:id/status', verificarToken, podeVerDocumentos, documentController.setEmployeeSituation);
 // Download: um arquivo, ou vários num ZIP (body { documentIds })
 router.get('/:id/download', verificarToken, podeVerDocumentos, documentController.downloadDocument);
 // Histórico de entregas do documento

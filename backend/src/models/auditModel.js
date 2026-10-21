@@ -71,7 +71,8 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
                           OR target.[name] LIKE @search OR target.email LIKE @search
                           OR target_document_type.[name] LIKE @search
                           OR target_activity.[name] LIKE @search
-                          OR target_document.file_name LIKE @search)`);
+                          OR target_document.file_name LIKE @search
+                          OR target_employee.full_name LIKE @search)`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -91,7 +92,8 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
                 target.[name],
                 target_document_type.[name],
                 target_activity.[name],
-                target_document_kind.[name] + N' · ' + target_document.file_name
+                target_document_kind.[name] + N' · ' + target_document.file_name,
+                target_employee.full_name
             ) AS target_name,
             target.email  AS target_email,
             a.old_values,
@@ -113,6 +115,8 @@ export async function listAuditLogs({ page = 1, limit = 25, action, from, to, se
             ON a.entity_type = 'document' AND target_document.id = a.entity_id
         LEFT JOIN document_types AS target_document_kind
             ON target_document_kind.id = target_document.document_type_id
+        LEFT JOIN employees AS target_employee
+            ON a.entity_type = 'employee' AND target_employee.id = a.entity_id
         ${whereClause}
         ORDER BY a.created_at DESC, a.id DESC
         OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
