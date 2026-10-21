@@ -19,6 +19,3 @@ export const EMPLOYEE_DOCUMENT_CATEGORIES = [
 export function scopeForCategory(category) {
     return category === DOCUMENT_CATEGORIES.COMPANY ? 0 : 1;
 }
-
-// document_types.validation_method dos tipos criados pelo Admin: 2 = Manual
-export const MANUAL_VALIDATION_METHOD = 2;

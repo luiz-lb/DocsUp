@@ -21,7 +21,21 @@ export async function listDocumentTypes(params = {}) {
   }
 }
 
-/** POST /parameters/document-types — { name, description, category, hasExpiration, validityDays, code? } */
+/** GET /parameters/api-integrations — integrações de API prontas para o método "API" ([{ key, label }]). */
+export async function listApiIntegrations() {
+  try {
+    const result = await api.get('/parameters/api-integrations');
+    return { success: true, body: result.data.body?.result ?? [] };
+  } catch (error) {
+    console.error('Erro ao buscar integrações de API:', error);
+    return { success: false, body: [], message: getApiErrorMessage(error, 'Erro ao buscar as integrações de API.') };
+  }
+}
+
+/**
+ * POST /parameters/document-types — { name, description, category, hasExpiration, validityDays, code?,
+ * validationMethod, apiIntegration?, aiInstructions? }
+ */
 export async function createDocumentType(payload) {
   try {
     const result = await api.post('/parameters/document-types', payload);

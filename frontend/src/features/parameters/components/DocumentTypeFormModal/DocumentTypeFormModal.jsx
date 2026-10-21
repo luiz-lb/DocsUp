@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { LuSave } from 'react-icons/lu';
 import { Modal, Button, FormField, Banner } from '../../../../components/ui/index.js';
 import { DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../../constants/enums.js';
-import { createDocumentType, updateDocumentType } from '../../api/parametersApi.js';
+import { createDocumentType, listApiIntegrations, updateDocumentType } from '../../api/parametersApi.js';
 import styles from './DocumentTypeFormModal.module.css';
 
 const EMPTY_FORM = {
@@ -12,7 +12,14 @@ const EMPTY_FORM = {
   hasExpiration: false,
   validityDays: '',
   category: '',
+  validationMethod: '2',
+  apiIntegration: '',
+  aiInstructions: '',
 };
+
+// Método de validação (document_types.validation_method): 2 Manual, 0 API, 1 IA (N8N)
+const VALIDATION = { API: '0', AI: '1', MANUAL: '2' };
+const AI_INSTRUCTIONS_MAX_LENGTH = 4000;
 
 // Categorias de colaborador entre as quais um tipo pode ser movido na edição
 const MOVABLE_CATEGORIES = [DOCUMENT_CATEGORY_ID.BASICO, DOCUMENT_CATEGORY_ID.OUTRO];
@@ -40,6 +47,19 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Integrações de API prontas (vazia por enquanto)
+  const [integrations, setIntegrations] = useState([]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    listApiIntegrations().then((result) => {
+      if (!cancelled) setIntegrations(result.success ? result.body : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Preenche o formulário a cada abertura
   useEffect(() => {
@@ -58,6 +78,9 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
             hasExpiration: Boolean(documentType.has_expiration),
             validityDays: documentType.validity_days ? String(documentType.validity_days) : '',
             category: String(documentType.category),
+            validationMethod: String(documentType.validation_method ?? VALIDATION.MANUAL),
+            apiIntegration: documentType.api_endpoint ?? '',
+            aiInstructions: documentType.ai_instructions ?? '',
           }
         : EMPTY_FORM,
     );
@@ -71,6 +94,12 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
     if (!name) return isNr ? 'Informe o título da NR.' : 'Informe o nome.';
     if (name.length > 200) return 'O nome pode ter no máximo 200 caracteres.';
     if (isNr && !NR_CODE_PATTERN.test(form.code.trim())) return 'Informe o código no formato NR-00 (ex.: NR-35).';
+    if (form.validationMethod === VALIDATION.API && !form.apiIntegration) {
+      return 'Selecione a integração de API.';
+    }
+    if (form.validationMethod === VALIDATION.AI && !form.aiInstructions.trim()) {
+      return 'Informe a instrução para a IA.';
+    }
     if (form.hasExpiration && form.validityDays !== '') {
       const days = Number(form.validityDays);
       if (!Number.isInteger(days) || days < 1 || days > 3650) {
@@ -95,6 +124,9 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
       hasExpiration: form.hasExpiration,
       validityDays: form.hasExpiration && form.validityDays !== '' ? Number(form.validityDays) : null,
     };
+    payload.validationMethod = Number(form.validationMethod);
+    if (form.validationMethod === VALIDATION.API) payload.apiIntegration = form.apiIntegration;
+    if (form.validationMethod === VALIDATION.AI) payload.aiInstructions = form.aiInstructions.trim();
     if (isNr) payload.code = form.code.trim();
     if (!isEdit) payload.category = category;
     if (canMove) payload.category = Number(form.category);
@@ -190,6 +222,47 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
               value={form.validityDays}
               onChange={updateField('validityDays')}
               placeholder="Ex.: 365"
+            />
+          </FormField>
+        )}
+
+        <FormField
+          label="Método de validação"
+          required
+          hint="A validação automática ainda não está ligada: por enquanto o RH valida todo documento à mão."
+        >
+          <select value={form.validationMethod} onChange={updateField('validationMethod')}>
+            <option value={VALIDATION.MANUAL}>Manual (RH / Segurança)</option>
+            <option value={VALIDATION.API} disabled={integrations.length === 0}>
+              {integrations.length === 0 ? 'API pública (nenhuma integração disponível ainda)' : 'API pública'}
+            </option>
+            <option value={VALIDATION.AI}>IA (N8N)</option>
+          </select>
+        </FormField>
+
+        {form.validationMethod === VALIDATION.API && (
+          <FormField label="Integração de API" required>
+            <select value={form.apiIntegration} onChange={updateField('apiIntegration')}>
+              <option value="">{integrations.length === 0 ? 'Nenhuma integração disponível ainda' : 'Selecione…'}</option>
+              {integrations.map((integration) => (
+                <option key={integration.key} value={integration.key}>{integration.label}</option>
+              ))}
+            </select>
+          </FormField>
+        )}
+
+        {form.validationMethod === VALIDATION.AI && (
+          <FormField
+            label="Instrução para a IA"
+            required
+            hint={`O que a IA deve verificar no documento. Não coloque senhas, tokens nem dados pessoais: este texto é enviado para a IA. ${form.aiInstructions.length}/${AI_INSTRUCTIONS_MAX_LENGTH}`}
+          >
+            <textarea
+              rows={5}
+              value={form.aiInstructions}
+              maxLength={AI_INSTRUCTIONS_MAX_LENGTH}
+              onChange={updateField('aiInstructions')}
+              placeholder="Ex.: Confirme que o ASO tem nome e CPF do colaborador, data de emissão, assinatura e CRM do médico e o resultado APTO."
             />
           </FormField>
         )}

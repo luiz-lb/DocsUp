@@ -14,6 +14,8 @@ router.get('/document-types', parametersController.listDocumentTypes);
 router.post('/document-types', parametersController.createDocumentType);
 router.put('/document-types/:id', parametersController.updateDocumentType);
 router.put('/document-types/:id/status', parametersController.setDocumentTypeStatus);
+// Integrações de API disponíveis para o método de validação "API"
+router.get('/api-integrations', parametersController.listApiIntegrations);
 
 // Atividades e seus documentos sugeridos: lista (filtros status e search), cria, edita e ativa / inativa
 router.get('/activities', parametersController.listActivities);

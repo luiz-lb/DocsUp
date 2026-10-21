@@ -1,5 +1,6 @@
 import * as documentTypeService from '../services/documentTypeService.js';
 import * as activityService from '../services/activityService.js';
+import { AVAILABLE_API_INTEGRATIONS } from '../constants/validationMethods.js';
 
 const CATEGORY_FILTERS = ['0', '1', '2', '3'];
 
@@ -84,9 +85,11 @@ export async function listDocumentTypes(req, res) {
 /** POST /parameters/document-types  Body: { name, description?, category, hasExpiration, validityDays, code? } */
 export async function createDocumentType(req, res) {
     try {
-        const { name, description, category, hasExpiration, validityDays, code } = req.body ?? {};
+        const {
+            name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions,
+        } = req.body ?? {};
         const result = await documentTypeService.createDocumentType(
-            { name, description, category, hasExpiration, validityDays, code },
+            { name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions },
             auditContext(req),
         );
         return sendResult(res, result, 201);
@@ -101,10 +104,12 @@ export async function updateDocumentType(req, res) {
         const id = parseId(req.params.id);
         if (!id) return badRequest(res, 'Id de tipo de documento inválido.');
 
-        const { name, description, category, hasExpiration, validityDays, code } = req.body ?? {};
+        const {
+            name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions,
+        } = req.body ?? {};
         const result = await documentTypeService.updateDocumentType(
             id,
-            { name, description, category, hasExpiration, validityDays, code },
+            { name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions },
             auditContext(req),
         );
         return sendResult(res, result);
@@ -124,6 +129,11 @@ export async function setDocumentTypeStatus(req, res) {
     } catch (error) {
         return internalError(res, 'setDocumentTypeStatus', error);
     }
+}
+
+/** GET /parameters/api-integrations  — integrações de API prontas para o método "API" (vazia por enquanto) */
+export function listApiIntegrations(req, res) {
+    return res.status(200).json({ success: true, body: { result: AVAILABLE_API_INTEGRATIONS } });
 }
 
 // ─────────────────────────────────────────────

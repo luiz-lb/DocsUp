@@ -5,11 +5,16 @@ import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
 import {
     DOCUMENT_CATEGORIES,
     DOCUMENT_CATEGORY_IDS,
-    MANUAL_VALIDATION_METHOD,
     scopeForCategory,
 } from '../constants/documentCategories.js';
 import { changedFields, collaboratorAuditEntry } from '../utils/audit.js';
 import { isBlank, toInteger } from '../utils/parse.js';
+import {
+    AI_INSTRUCTIONS_MAX_LENGTH,
+    AVAILABLE_API_INTEGRATIONS,
+    SELECTABLE_VALIDATION_METHODS,
+    VALIDATION_METHODS,
+} from '../constants/validationMethods.js';
 
 const NAME_MAX_LENGTH = 200;
 const DESCRIPTION_MAX_LENGTH = 2000;
@@ -107,6 +112,54 @@ function validateExpiration(hasExpiration, validityDays) {
     return { hasExpiration, validityDays: days };
 }
 
+/**
+ * Método de validação: Manual (padrão), API (integração da lista AVAILABLE_API_INTEGRATIONS)
+ * ou IA via N8N (instrução obrigatória, texto puro até 4000 caracteres: ela é enviada para a
+ * IA, então não pode ter segredos). Manual não guarda integração nem instrução.
+ * Sem validationMethod no payload: criação = Manual; edição = mantém o que está gravado.
+ * Retorna { validationMethod, apiEndpoint, aiInstructions } ou { error }.
+ */
+function resolveValidation(payload, before = null) {
+    if (payload.validationMethod === undefined || payload.validationMethod === null) {
+        return before
+            ? {
+                validationMethod: before.validation_method,
+                apiEndpoint: before.api_endpoint ?? null,
+                aiInstructions: before.ai_instructions ?? null,
+            }
+            : { validationMethod: VALIDATION_METHODS.MANUAL, apiEndpoint: null, aiInstructions: null };
+    }
+
+    const method = toInteger(payload.validationMethod);
+    if (!SELECTABLE_VALIDATION_METHODS.includes(method)) {
+        return { error: 'Selecione um método de validação válido.' };
+    }
+
+    if (method === VALIDATION_METHODS.API) {
+        if (AVAILABLE_API_INTEGRATIONS.length === 0) {
+            return { error: 'Nenhuma integração de API disponível ainda.' };
+        }
+        const integration = AVAILABLE_API_INTEGRATIONS.find((item) => item.key === payload.apiIntegration);
+        if (!integration) return { error: 'Selecione uma integração de API.' };
+        return { validationMethod: method, apiEndpoint: integration.key, aiInstructions: null };
+    }
+
+    if (method === VALIDATION_METHODS.AI) {
+        // Texto puro: tira caracteres de controle (mantém quebra de linha e tab)
+        const instructions = typeof payload.aiInstructions === 'string'
+            // eslint-disable-next-line no-control-regex
+            ? payload.aiInstructions.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim()
+            : '';
+        if (!instructions) return { error: 'Informe a instrução para a IA.' };
+        if (instructions.length > AI_INSTRUCTIONS_MAX_LENGTH) {
+            return { error: `A instrução para a IA pode ter no máximo ${AI_INSTRUCTIONS_MAX_LENGTH} caracteres.` };
+        }
+        return { validationMethod: method, apiEndpoint: null, aiInstructions: instructions };
+    }
+
+    return { validationMethod: VALIDATION_METHODS.MANUAL, apiEndpoint: null, aiInstructions: null };
+}
+
 // ─────────────────────────────────────────────
 // Auditoria
 // ─────────────────────────────────────────────
@@ -119,6 +172,9 @@ function auditSnapshot(documentType) {
         category: documentType.category,
         has_expiration: Boolean(documentType.has_expiration),
         validity_days: documentType.validity_days ?? null,
+        validation_method: documentType.validation_method,
+        api_endpoint: documentType.api_endpoint ?? null,
+        ai_instructions: documentType.ai_instructions ?? null,
     };
     if (documentType.category === DOCUMENT_CATEGORIES.EMPLOYEE_NR) {
         snapshot.code = documentType.code ?? null;
@@ -171,12 +227,17 @@ export async function createDocumentType(payload = {}, context = {}) {
     const expiration = validateExpiration(payload.hasExpiration, payload.validityDays);
     if (expiration.error) return badRequest(expiration.error);
 
+    const validation = resolveValidation(payload);
+    if (validation.error) return badRequest(validation.error);
+
     const data = {
         name: nameResult.name,
         description: descriptionResult.value,
         category,
         scope: scopeForCategory(category),
-        validationMethod: MANUAL_VALIDATION_METHOD,
+        validationMethod: validation.validationMethod,
+        apiEndpoint: validation.apiEndpoint,
+        aiInstructions: validation.aiInstructions,
         hasExpiration: expiration.hasExpiration,
         validityDays: expiration.validityDays,
     };
@@ -216,6 +277,9 @@ export async function createDocumentType(payload = {}, context = {}) {
                     category,
                     has_expiration: data.hasExpiration,
                     validity_days: data.validityDays,
+                    validation_method: data.validationMethod,
+                    api_endpoint: data.apiEndpoint,
+                    ai_instructions: data.aiInstructions,
                     code,
                     is_active: true,
                 }),
@@ -284,12 +348,18 @@ export async function updateDocumentType(id, payload = {}, context = {}) {
         const expiration = validateExpiration(payload.hasExpiration, validityDaysInput);
         if (expiration.error) return badRequest(expiration.error);
 
+        const validation = resolveValidation(payload, before);
+        if (validation.error) return badRequest(validation.error);
+
         const after = {
             name: nameResult.name,
             description,
             category,
             has_expiration: expiration.hasExpiration,
             validity_days: expiration.validityDays,
+            validation_method: validation.validationMethod,
+            api_endpoint: validation.apiEndpoint,
+            ai_instructions: validation.aiInstructions,
             code,
             is_active: before.is_active,
         };
@@ -324,6 +394,9 @@ export async function updateDocumentType(id, payload = {}, context = {}) {
                 scope: scopeForCategory(category),
                 hasExpiration: after.has_expiration,
                 validityDays: after.validity_days,
+                validationMethod: after.validation_method,
+                apiEndpoint: after.api_endpoint,
+                aiInstructions: after.ai_instructions,
             });
 
             await auditModel.insertAuditLog(transaction, documentTypeAuditEntry(

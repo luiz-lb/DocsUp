@@ -1,4 +1,4 @@
-import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, EMPLOYEE_STATUS, RISK_LEVEL } from '../../constants/enums.js';
+import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, EMPLOYEE_STATUS, RISK_LEVEL, VALIDATION_METHOD } from '../../constants/enums.js';
 
 // Nome dos campos gravados em old_values / new_values
 const FIELD_LABELS = {
@@ -24,6 +24,9 @@ const FIELD_LABELS = {
   status: 'Status',
   observation: 'Observação',
   integration_at: 'Integração',
+  validation_method: 'Método de validação',
+  api_endpoint: 'Integração de API',
+  ai_instructions: 'Instrução para a IA',
 };
 
 // Campos com lista de ids, mostrados como '#1, #2'
@@ -83,6 +86,7 @@ function formatValue(field, value, entityType) {
   if (field === 'integration_at') return String(value).replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}).*$/, '$3/$2/$1 $4');
   if (field === 'department') return DEPARTMENT[value]?.label ?? String(value);
   if (field === 'category') return DOCUMENT_CATEGORY[value]?.label ?? String(value);
+  if (field === 'validation_method') return VALIDATION_METHOD[value]?.label ?? String(value);
   if (field === 'status') return DOCUMENT_STATUS[value]?.label ?? String(value);
   if (field === 'risk_level') return RISK_LEVEL[value]?.label ?? String(value);
   if (ID_LIST_FIELDS.has(field) && Array.isArray(value)) {

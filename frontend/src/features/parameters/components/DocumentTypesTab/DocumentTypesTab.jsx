@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { LuBan, LuCircleCheck, LuPencil } from 'react-icons/lu';
 import { DataTable, StatusBadge, Button, Banner, ConfirmDialog } from '../../../../components/ui/index.js';
-import { DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../../constants/enums.js';
+import { DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID, VALIDATION_METHOD } from '../../../../constants/enums.js';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue.js';
 import { useDocumentTypes } from '../../hooks/useParameters.js';
 import { setDocumentTypeStatus } from '../../api/parametersApi.js';
@@ -99,6 +99,11 @@ export default function DocumentTypesTab({ category }) {
         ),
     },
     { key: 'validity', header: 'Validade', render: (row) => describeValidity(row) },
+    {
+      key: 'validation',
+      header: 'Validação',
+      render: (row) => <StatusBadge enumMap={VALIDATION_METHOD} value={row.validation_method} />,
+    },
     {
       key: 'status',
       header: 'Status',

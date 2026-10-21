@@ -11,6 +11,8 @@ const DOCUMENT_TYPE_FIELDS = `
     dt.has_expiration,
     dt.validity_days,
     dt.validation_method,
+    dt.api_endpoint,
+    dt.ai_instructions,
     CAST(ISNULL(dt.is_active, 0) AS BIT) AS is_active,
     dt.nr_type_id,
     nr.code,
@@ -169,7 +171,7 @@ export async function updateNrType(transaction, id, { code, name, description })
  * Retorna o id gerado.
  */
 export async function insertDocumentType(transaction, {
-    name, description, category, scope, validationMethod, hasExpiration, validityDays, nrTypeId,
+    name, description, category, scope, validationMethod, apiEndpoint, aiInstructions, hasExpiration, validityDays, nrTypeId,
 }) {
     const result = await new sql.Request(transaction)
         .input('name', sql.NVarChar(200), name)
@@ -177,27 +179,29 @@ export async function insertDocumentType(transaction, {
         .input('category', sql.TinyInt, category)
         .input('scope', sql.TinyInt, scope)
         .input('validation_method', sql.TinyInt, validationMethod)
+        .input('api_endpoint', sql.VarChar(500), apiEndpoint ?? null)
+        .input('ai_instructions', sql.NVarChar(4000), aiInstructions ?? null)
         .input('has_expiration', sql.Bit, hasExpiration)
         .input('validity_days', sql.Int, validityDays ?? null)
         .input('nr_type_id', sql.Int, nrTypeId ?? null)
         .query(`
             INSERT INTO document_types
-                ([name], [description], category, scope, validation_method,
+                ([name], [description], category, scope, validation_method, api_endpoint, ai_instructions,
                  has_expiration, validity_days, nr_type_id, is_active)
             OUTPUT INSERTED.id
             VALUES
-                (@name, @description, @category, @scope, @validation_method,
+                (@name, @description, @category, @scope, @validation_method, @api_endpoint, @ai_instructions,
                  @has_expiration, @validity_days, @nr_type_id, 1)
         `);
     return result.recordset[0].id;
 }
 
 /**
- * Atualiza os dados editáveis de um tipo de documento. Não mexe em validation_method,
- * api_endpoint, nr_type_id nem is_active.
+ * Atualiza os dados editáveis de um tipo de documento, inclusive o método de validação
+ * (integração de API / instrução para a IA). Não mexe em nr_type_id nem is_active.
  */
 export async function updateDocumentType(transaction, id, {
-    name, description, category, scope, hasExpiration, validityDays,
+    name, description, category, scope, hasExpiration, validityDays, validationMethod, apiEndpoint, aiInstructions,
 }) {
     const result = await new sql.Request(transaction)
         .input('id', sql.Int, id)
@@ -207,6 +211,9 @@ export async function updateDocumentType(transaction, id, {
         .input('scope', sql.TinyInt, scope)
         .input('has_expiration', sql.Bit, hasExpiration)
         .input('validity_days', sql.Int, validityDays ?? null)
+        .input('validation_method', sql.TinyInt, validationMethod)
+        .input('api_endpoint', sql.VarChar(500), apiEndpoint ?? null)
+        .input('ai_instructions', sql.NVarChar(4000), aiInstructions ?? null)
         .query(`
             UPDATE document_types
             SET [name]         = @name,
@@ -214,7 +221,10 @@ export async function updateDocumentType(transaction, id, {
                 category       = @category,
                 scope          = @scope,
                 has_expiration = @has_expiration,
-                validity_days  = @validity_days
+                validity_days  = @validity_days,
+                validation_method = @validation_method,
+                api_endpoint      = @api_endpoint,
+                ai_instructions   = @ai_instructions
             WHERE id = @id
         `);
     return result.rowsAffected[0] > 0;

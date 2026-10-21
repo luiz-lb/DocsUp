@@ -7,9 +7,6 @@ import * as auditModel from '../models/auditModel.js';
 import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
 import { collaboratorAuditEntry } from '../utils/audit.js';
 
-// Score mínimo para aprovação automática por IA
-const AI_AUTO_APPROVE_THRESHOLD = 85;
-
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
@@ -206,19 +203,40 @@ export async function triggerDocumentValidation(documentId, supplierId) {
 // Webhook N8N: recebe resultado da IA
 // ─────────────────────────────────────────────
 
+// Resultado que a IA pode devolver e o tamanho máximo do motivo
+const AI_RESULTS = ['aprovado', 'reprovado', 'inconclusivo'];
+const AI_REASON_MAX_LENGTH = 1000;
+const AI_MODEL_MAX_LENGTH = 100;
+
+/** Texto vindo de fora (N8N): sem tags HTML nem caracteres de controle, cortado no limite. */
+function sanitizeExternalText(value, maxLength) {
+    if (typeof value !== 'string') return null;
+    const clean = value
+        .replace(/<[^>]*>/g, '')
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .trim();
+    return clean ? clean.slice(0, maxLength) : null;
+}
+
 /**
- * Recebe o resultado da análise de IA (via N8N) e aplica a decisão automática.
- * Se score >= 85 → aprova automaticamente.
- * Se score < 85  → encaminha para revisão manual (final_status=0).
+ * Recebe o resultado da IA (webhook do N8N, autenticado pelo X-Webhook-Secret).
  *
- * @param {{ documentId, validationId, aiScore, aiResultJson, aiModelUsed }} payload
+ * A IA só SUGERE: grava a nota (0 a 100), o resultado (aprovado / reprovado / inconclusivo) e o
+ * motivo na validação; o status do documento não muda. Quem aprova ou reprova é o RH.
+ * Só os campos esperados são aceitos (o resto é descartado) e os textos são limpos antes de
+ * gravar. Resposta fora do formato é recusada (o documento segue para a análise manual).
+ *
+ * Payload: { documentId, validationId, aiScore, result, reason, aiModelUsed? }
  */
 export async function receiveAiValidationResult(payload = {}) {
-    const { aiResultJson, aiModelUsed } = payload;
     // O N8N pode mandar números como texto ("123"): converte antes de validar
     const documentId = Number(payload.documentId);
     const validationId = Number(payload.validationId);
     const aiScore = payload.aiScore === null || payload.aiScore === '' ? NaN : Number(payload.aiScore);
+    const result = typeof payload.result === 'string' ? payload.result.trim().toLowerCase() : '';
+    const reason = sanitizeExternalText(payload.reason, AI_REASON_MAX_LENGTH);
+    const aiModelUsed = sanitizeExternalText(payload.aiModelUsed, AI_MODEL_MAX_LENGTH);
 
     if (!Number.isInteger(documentId) || documentId <= 0 || !Number.isInteger(validationId) || validationId <= 0) {
         return { success: false, message: 'documentId e validationId devem ser inteiros positivos.' };
@@ -226,53 +244,37 @@ export async function receiveAiValidationResult(payload = {}) {
     if (!Number.isFinite(aiScore) || aiScore < 0 || aiScore > 100) {
         return { success: false, message: 'aiScore deve ser um número entre 0 e 100.' };
     }
-
-    let transaction;
-    let transactionDone = false;
+    if (!AI_RESULTS.includes(result)) {
+        return { success: false, message: 'result deve ser aprovado, reprovado ou inconclusivo.' };
+    }
+    if (!reason) {
+        return { success: false, message: 'reason (motivo da nota) é obrigatório.' };
+    }
 
     try {
-        // A validação precisa ser deste documento: impede aprovar um documento com o validationId de outro
+        // A validação precisa ser deste documento: impede gravar o resultado no documento errado
         const validation = await documentValidationModel.getValidationByIdAndDocument(validationId, documentId);
         if (!validation) {
             return { success: false, message: 'Validação não encontrada para este documento.' };
         }
 
-        transaction = await trasaction.iniciarTransacao();
+        await trasaction.executarEmTransacao(async (transaction) => {
+            await new sql.Request(transaction)
+                .input('id', sql.Int, validationId)
+                .input('ai_score', sql.Decimal(5, 2), aiScore)
+                .input('ai_result_json', sql.NVarChar(sql.MAX), JSON.stringify({ result, reason }))
+                .input('ai_model_used', sql.VarChar(100), aiModelUsed)
+                .query(`
+                    UPDATE document_validations
+                    SET ai_score       = @ai_score,
+                        ai_result_json = @ai_result_json,
+                        ai_model_used  = @ai_model_used
+                    WHERE id = @id
+                `);
+        });
 
-        const isAutoApproved = aiScore >= AI_AUTO_APPROVE_THRESHOLD;
-        const finalStatus = isAutoApproved ? 1 : 0;
-        const docStatus   = isAutoApproved ? 2 : 1;
-
-        // Atualiza o registro de validação com os dados da IA
-        const req = new sql.Request(transaction);
-        await req
-            .input('id', sql.Int, validationId)
-            .input('ai_score', sql.Decimal(5, 2), aiScore)
-            .input('ai_result_json', sql.NVarChar(sql.MAX), aiResultJson ?? null)
-            .input('ai_model_used', sql.VarChar(100), aiModelUsed ?? null)
-            .input('final_status', sql.TinyInt, finalStatus)
-            .query(`
-                UPDATE document_validations
-                SET ai_score       = @ai_score,
-                    ai_result_json = @ai_result_json,
-                    ai_model_used  = @ai_model_used,
-                    final_status   = @final_status
-                WHERE id = @id
-            `);
-
-        await documentValidationModel.updateDocumentStatus(transaction, documentId, docStatus);
-
-        await trasaction.finalizarTransacao(transaction, true);
-        transactionDone = true;
-
-        return {
-            success: true,
-            body: { autoApproved: isAutoApproved, finalStatus },
-        };
+        return { success: true, body: { message: 'Resultado da IA registrado. A decisão é do RH.' } };
     } catch (error) {
-        if (transaction && !transactionDone) {
-            await trasaction.finalizarTransacao(transaction, false);
-        }
         console.error('receiveAiValidationResult error:', error);
         return { success: false, message: 'Erro ao processar resultado da IA.' };
     }

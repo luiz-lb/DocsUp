@@ -66,7 +66,7 @@ export const DOCUMENT_CATEGORY_ID = {
 
 export const VALIDATION_METHOD = {
   0: { label: 'API Pública', tone: 'success' },
-  1: { label: 'IA', tone: 'indigo' },
+  1: { label: 'IA (N8N)', tone: 'indigo' },
   2: { label: 'Manual', tone: 'neutral' },
   3: { label: 'Híbrida', tone: 'warning' },
 };

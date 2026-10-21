@@ -281,8 +281,8 @@ export async function setStatus(req, res) {
 
 /**
  * POST /documents/ai-result  — webhook do N8N com resultado da IA
- * Body: { documentId, validationId, aiScore, aiResultJson, aiModelUsed }
- * Protegido por X-Webhook-Secret para uso interno
+ * Body: { documentId, validationId, aiScore (0-100), result (aprovado|reprovado|inconclusivo), reason, aiModelUsed? }
+ * Protegido por X-Webhook-Secret para uso interno. A IA só sugere: o status do documento não muda.
  */
 export async function receiveAiResult(req, res) {
     try {
