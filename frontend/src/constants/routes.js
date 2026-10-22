@@ -25,6 +25,7 @@ export const ROUTES = {
     register: '/fornecedor/cadastro',
     portal: '/fornecedor/painel',
     myProfile: '/fornecedor/perfil',
+    documents: '/fornecedor/documentos',
   },
 
   documents: {

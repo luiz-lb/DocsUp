@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { LuFileCheck, LuSend, LuLogIn, LuHouse } from 'react-icons/lu';
-import { Card, Button, FormField, Banner, CountdownTimer } from '../../../components/ui/index.js';
+import { useParams } from 'react-router-dom';
+import { LuFileCheck, LuSend } from 'react-icons/lu';
+import { Button, FormField, Banner, CountdownTimer } from '../../../components/ui/index.js';
 import { formatCurrency, formatDateTime } from '../../../utils/formatters.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { getInviteByToken, submitQuotation } from '../api/quotationsApi.js';
@@ -9,14 +9,14 @@ import NrDeclarationsForm from '../components/NrDeclarationsForm/index.js';
 import CompanyChecklistForm from '../components/CompanyChecklistForm/index.js';
 import AcceptanceTermDialog from '../components/AcceptanceTermDialog/index.js';
 import { useDisclosure } from '../../../hooks/useDisclosure.js';
-import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
+import SupplierLayout from '../../suppliers/components/SupplierLayout/index.js';
+import SupplierPageHeader from '../../suppliers/components/SupplierPageHeader/index.js';
 import { ROUTES } from '../../../constants/routes.js';
+import { cn } from '../../../utils/cn.js';
 import styles from './QuotationSubmitPage.module.css';
 
 export default function QuotationSubmitPage() {
   const { token } = useParams();
-  const navigate = useNavigate();
-  const { isAuthenticated: isSupplierAuth, isLoading: isAuthLoading } = useSupplierAuth();
 
   const { data, isLoading } = useAsyncData(() => getInviteByToken(token), [token]);
   const termDialog = useDisclosure(false);
@@ -28,43 +28,36 @@ export default function QuotationSubmitPage() {
   const [submitted, setSubmitted] = useState(null);
   const [submitError, setSubmitError] = useState('');
 
-  // Enquanto valida autenticação e carrega dados
-  if (isAuthLoading || isLoading) return null;
+  // Cabeçalho comum (o login é garantido pela rota: RequireSupplierAuth)
+  const header = (subtitle, actions) => (
+    <SupplierPageHeader
+      title="Cotação"
+      subtitle={subtitle}
+      backTo={ROUTES.suppliers.portal}
+      backLabel="Minhas cotações"
+      actions={actions}
+    />
+  );
 
-  // Fornecedor não está autenticado — redireciona para login preservando o destino
-  if (!isSupplierAuth) {
+  if (isLoading) {
     return (
-      <Card tone="dark" className={styles.card}>
-        <Card.Body>
-          <p className={styles.eyebrow}>Portal do Fornecedor</p>
-          <h1 className={styles.title}>Faça login para continuar</h1>
-          <p className={styles.subtitle}>
-            Para responder a esta cotação, você precisa estar autenticado no portal.
-          </p>
-          <Button
-            icon={LuLogIn}
-            fullWidth
-            onClick={() =>
-              navigate(ROUTES.suppliers.login, {
-                state: { returnTo: `/cotacoes/responder/${token}` },
-              })
-            }
-          >
-            Entrar no portal
-          </Button>
-        </Card.Body>
-      </Card>
+      <SupplierLayout>
+        {header()}
+        <p className={styles.loading}>Carregando cotação…</p>
+      </SupplierLayout>
     );
   }
 
   if (!data) {
     return (
-      <Card tone="dark" className={styles.card}>
-        <Card.Body>
-          <h1 className={styles.title}>Cotação não encontrada</h1>
-          <p className={styles.subtitle}>O link é inválido, expirado ou o prazo já encerrou.</p>
-        </Card.Body>
-      </Card>
+      <SupplierLayout>
+        {header()}
+        <Banner
+          tone="danger"
+          title="Cotação não encontrada"
+          description="O link é inválido, expirado ou o prazo já encerrou."
+        />
+      </SupplierLayout>
     );
   }
 
@@ -74,24 +67,18 @@ export default function QuotationSubmitPage() {
   if (submitted || existingQuotation) {
     const record = submitted ?? existingQuotation;
     return (
-      <Card tone="dark" className={styles.card}>
-        <Button
-          icon={LuHouse}
-          onClick={() => navigate(ROUTES.suppliers.portal)}
-          className={styles.homeButton}
-        >
-          Ir para o início
-        </Button>
-        <Card.Body className={styles.successBody}>
+      <SupplierLayout>
+        {header(laborRequest.title)}
+        <div className={cn(styles.panel, styles.successBody)}>
           <LuFileCheck className={styles.successIcon} />
-          <h1 className={styles.title}>Cotação enviada com sucesso</h1>
+          <h2 className={styles.successTitle}>Cotação enviada com sucesso</h2>
           <p className={styles.subtitle}>
             Registramos o Termo de Aceite em{' '}
             {formatDateTime(record.acceptance_at ?? record.submitted_at)} (IP{' '}
             {record.acceptance_ip ?? '—'}).
           </p>
-        </Card.Body>
-      </Card>
+        </div>
+      </SupplierLayout>
     );
   }
 
@@ -142,14 +129,15 @@ export default function QuotationSubmitPage() {
   };
 
   return (
-    <Card tone="dark" className={styles.card}>
-      <Card.Body>
-        <p className={styles.eyebrow}>Cotação — {laborRequest.title}</p>
-        <h1 className={styles.title}>Responder cotação</h1>
+    <SupplierLayout>
+      {header(
+        laborRequest.title,
         <div className={styles.deadlineRow}>
           <span>Prazo de resposta:</span>
           <CountdownTimer deadline={round.deadline} />
-        </div>
+        </div>,
+      )}
+      <div className={styles.panel}>
 
         {/* Valor da proposta */}
         <div className={styles.section}>
@@ -207,7 +195,7 @@ export default function QuotationSubmitPage() {
         >
           Enviar cotação
         </Button>
-      </Card.Body>
+      </div>
 
       <AcceptanceTermDialog
         open={termDialog.isOpen}
@@ -215,6 +203,6 @@ export default function QuotationSubmitPage() {
         onAccept={handleAccept}
         isSubmitting={isSubmitting}
       />
-    </Card>
+    </SupplierLayout>
   );
 }

@@ -34,6 +34,22 @@
     cursor: pointer;
 }
 
+/* Tela estreita: os botões Possui / Não possui vão para baixo do nome do documento */
+@media (max-width: 520px) {
+    .row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .toggle {
+        width: 100%;
+    }
+
+    .option {
+        flex: 1;
+    }
+}
+
 .yes {
     background: var(--color-successBg, #e8f7ec);
     border-color: var(--color-success, #2f9e44);

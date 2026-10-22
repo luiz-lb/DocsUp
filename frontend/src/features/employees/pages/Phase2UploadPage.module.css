@@ -1,3 +1,29 @@
+/* ── Página dentro do portal do fornecedor (SupplierLayout) ── */
+.panel {
+    padding: 1.5em;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 250, 228, 0.15);
+    color: var(--color-creamText, #fffae4);
+}
+
+.intro {
+    margin: 0 0 1em;
+    font-size: 0.9rem;
+    color: rgba(255, 250, 228, 0.8);
+}
+
+.loading {
+    color: rgba(255, 250, 228, 0.7);
+    font-size: 0.9rem;
+}
+
+@media (max-width: 600px) {
+    .panel {
+        padding: 1em 0.85em;
+    }
+}
+
 .formSection {
     margin-top: 1.5em;
     padding-top: 1.5em;
@@ -105,6 +131,9 @@
     gap: 0.5em;
     margin-top: 1.5em;
     border-bottom: 1px solid rgba(255, 250, 228, 0.2);
+    /* tela estreita: as abas rolam na horizontal em vez de quebrar */
+    overflow-x: auto;
+    scrollbar-width: thin;
 }
 
 .tab {
@@ -120,6 +149,7 @@
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: 600;
+    white-space: nowrap;
 }
 
 .tab:hover {

@@ -31,6 +31,17 @@
     background: #fff;
 }
 
+/* Tela estreita: o número vai para baixo do nome da NR */
+@media (max-width: 520px) {
+    .row {
+        flex-wrap: wrap;
+    }
+
+    .row input {
+        width: 100%;
+    }
+}
+
 .empty {
     margin: 0;
     font-size: 0.85rem;

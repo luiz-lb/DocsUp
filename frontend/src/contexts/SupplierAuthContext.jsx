@@ -21,11 +21,13 @@ export function SupplierAuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
 
   // Só restaura a sessão de fornecedor quando estamos na área do fornecedor
-  // (portal, login/cadastro/MFA de fornecedor ou Fase 2). Evita chamar o
+  // (portal, login/cadastro/MFA de fornecedor, Fase 2 ou resposta de cotação). Evita chamar o
   // /supplier/auth/me nas telas internas de colaborador.
   useEffect(() => {
     const path = window.location.pathname;
-    const isSupplierArea = path.startsWith('/fornecedor') || path.startsWith('/fase2');
+    const isSupplierArea = path.startsWith('/fornecedor')
+      || path.startsWith('/fase2')
+      || path.startsWith('/cotacoes/responder');
 
     if (!isSupplierArea) {
       setIsLoading(false);

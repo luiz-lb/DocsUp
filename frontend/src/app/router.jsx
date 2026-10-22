@@ -29,6 +29,7 @@ const SupplierMfaPage = lazy(() => import('../features/suppliers/pages/SupplierM
 const SupplierRegisterPage = lazy(() => import('../features/suppliers/pages/SupplierRegisterPage.jsx'));
 const SupplierPortalPage = lazy(() => import('../features/suppliers/pages/SupplierPortalPage.jsx'));
 const SupplierMyProfilePage = lazy(() => import('../features/suppliers/pages/SupplierMyProfilePage.jsx'));
+const SupplierPhase2ListPage = lazy(() => import('../features/suppliers/pages/SupplierPhase2ListPage.jsx'));
 
 const DocumentCenterPage = lazy(() => import('../features/documents/pages/DocumentCenterPage.jsx'));
 const DocumentReviewPage = lazy(() => import('../features/documents/pages/DocumentReviewPage.jsx'));
@@ -120,11 +121,9 @@ export const router = createBrowserRouter([
         element: <PublicLayout />,
         children: [
           { path: ROUTES.auth.login, element: <CollaboratorLoginPage /> },
-          { path: ROUTES.quotations.submit(), element: <QuotationSubmitPage /> },
           { path: ROUTES.suppliers.login, element: <SupplierLoginPage /> },
           { path: ROUTES.suppliers.mfa, element: <SupplierMfaPage /> },
           { path: ROUTES.suppliers.register, element: <SupplierRegisterPage /> },
-          { path: ROUTES.employees.phase2(), element: <Phase2UploadPage /> },
         ],
       },
       // Portal do fornecedor: usa seu próprio shell com sidebar (SupplierLayout),
@@ -135,6 +134,10 @@ export const router = createBrowserRouter([
         children: [
           { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
           { path: ROUTES.suppliers.myProfile, element: <SupplierMyProfilePage /> },
+          { path: ROUTES.suppliers.documents, element: <SupplierPhase2ListPage /> },
+          // Abertas por link de e-mail: sem sessão, o login guarda o token e volta para cá
+          { path: ROUTES.quotations.submit(), element: <QuotationSubmitPage /> },
+          { path: ROUTES.employees.phase2(), element: <Phase2UploadPage /> },
         ],
       },
     ],

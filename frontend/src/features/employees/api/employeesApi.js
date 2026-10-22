@@ -29,6 +29,20 @@ export async function getPhase2ByToken(token) {
 }
 
 /**
+ * Solicitações em que o fornecedor logado tem link da Fase 2, com o prazo e o resumo dos documentos.
+ * GET /phase2/supplier/requests  (exige cookie supplier_token)
+ */
+export async function listMyPhase2Requests() {
+  try {
+    const result = await api.get('/phase2/supplier/requests');
+    return { success: true, body: result.data.body?.result ?? [] };
+  } catch (error) {
+    console.error('listMyPhase2Requests error:', error);
+    return { success: false, body: [], message: getApiErrorMessage(error, 'Erro ao buscar as solicitações da Fase 2.') };
+  }
+}
+
+/**
  * O fornecedor baixa um arquivo que ele enviou nesta solicitação (atual ou do histórico).
  * GET /phase2/:token/documents/:documentId/download  (exige cookie supplier_token)
  * @returns {Promise<{ success: true, fileName } | { success: false, body: { message } }>}

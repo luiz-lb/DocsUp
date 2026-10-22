@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { LuLogIn, LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
-import { Card, Button, FormField, FileDropzone, StatusBadge, Banner, SearchSelect } from '../../../components/ui/index.js';
+import { useParams } from 'react-router-dom';
+import { LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
+import { Button, FormField, FileDropzone, StatusBadge, Banner, SearchSelect } from '../../../components/ui/index.js';
 import { EMPLOYEE_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { getPhase2ByToken, addEmployee, uploadCompanyDocuments, downloadPhase2Document } from '../api/employeesApi.js';
 import Phase2CountdownBanner from '../components/Phase2CountdownBanner/index.js';
 import SupplierDocumentItem from '../components/SupplierDocumentItem/index.js';
 import ResendDocumentModal from '../components/ResendDocumentModal/index.js';
-import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
+import SupplierLayout from '../../suppliers/components/SupplierLayout/index.js';
+import SupplierPageHeader from '../../suppliers/components/SupplierPageHeader/index.js';
 import { ROUTES } from '../../../constants/routes.js';
 import { cn } from '../../../utils/cn.js';
 import { addDaysToToday, formatDateTime, toDateInputValue } from '../../../utils/formatters.js';
-import authStyles from '../../../styles/authCard.module.css';
 import styles from './Phase2UploadPage.module.css';
 
 const EMPTY_EMPLOYEE = { fullName: '', cpf: '', rg: '', roleFunction: '', documentTypeId: '', expiresAt: '' };
@@ -62,9 +62,6 @@ function ExpiryNote({ documentType }) {
 
 export default function Phase2UploadPage() {
   const { token } = useParams();
-  const navigate = useNavigate();
-  const { isAuthenticated: isSupplierAuth, isLoading: isAuthLoading } = useSupplierAuth();
-
   const { data: response, isLoading, reload } = useAsyncData(() => getPhase2ByToken(token), [token]);
 
   const [tab, setTab] = useState(TABS.COMPANY);
@@ -87,47 +84,27 @@ export default function Phase2UploadPage() {
   const [resendTarget, setResendTarget] = useState(null);
   const [docFeedback, setDocFeedback] = useState(null);
 
-  // Aguarda validação de autenticação (nos recarregamentos, mantém a tela com os dados atuais)
-  if (isAuthLoading || (isLoading && !response)) return null;
-
-  // Fornecedor não autenticado
-  if (!isSupplierAuth) {
+  // O login é garantido pela rota (RequireSupplierAuth). Nos recarregamentos, mantém os dados na tela.
+  if (isLoading && !response) {
     return (
-      <Card tone="dark" className={cn(authStyles.card, authStyles.wide)}>
-        <Card.Body>
-          <p className={authStyles.eyebrow}>Fase 2 — Documentação</p>
-          <h1 className={authStyles.title}>Faça login para continuar</h1>
-          <p className={authStyles.subtitle}>
-            Para enviar os documentos, você precisa estar autenticado no portal.
-          </p>
-          <Button
-            icon={LuLogIn}
-            fullWidth
-            onClick={() =>
-              // Passa o token da Fase 2 na URL para que login → MFA
-              // consigam redirecionar de volta para /fase2/:token após autenticar.
-              navigate(`${ROUTES.suppliers.login}?fase2=${token}`)
-            }
-          >
-            Entrar no portal
-          </Button>
-        </Card.Body>
-      </Card>
+      <SupplierLayout>
+        <SupplierPageHeader title="Fase 2 · Documentos" backTo={ROUTES.suppliers.documents} backLabel="Documentos (Fase 2)" />
+        <p className={styles.loading}>Carregando…</p>
+      </SupplierLayout>
     );
   }
 
   // Link inválido, expirado ou de outro fornecedor: mostra a mensagem do backend
   if (!response?.success) {
     return (
-      <Card tone="dark" className={cn(authStyles.card, authStyles.wide)}>
-        <Card.Body>
-          <p className={authStyles.eyebrow}>Fase 2 — Documentação</p>
-          <h1 className={authStyles.title}>Não foi possível abrir este link</h1>
-          <p className={authStyles.subtitle}>
-            {response?.message ?? 'O link da Fase 2 é inválido, expirado ou já foi utilizado.'}
-          </p>
-        </Card.Body>
-      </Card>
+      <SupplierLayout>
+        <SupplierPageHeader title="Fase 2 · Documentos" backTo={ROUTES.suppliers.documents} backLabel="Documentos (Fase 2)" />
+        <Banner
+          tone="danger"
+          title="Não foi possível abrir este link"
+          description={response?.message ?? 'O link da Fase 2 é inválido, expirado ou já foi utilizado.'}
+        />
+      </SupplierLayout>
     );
   }
 
@@ -320,11 +297,15 @@ export default function Phase2UploadPage() {
   };
 
   return (
-    <Card tone="dark" className={cn(authStyles.card, authStyles.wide)}>
-      <Card.Body>
-        <p className={authStyles.eyebrow}>{deadline.labor_request_title}</p>
-        <h1 className={authStyles.title}>Envio de documentação — Fase 2</h1>
-        <p className={authStyles.subtitle}>
+    <SupplierLayout>
+      <SupplierPageHeader
+        title="Fase 2 · Documentos"
+        subtitle={deadline.labor_request_title}
+        backTo={ROUTES.suppliers.documents}
+        backLabel="Documentos (Fase 2)"
+      />
+      <div className={styles.panel}>
+        <p className={styles.intro}>
           Envie os documentos da empresa e cadastre os colaboradores que atuarão nesta obra.
           Para cada colaborador, envie um documento por vez (ASO, certificados de NR, Ficha de EPI…).
         </p>
@@ -629,7 +610,7 @@ export default function Phase2UploadPage() {
             )}
           </div>
         )}
-      </Card.Body>
+      </div>
 
       <ResendDocumentModal
         open={Boolean(resendTarget)}
@@ -638,6 +619,6 @@ export default function Phase2UploadPage() {
         onClose={() => setResendTarget(null)}
         onSuccess={handleResendSuccess}
       />
-    </Card>
+    </SupplierLayout>
   );
 }

@@ -706,6 +706,54 @@ export async function getDocumentTypesByIds(ids = []) {
 /**
  * Busca um phase2_deadline pelo link_token.
  */
+/**
+ * Links da Fase 2 do fornecedor (portal, menu "Documentos (Fase 2)"), mais novo primeiro, com o
+ * resumo dos documentos atuais: enviados, em análise, aprovados, devolvidos e vencidos.
+ */
+export async function listPhase2DeadlinesBySupplier(supplierId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('supplier_id', sql.Int, supplierId)
+        .query(`
+            SELECT
+                p.link_token,
+                p.started_at,
+                p.expires_at,
+                p.[status]       AS deadline_status,
+                lr.id            AS labor_request_id,
+                lr.title         AS labor_request_title,
+                lr.[location]    AS labor_request_location,
+                ISNULL(emp.employees, 0)   AS employees,
+                ISNULL(docs.total, 0)      AS documents_total,
+                ISNULL(docs.pending, 0)    AS documents_pending,
+                ISNULL(docs.approved, 0)   AS documents_approved,
+                ISNULL(docs.returned, 0)   AS documents_returned,
+                ISNULL(docs.expired, 0)    AS documents_expired
+            FROM phase2_deadlines AS p
+            INNER JOIN labor_requests AS lr ON lr.id = p.labor_request_id
+            OUTER APPLY (
+                SELECT COUNT(*) AS employees
+                FROM employees AS e
+                WHERE e.supplier_id = p.supplier_id AND e.labor_request_id = p.labor_request_id
+            ) AS emp
+            OUTER APPLY (
+                SELECT
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN d.[status] IN (0, 1) THEN 1 ELSE 0 END) AS pending,
+                    SUM(CASE WHEN d.[status] = 2 THEN 1 ELSE 0 END)      AS approved,
+                    SUM(CASE WHEN d.[status] IN (3, 4) THEN 1 ELSE 0 END) AS returned,
+                    SUM(CASE WHEN d.[status] = 5 THEN 1 ELSE 0 END)      AS expired
+                FROM documents AS d
+                WHERE d.supplier_id = p.supplier_id
+                  AND d.labor_request_id = p.labor_request_id
+                  AND d.is_current = 1
+            ) AS docs
+            WHERE p.supplier_id = @supplier_id
+            ORDER BY p.started_at DESC
+        `);
+    return result.recordset;
+}
+
 export async function getPhase2DeadlineByToken(token) {
     const pool = await poolPromise;
     const result = await pool.request()

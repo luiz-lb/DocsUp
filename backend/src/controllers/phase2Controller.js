@@ -56,6 +56,23 @@ export async function getPhase2(req, res) {
 }
 
 // ─────────────────────────────────────────────
+// GET /phase2/supplier/requests  (requer JWT de fornecedor)
+// Solicitações da Fase 2 do fornecedor logado (portal, menu "Documentos (Fase 2)")
+// ─────────────────────────────────────────────
+export async function listMyRequests(req, res) {
+    try {
+        const result = await phase2Service.listSupplierPhase2Requests(req.fornecedor.supplierId);
+        if (!result.success) {
+            return res.status(result.status ?? 500).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('phase2 listMyRequests controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
 // GET /phase2/:token/documents/:documentId/download  (requer JWT de fornecedor)
 // O fornecedor baixa um arquivo que ele enviou nesta solicitação (atual ou do histórico)
 // ─────────────────────────────────────────────

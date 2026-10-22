@@ -564,6 +564,28 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
 }
 
 // ─────────────────────────────────────────────
+// Lista do fornecedor (portal, "Documentos (Fase 2)")
+// ─────────────────────────────────────────────
+
+/**
+ * Solicitações em que o fornecedor tem link da Fase 2, com o prazo (isExpired: encerrado) e
+ * o resumo dos documentos. Só as dele (supplierId vem do JWT do fornecedor).
+ */
+export async function listSupplierPhase2Requests(supplierId) {
+    try {
+        const rows = await quotationModel.listPhase2DeadlinesBySupplier(supplierId);
+        const result = rows.map((row) => ({
+            ...row,
+            isExpired: isDeadlineClosed({ status: row.deadline_status, expires_at: row.expires_at }),
+        }));
+        return { success: true, body: { result } };
+    } catch (error) {
+        console.error('listSupplierPhase2Requests error:', error);
+        return { success: false, status: 500, message: 'Erro ao buscar as solicitações da Fase 2.' };
+    }
+}
+
+// ─────────────────────────────────────────────
 // Download do próprio fornecedor
 // ─────────────────────────────────────────────
 
