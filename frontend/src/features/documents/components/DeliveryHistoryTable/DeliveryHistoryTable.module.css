@@ -38,15 +38,30 @@
   background: rgba(79, 70, 229, 0.04);
 }
 
+/* Data de entrega e, embaixo, a etiqueta "atual", centralizadas na coluna */
+.dateCell {
+  text-align: center;
+}
+
+.dateValue {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3em;
+  white-space: nowrap;
+}
+
 .currentTag {
-  display: inline-block;
-  margin-left: 0.4em;
-  padding: 0 0.45em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.1em 0.6em;
   border-radius: 999px;
   background: rgba(79, 70, 229, 0.12);
   color: var(--color-indigo, #4f46e5);
   font-size: 0.68rem;
   font-weight: 700;
+  line-height: 1.4;
 }
 
 .fileCell {
@@ -114,6 +129,7 @@
   .table td {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: 1em;
     border-bottom: none;
     text-align: right;

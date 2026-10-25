@@ -34,6 +34,23 @@
     flex-shrink: 0;
 }
 
+/* Celular: as ações (ex.: o cronômetro do prazo) vão para baixo do texto, alinhadas a ele */
+@media (max-width: 520px) {
+    .banner {
+        flex-wrap: wrap;
+    }
+
+    .content {
+        min-width: 0;
+    }
+
+    .actions {
+        flex-basis: 100%;
+        flex-wrap: wrap;
+        margin-left: calc(1.3rem + 0.9em);
+    }
+}
+
 .center {
     justify-content: center;
     align-items: center;

@@ -18,4 +18,24 @@
 .actions {
     padding: 1em 1.5em;
     justify-content: center !important;
+    flex-wrap: wrap;
+    gap: 0.5em;
+}
+
+/* O espaço entre os botões vem do gap (a margem do MUI desalinha quando quebram linha) */
+.actions > :not(:first-of-type) {
+    margin-left: 0 !important;
+}
+
+/* Celular: botões empilhados, na largura toda, com a ação principal em cima */
+@media (max-width: 520px) {
+    .actions {
+        flex-direction: column-reverse;
+        align-items: stretch !important;
+        padding: 1em;
+    }
+
+    .actions > * {
+        width: 100%;
+    }
 }

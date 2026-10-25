@@ -152,6 +152,27 @@
     white-space: nowrap;
 }
 
+/* Rótulo curto das abas só no celular */
+.tabLabelShort {
+    display: none;
+}
+
+@media (max-width: 600px) {
+    .tab {
+        flex: 1;
+        justify-content: center;
+        padding: 0.7em 0.5em;
+    }
+
+    .tabLabelLong {
+        display: none;
+    }
+
+    .tabLabelShort {
+        display: inline;
+    }
+}
+
 .tab:hover {
     opacity: 0.9;
 }

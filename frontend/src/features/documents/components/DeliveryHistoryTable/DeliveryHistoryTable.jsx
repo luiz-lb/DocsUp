@@ -26,7 +26,7 @@ export default function DeliveryHistoryTable({ deliveries = [], onDownload, down
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>Data de entrega</th>
+            <th className={styles.dateCell}>Data de entrega</th>
             <th>Validade</th>
             <th>Arquivo</th>
             <th>Análise</th>
@@ -36,9 +36,11 @@ export default function DeliveryHistoryTable({ deliveries = [], onDownload, down
         <tbody>
           {deliveries.map((delivery) => (
             <tr key={delivery.id} className={delivery.is_current ? styles.current : undefined}>
-              <td data-label="Data de entrega">
-                {formatDateTime(delivery.uploaded_at)}
-                {delivery.is_current && <span className={styles.currentTag}>atual</span>}
+              <td data-label="Data de entrega" className={styles.dateCell}>
+                <span className={styles.dateValue}>
+                  {formatDateTime(delivery.uploaded_at)}
+                  {delivery.is_current && <span className={styles.currentTag}>atual</span>}
+                </span>
               </td>
               <td data-label="Validade">{delivery.expires_at ? formatDateOnly(delivery.expires_at) : '—'}</td>
               <td data-label="Arquivo">

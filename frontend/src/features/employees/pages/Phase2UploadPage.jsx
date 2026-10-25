@@ -313,10 +313,15 @@ export default function Phase2UploadPage() {
         {/* Banner de countdown com expiração automática */}
         <Phase2CountdownBanner deadline={deadline} />
 
+        {/* Prazo encerrado: só o que o RH devolveu (reprovado / reenvio necessário) pode ser reenviado */}
         {deadline.isExpired && (
           <Banner
             tone="info"
-            description="O prazo de envio encerrou. Você ainda pode reenviar os documentos reprovados ou com reenvio necessário (botão Reenviar em cada um)."
+            description={
+              returnedCount > 0
+                ? 'O prazo de envio encerrou. Você ainda pode reenviar os documentos que o RH reprovou ou pediu reenvio: use o botão Reenviar nesses documentos.'
+                : 'O prazo de envio encerrou. Novos envios estão bloqueados. Se o RH reprovar ou pedir o reenvio de algum documento, o botão Reenviar aparece nele.'
+            }
           />
         )}
         {returnedCount > 0 && (
@@ -337,7 +342,9 @@ export default function Phase2UploadPage() {
             className={cn(styles.tab, tab === TABS.COMPANY && styles.tabActive)}
             onClick={() => setTab(TABS.COMPANY)}
           >
-            <LuBuilding2 /> Documentos da empresa
+            <LuBuilding2 aria-hidden="true" />
+            <span className={styles.tabLabelLong}>Documentos da empresa</span>
+            <span className={styles.tabLabelShort}>Empresa</span>
           </button>
           <button
             type="button"
@@ -346,7 +353,9 @@ export default function Phase2UploadPage() {
             className={cn(styles.tab, tab === TABS.EMPLOYEES && styles.tabActive)}
             onClick={() => setTab(TABS.EMPLOYEES)}
           >
-            <LuUsers /> Documentos dos colaboradores
+            <LuUsers aria-hidden="true" />
+            <span className={styles.tabLabelLong}>Documentos dos colaboradores</span>
+            <span className={styles.tabLabelShort}>Colaboradores</span>
           </button>
         </div>
 
