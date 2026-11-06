@@ -15,6 +15,11 @@ import { downloadDocumentFiles, listDeliveredDocuments } from '../api/documentsR
 import DocumentStatusModal from '../components/DocumentStatusModal/index.js';
 import DeliveryHistoryModal from '../components/DeliveryHistoryModal/index.js';
 import EmployeeSituationTab, { EMPTY_EMPLOYEE_FILTERS } from '../components/EmployeeSituationTab/index.js';
+import DocumentFilters, {
+  EMPTY_DOCUMENT_FILTERS,
+  buildFilterOptions,
+  filterDocuments,
+} from '../components/DocumentFilters/index.js';
 import { cn } from '../../../utils/cn.js';
 import styles from './SupplierDocumentsPage.module.css';
 
@@ -70,6 +75,8 @@ export default function SupplierDocumentsPage() {
   const [view, setView] = useState('documents');
   // Filtros da aba Colaboradores: ficam aqui para continuarem ao trocar de aba (saindo da tela, voltam ao padrão)
   const [employeeFilters, setEmployeeFilters] = useState(EMPTY_EMPLOYEE_FILTERS);
+  // Busca e filtros da aba Documentos (mesma regra: ficam enquanto a tela estiver aberta)
+  const [documentFilters, setDocumentFilters] = useState(EMPTY_DOCUMENT_FILTERS);
   const [groupBy, setGroupBy] = useState('supplier');
   const [openGroupKey, setOpenGroupKey] = useState(null);
 
@@ -90,8 +97,14 @@ export default function SupplierDocumentsPage() {
   const [downloading, setDownloading] = useState(null);
 
   // Agrupa os documentos conforme o modo selecionado
+  const filterOptions = useMemo(() => buildFilterOptions(documents ?? []), [documents]);
+  const filteredDocuments = useMemo(
+    () => filterDocuments(documents ?? [], documentFilters),
+    [documents, documentFilters],
+  );
+
   const groups = useMemo(() => {
-    const docs = documents ?? [];
+    const docs = filteredDocuments;
     const cfg = GROUP_BY[groupBy];
     const map = new Map();
     for (const doc of docs) {
@@ -104,7 +117,7 @@ export default function SupplierDocumentsPage() {
       group.counts[doc.status] = (group.counts[doc.status] ?? 0) + 1;
     }
     return Array.from(map.values()).sort((a, b) => b.docs.length - a.docs.length);
-  }, [documents, groupBy]);
+  }, [filteredDocuments, groupBy]);
 
   const openGroup = groups.find((g) => g.key === openGroupKey) ?? null;
 
@@ -232,6 +245,9 @@ export default function SupplierDocumentsPage() {
       ),
     },
     { key: 'origin', ...originColumn },
+    ...(groupBy !== 'location'
+      ? [{ key: 'location', header: 'Local', render: (row) => row.labor_request_location ?? '—' }]
+      : []),
     {
       key: 'uploaded_at',
       header: 'Enviado em',
@@ -328,6 +344,15 @@ export default function SupplierDocumentsPage() {
         <EmployeeSituationTab filters={employeeFilters} onFiltersChange={setEmployeeFilters} />
       )}
 
+      {view === 'documents' && (
+        <DocumentFilters
+          filters={documentFilters}
+          onFiltersChange={setDocumentFilters}
+          options={filterOptions}
+          resultCount={filteredDocuments.length}
+        />
+      )}
+
       {view === 'documents' && feedback && <Banner tone={feedback.tone} description={feedback.message} />}
 
       {view !== 'documents' ? null : openGroup ? (
@@ -390,7 +415,11 @@ export default function SupplierDocumentsPage() {
           getRowKey={(g) => g.key}
           onRowClick={(g) => openGroupWith(g.key)}
           emptyTitle="Nenhum documento encontrado"
-          emptyDescription="Ainda não há documentos entregues pelos fornecedores."
+          emptyDescription={
+            (documents ?? []).length > 0
+              ? 'Nenhum documento com essa busca ou esses filtros. Ajuste ou limpe os filtros.'
+              : 'Ainda não há documentos entregues pelos fornecedores.'
+          }
           stackOnMobile
         />
       )}

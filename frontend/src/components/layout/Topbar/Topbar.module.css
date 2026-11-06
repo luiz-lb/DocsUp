@@ -39,7 +39,8 @@
         display: flex;
     }
 
+    /* Celular: o nome cabe cortado com "…" (o Select do MUI já corta texto longo) */
     .userSelect {
-        max-width: 40px;
+        max-width: 160px;
     }
 }

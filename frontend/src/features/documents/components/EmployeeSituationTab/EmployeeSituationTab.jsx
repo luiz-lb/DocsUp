@@ -108,6 +108,7 @@ export default function EmployeeSituationTab({ filters = EMPTY_EMPLOYEE_FILTERS,
         </div>
       ),
     },
+    { key: 'location', header: 'Local', render: (row) => row.labor_request_location ?? '—' },
     {
       key: 'documents',
       header: 'Documentos',

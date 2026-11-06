@@ -1,0 +1,108 @@
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 1.1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-white, #fff);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  flex: 1 1 320px;
+  min-width: 220px;
+  padding: 0.6em 1em;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  background: #f9fafb;
+}
+
+.searchField:focus-within {
+  border-color: var(--color-indigo, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.searchIcon {
+  color: var(--color-textMuted, #6b7280);
+  flex-shrink: 0;
+}
+
+.searchField input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--color-textDark, #111827);
+}
+
+.result {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-indigo, #4f46e5);
+}
+
+/* Campos em grade: quantos couberem por linha (no celular, um por linha) */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+}
+
+/* Campos mais compactos que o FormField padrão (rótulo menor, menos altura) */
+.field {
+  gap: 0.3em !important;
+}
+
+.field > span:first-child {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-textMuted, #6b7280);
+}
+
+.grid .field input,
+.grid .field select {
+  padding: 0.55em 0.75em;
+  font-size: 0.86rem;
+}
+
+.grid .field input[role='combobox'] {
+  padding-right: 2.4em;
+}
+
+/* Botão "Filtros": só no celular */
+.toggle {
+  display: none !important;
+}
+
+@media (max-width: 700px) {
+  .toggle {
+    display: inline-flex !important;
+  }
+
+  /* Campos recolhidos até abrir pelo botão */
+  .grid {
+    display: none;
+  }
+
+  .gridOpen {
+    display: grid;
+  }
+
+  .searchField {
+    flex-basis: 100%;
+  }
+}
