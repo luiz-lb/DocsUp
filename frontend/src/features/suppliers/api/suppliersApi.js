@@ -201,22 +201,3 @@ export async function getSupplierDetail(id) {
     return null;
   }
 }
-
-// ─────────────────────────────────────────────
-// Cotações do fornecedor (portal)
-// ─────────────────────────────────────────────
-
-/**
- * Lista as cotações do fornecedor autenticado (pendentes, enviadas, aprovadas).
- * GET /quotations/supplier/my-quotations
- * Exige cookie supplier_token.
- */
-export async function getMyQuotations() {
-  try {
-    const result = await api.get('/quotations/supplier/my-quotations');
-    return result.data.body?.quotations ?? [];
-  } catch (error) {
-    console.error('getMyQuotations error:', error);
-    return [];
-  }
-}

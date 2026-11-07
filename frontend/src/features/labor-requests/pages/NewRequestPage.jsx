@@ -65,7 +65,7 @@ export default function NewRequestPage() {
       <PageHeader
         eyebrow="Obra"
         title="Nova solicitação de mão de obra"
-        description="Ao enviar, o departamento de Suprimentos é notificado por e-mail para dar sequência à cotação."
+        description="Ao enviar, a Segurança do Trabalho aprova e define o número do contrato e os documentos exigidos. Depois, Compras indica o fornecedor."
       />
 
       <WizardStepper steps={STEPS} activeStep={step} />
@@ -131,7 +131,7 @@ export default function NewRequestPage() {
               <Banner
                 tone="success"
                 title="Pronto para enviar"
-                description="Suprimentos receberá um e-mail assim que você enviar esta solicitação."
+                description="Depois de enviar, a solicitação aparece para a Segurança do Trabalho aprovar."
               />
             </div>
           )}

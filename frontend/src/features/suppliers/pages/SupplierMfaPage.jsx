@@ -13,8 +13,6 @@ export default function SupplierMfaPage() {
 
   // Em ambiente de desenvolvimento o backend devolve o OTP no body do login
   const devOtp = location.state?.devOtp ?? null;
-  // Token de proposta propagado desde a tela de login
-  const tokenProposta = location.state?.tokenProposta ?? null;
   // Token da Fase 2 propagado desde a tela de login
   const fase2Token = location.state?.fase2Token ?? null;
   // Rota de origem (quando o guard redirecionou para o login)
@@ -43,19 +41,13 @@ export default function SupplierMfaPage() {
       return;
     }
 
-    // Se veio com token de proposta, abre direto a cotação apontada
-    if (tokenProposta) {
-      navigate(ROUTES.quotations.submit(tokenProposta));
-      return;
-    }
-
     // Se foi redirecionado pelo guard, volta para a rota de origem
     if (returnTo) {
       navigate(returnTo);
       return;
     }
 
-    // Caso padrão: portal do fornecedor com a lista de cotações
+    // Caso padrão: portal do fornecedor ("Meus contratos")
     navigate(ROUTES.suppliers.portal);
   };
 

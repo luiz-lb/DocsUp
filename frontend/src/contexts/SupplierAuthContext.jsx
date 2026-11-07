@@ -38,9 +38,7 @@ export function SupplierAuthProvider({ children }) {
   // /supplier/auth/me nas telas internas de colaborador.
   useEffect(() => {
     const path = window.location.pathname;
-    const isSupplierArea = path.startsWith('/fornecedor')
-      || path.startsWith('/fase2')
-      || path.startsWith('/cotacoes/responder');
+    const isSupplierArea = path.startsWith('/fornecedor') || path.startsWith('/fase2');
 
     if (!isSupplierArea) {
       setIsLoading(false);

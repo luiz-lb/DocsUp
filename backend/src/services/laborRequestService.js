@@ -190,7 +190,7 @@ export async function listApprovals(laborRequestId) {
  *
  * Regras de status da labor_request:
  *  - Reprovação → status 2 (Reprovado)
- *  - Aprovação  → status 3 (Em Cotação)
+ *  - Aprovação  → status 3 (Aguardando fornecedor: Compras indica pelo e-mail)
  *
  * Ao aprovar (decision=2), a Segurança do Trabalho define:
  *  - contractNumber    → número do contrato (obrigatório; fica fixo depois)
@@ -261,7 +261,7 @@ export async function approveRequest(laborRequestId, approverId, department, dec
             }
         }
 
-        // Novo status: reprovado=2, aprovado=3 (Em Cotação)
+        // Novo status: reprovado=2, aprovado=3 (Aguardando fornecedor)
         let newStatus = request.status;
         if (decision === 1) newStatus = 2;
         else if (decision === 2) newStatus = 3;

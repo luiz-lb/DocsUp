@@ -6,7 +6,7 @@ import styles from './FileDropzone.module.css';
 
 /**
  * Zona de upload por drag&drop + clique. Usada por qualquer fluxo que envie
- * documentos (cotacao, fase 2, central de documentos). Controlada: o pai
+ * documentos (contrato do fornecedor, central de documentos). Controlada: o pai
  * guarda `files` e recebe `onFilesChange(File[])`.
  */
 export default function FileDropzone({

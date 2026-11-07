@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 /**
  * Contagem regressiva ate `deadline` (Date | ISO string). Usada no SLA de
- * Fase 2 (upload de colaboradores) e no prazo de resposta de cotacao.
+ * prazo dos documentos iniciais do fornecedor (definido por Compras).
  */
 export function useCountdown(deadline) {
   const target = useMemo(() => new Date(deadline).getTime(), [deadline]);

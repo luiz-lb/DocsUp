@@ -10,17 +10,15 @@ import styles from '../../../styles/authCard.module.css';
  * Login do fornecedor: e-mail do usuário (Responsável ou Operador) e senha. Depois vem o
  * código de 6 dígitos enviado para o e-mail (tela de código).
  *
- * Os tokens da URL (?fase2 / ?tokenProposta) vêm dos links abertos sem sessão: seguem para o
- * cadastro e, depois do login, a tela de código volta para o link.
+ * O token da URL (?fase2) vem do link do convite aberto sem sessão: segue para o cadastro e,
+ * depois do login, a tela de código volta para o contrato.
  */
 export default function SupplierLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  // Token de proposta (cotação) vindo na URL: ?tokenProposta=XXX
-  const tokenProposta = searchParams.get('tokenProposta');
-  // Token da Fase 2 vindo na URL: ?fase2=XXX
+  // Token do contrato (link do convite) vindo na URL: ?fase2=XXX
   const fase2Token = searchParams.get('fase2');
   // Rota de origem quando o guard redirecionou para o login
   const returnTo = location.state?.returnTo ?? null;
@@ -48,11 +46,10 @@ export default function SupplierLoginPage() {
     }
 
     if (result.body?.requiresMfa) {
-      // Leva o devOtp (só fora de produção) e os tokens (proposta / fase 2) para a tela de código
+      // Leva o devOtp (só fora de produção) e o token do contrato para a tela de código
       navigate(ROUTES.suppliers.mfa, {
         state: {
           devOtp: result.body?.devOtp ?? null,
-          tokenProposta: tokenProposta ?? null,
           fase2Token: fase2Token ?? null,
           returnTo: returnTo ?? null,
         },
@@ -60,11 +57,9 @@ export default function SupplierLoginPage() {
     }
   };
 
-  const buildRegisterUrl = () => {
-    if (tokenProposta) return `${ROUTES.suppliers.register}?tokenProposta=${encodeURIComponent(tokenProposta)}`;
-    if (fase2Token) return `${ROUTES.suppliers.register}?fase2=${encodeURIComponent(fase2Token)}`;
-    return ROUTES.suppliers.register;
-  };
+  const buildRegisterUrl = () => (fase2Token
+    ? `${ROUTES.suppliers.register}?fase2=${encodeURIComponent(fase2Token)}`
+    : ROUTES.suppliers.register);
 
   return (
     <Card tone="dark" className={styles.card}>

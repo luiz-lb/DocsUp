@@ -12,11 +12,6 @@ export const ROUTES = {
     detail: (id = ':id') => `/solicitacoes/${id}`,
   },
 
-  quotations: {
-    round: (id = ':roundId') => `/cotacoes/${id}`,
-    submit: (token = ':token') => `/cotacoes/responder/${token}`,
-  },
-
   suppliers: {
     list: '/fornecedores',
     profile: (id = ':id') => `/fornecedores/${id}`,

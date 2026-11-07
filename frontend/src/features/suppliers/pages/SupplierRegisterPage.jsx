@@ -31,13 +31,12 @@ const INITIAL = {
  *  2. Usuários: Responsável (dono) e Operador, com nome e e-mail. Os dois entram no portal.
  *  3. Senha: senha inicial dos dois usuários (cada um troca a sua depois, no Perfil).
  *
- * Os tokens da URL (?fase2 / ?tokenProposta) vêm de um link aberto sem cadastro: voltam
- * para o login, que depois leva de volta ao link.
+ * O token da URL (?fase2) vem do link do convite aberto sem cadastro: volta para o login,
+ * que depois leva de volta ao contrato.
  */
 export default function SupplierRegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const tokenProposta = searchParams.get('tokenProposta');
   const fase2Token = searchParams.get('fase2');
 
   const [step, setStep] = useState(0);
@@ -48,11 +47,9 @@ export default function SupplierRegisterPage() {
 
   const setField = (field) => (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
 
-  const loginUrl = () => {
-    if (tokenProposta) return `${ROUTES.suppliers.login}?tokenProposta=${encodeURIComponent(tokenProposta)}`;
-    if (fase2Token) return `${ROUTES.suppliers.login}?fase2=${encodeURIComponent(fase2Token)}`;
-    return ROUTES.suppliers.login;
-  };
+  const loginUrl = () => (fase2Token
+    ? `${ROUTES.suppliers.login}?fase2=${encodeURIComponent(fase2Token)}`
+    : ROUTES.suppliers.login);
 
   const goTo = (nextStep) => {
     setError('');

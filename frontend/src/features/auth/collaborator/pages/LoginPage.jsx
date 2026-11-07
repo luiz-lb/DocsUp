@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { LuLogIn } from 'react-icons/lu';
 import { Card, Button, FormField, Banner } from '../../../../components/ui/index.js';
 import { useAuth } from '../../../../contexts/AuthContext.jsx';
-import { mockDelay } from '../../../../hooks/useMockApi.js';
 import { ROUTES } from '../../../../constants/routes.js';
 import authStyles from '../../../../styles/authCard.module.css';
 
@@ -31,7 +30,7 @@ export default function LoginPage() {
       <Card.Body>
         <p className={authStyles.eyebrow}>DocsUp</p>
         <h1 className={authStyles.title}>Entrar</h1>
-        <p className={authStyles.subtitle}>Acesse com seu e-mail corporativo para acompanhar solicitações, cotações e documentação.</p>
+        <p className={authStyles.subtitle}>Acesse com seu e-mail corporativo para acompanhar solicitações, fornecedores e documentação.</p>
 
         <form className={authStyles.form} onSubmit={handleSubmit}>
           <FormField label="E-mail corporativo" required>

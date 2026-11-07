@@ -3,7 +3,7 @@ import styles from './PublicLayout.module.css';
 
 /**
  * Shell para paginas sem sessao interna: login/MFA/cadastro de fornecedor
- * e a submissao de cotacao via link por token. Sem sidebar - o fornecedor
+ * e o cadastro do fornecedor. Sem sidebar - o fornecedor
  * so ve o que aquele link permite.
  */
 export default function PublicLayout() {

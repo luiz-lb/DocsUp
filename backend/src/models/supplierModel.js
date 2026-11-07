@@ -8,56 +8,6 @@ import { sql, poolPromise } from '../config/dbConfig.js';
 // ─────────────────────────────────────────────
 
 /**
- * E-mails dos usuários ativos do fornecedor (Responsável e Operador), no formato antigo
- * dos contatos: { email, contact_type } (0 = Responsável, 1 = Operador).
- */
-export async function getSupplierContactEmails(supplierId) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input('supplier_id', sql.Int, supplierId)
-        .query(`
-            SELECT email, [role] AS contact_type
-            FROM supplier_users
-            WHERE supplier_id = @supplier_id AND is_active = 1
-            ORDER BY [role] ASC
-        `);
-    return result.recordset;
-}
-
-/**
- * Busca um fornecedor por ID (payload do JWT e /me).
- */
-export async function getSupplierById(supplierId) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input('id', sql.Int, supplierId)
-        .query(`
-            SELECT id, uid, cnpj, razao_social, nome_fantasia, status
-            FROM suppliers
-            WHERE id = @id
-        `);
-    return result.recordset[0] ?? null;
-}
-
-/**
- * Retorna { id, employee_count } para uma lista de fornecedores.
- * Usado na comparação de cotações.
- */
-export async function getEmployeeCountsByIds(ids = []) {
-    if (!ids || ids.length === 0) return [];
-    const pool = await poolPromise;
-    const request = pool.request();
-    const params = ids.map((id, i) => {
-        request.input(`id${i}`, sql.Int, id);
-        return `@id${i}`;
-    });
-    const result = await request.query(
-        `SELECT id, employee_count FROM suppliers WHERE id IN (${params.join(',')})`,
-    );
-    return result.recordset;
-}
-
-/**
  * Verifica se um CNPJ já está cadastrado.
  */
 export async function supplierExistsByCnpj(cnpj) {

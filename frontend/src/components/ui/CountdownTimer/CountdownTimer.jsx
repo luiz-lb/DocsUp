@@ -5,7 +5,7 @@ import { cn } from '../../../utils/cn.js';
 import styles from './CountdownTimer.module.css';
 
 /**
- * Contagem regressiva visual usada no SLA de resposta de cotacao e no prazo
+ * Contagem regressiva visual usada no prazo dos documentos iniciais do fornecedor
  * da Fase 2 (upload de colaboradores). Fica critico (vermelho piscando) nos
  * ultimos 10% do tempo.
  */

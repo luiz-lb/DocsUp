@@ -134,28 +134,6 @@ export const APPROVAL_DECISION = {
   2: { label: 'Aprovado', tone: 'success' },
 };
 
-export const QUOTATION_ROUND_STATUS = {
-  0: { label: 'Aberta', tone: 'success' },
-  1: { label: 'Encerrada', tone: 'neutral' },
-  2: { label: 'Cancelada', tone: 'danger' },
-};
-
-export const QUOTATION_INVITE_STATUS = {
-  0: { label: 'Enviado', tone: 'info' },
-  1: { label: 'Visualizado', tone: 'indigo' },
-  2: { label: 'Respondido', tone: 'success' },
-  3: { label: 'Expirado', tone: 'danger' },
-};
-
-export const QUOTATION_STATUS = {
-  0: { label: 'Rascunho', tone: 'neutral' },
-  1: { label: 'Submetida', tone: 'info' },
-  2: { label: 'Vencedora', tone: 'success' },
-  3: { label: 'Perdedora', tone: 'neutral' },
-  4: { label: 'Desclassificada', tone: 'danger' },
-  5: { label: 'Desclassificada por Doc.', tone: 'danger' },
-};
-
 export const DOCUMENT_STATUS = {
   0: { label: 'Pendente', tone: 'warning' },
   1: { label: 'Validando', tone: 'info' },
@@ -175,12 +153,6 @@ export const FINAL_VALIDATION_STATUS = {
   0: { label: 'Pendente de Revisão', tone: 'warning' },
   1: { label: 'Aprovado', tone: 'success' },
   2: { label: 'Reprovado', tone: 'danger' },
-};
-
-export const RECEIPT_TYPE = {
-  0: { label: 'Cotação', tone: 'indigo' },
-  1: { label: 'Documentação', tone: 'info' },
-  2: { label: 'Fase 2', tone: 'teal' },
 };
 
 // employees.status: situação do colaborador (Fase 8). 4 e 6 vêm da rotina diária (00:01).

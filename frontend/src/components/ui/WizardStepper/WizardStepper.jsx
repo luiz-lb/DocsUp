@@ -21,7 +21,7 @@ const TONE_SX = {
 
 /**
  * Cabecalho de wizard multi-etapas. Usado pela nova solicitacao de M.O.,
- * cadastro de fornecedor e submissao de cotacao - todos fluxos "passo a passo".
+ * cadastro de fornecedor e aprovação da solicitação - todos fluxos "passo a passo".
  */
 export default function WizardStepper({ steps, activeStep, tone = 'light' }) {
   return (

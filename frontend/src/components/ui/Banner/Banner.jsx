@@ -11,7 +11,7 @@ const ICONS = {
 
 /**
  * Faixa de alerta contextual: bloqueio de pagamento, prazo estourado de Fase 2,
- * aviso de omissao de documentacao no fluxo de cotacao.
+ * convite do fornecedor pausado por falta de documento.
  */
 export default function Banner({ tone = 'info', title, description, actions, center = false }) {
   const Icon = ICONS[tone] ?? ICONS.info;

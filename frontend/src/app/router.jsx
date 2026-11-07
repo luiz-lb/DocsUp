@@ -19,8 +19,6 @@ const RequestListPage = lazy(() => import('../features/labor-requests/pages/Requ
 const NewRequestPage = lazy(() => import('../features/labor-requests/pages/NewRequestPage.jsx'));
 const RequestDetailPage = lazy(() => import('../features/labor-requests/pages/RequestDetailPage.jsx'));
 
-const QuotationRoundPage = lazy(() => import('../features/quotations/pages/QuotationRoundPage.jsx'));
-const QuotationSubmitPage = lazy(() => import('../features/quotations/pages/QuotationSubmitPage.jsx'));
 
 const SupplierListPage = lazy(() => import('../features/suppliers/pages/SupplierListPage.jsx'));
 const SupplierProfilePage = lazy(() => import('../features/suppliers/pages/SupplierProfilePage.jsx'));
@@ -70,9 +68,6 @@ export const router = createBrowserRouter([
               { path: ROUTES.laborRequests.list, element: <RequestListPage /> },
               { path: ROUTES.laborRequests.new, element: <NewRequestPage /> },
               { path: ROUTES.laborRequests.detail(), element: <RequestDetailPage /> },
-
-
-              { path: ROUTES.quotations.round(), element: <QuotationRoundPage /> },
 
               // Rotas por perfil: mesma regra do backend (constants/access.js)
               {
@@ -135,8 +130,7 @@ export const router = createBrowserRouter([
           { path: ROUTES.suppliers.myProfile, element: <SupplierMyProfilePage /> },
           // Antigo menu "Documentos (Fase 2)": agora os contratos ficam em "Meus contratos"
           { path: ROUTES.suppliers.documents, element: <Navigate to={ROUTES.suppliers.portal} replace /> },
-          // Abertas por link de e-mail: sem sessão, o login guarda o token e volta para cá
-          { path: ROUTES.quotations.submit(), element: <QuotationSubmitPage /> },
+          // Aberta pelo link do convite: sem sessão, o login guarda o token e volta para cá
           { path: ROUTES.employees.phase2(), element: <Phase2UploadPage /> },
         ],
       },
