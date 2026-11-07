@@ -5,35 +5,7 @@ import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
 import { EMPLOYEE_STATUSES, EMPLOYEE_STATUS_IDS } from '../constants/employeeStatus.js';
 import { collaboratorAuditEntry } from '../utils/audit.js';
 import { toInteger } from '../utils/parse.js';
-
-// 'YYYY-MM-DDTHH:mm' (input datetime-local), opcionalmente com segundos
-const LOCAL_DATETIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
-
-/**
- * 'YYYY-MM-DDTHH:mm' → Date no horário LOCAL (o pool usa useUTC = false), ou null se for
- * inválida (inclusive datas que o Date "corrige", como 31/02).
- */
-function parseLocalDateTime(value) {
-    if (typeof value !== 'string') return null;
-    const match = LOCAL_DATETIME_PATTERN.exec(value.trim());
-    if (!match) return null;
-
-    const [year, month, day, hour, minute] = match.slice(1, 6).map(Number);
-    const date = new Date(year, month - 1, day, hour, minute, 0, 0);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day
-        || date.getHours() !== hour || date.getMinutes() !== minute) {
-        return null;
-    }
-    return date;
-}
-
-/** Data/hora para a auditoria, sem fuso: 'YYYY-MM-DDTHH:mm' (como o RH digitou). */
-function toLocalDateTimeText(date) {
-    if (!date) return null;
-    const value = new Date(date);
-    const pad = (number) => String(number).padStart(2, '0');
-    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
-}
+import { parseLocalDateTime, toLocalDateTimeText } from '../utils/dates.js';
 
 // ─────────────────────────────────────────────
 // Casos de uso

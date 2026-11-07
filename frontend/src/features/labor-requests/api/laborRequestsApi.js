@@ -139,3 +139,99 @@ export async function getNrTypes() {
     return { success: false, body: [] };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Resumo (painel inicial)
+// ---------------------------------------------------------------------------
+
+/**
+ * Quantidade de solicitações por status e por urgência.
+ * GET /laborRequest/summary → { byStatus: { [status]: n }, byUrgency: { [urgency]: n }, total }
+ */
+export async function getLaborRequestSummary() {
+  try {
+    const result = await api.get('/laborRequest/summary');
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    console.error('Erro ao buscar o resumo das solicitações:', error);
+    return toErrorResult(error, 'Erro ao buscar o resumo das solicitações.');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fornecedor da solicitação (Compras indica pelo e-mail)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fornecedor da solicitação: vínculo atual, declaração, o que era para declarar e histórico.
+ * GET /laborRequest/:id/supplier
+ * → { current, declaration, declarationItems, history, canManage, mailEnabled }
+ */
+export async function getRequestSupplier(laborRequestId) {
+  try {
+    const result = await api.get(`/laborRequest/${laborRequestId}/supplier`);
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    console.error('Erro ao buscar o fornecedor da solicitação:', error);
+    return toErrorResult(error, 'Erro ao buscar o fornecedor da solicitação.');
+  }
+}
+
+/**
+ * O e-mail já tem cadastro no portal? (Compras)
+ * GET /laborRequest/supplier-lookup?email= → { email, registered, supplier?, user? }
+ */
+export async function lookupSupplierEmail(email) {
+  try {
+    const result = await api.get('/laborRequest/supplier-lookup', { params: { email } });
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao buscar o e-mail.');
+  }
+}
+
+/**
+ * Indica o fornecedor. POST /laborRequest/:id/supplier
+ * @param {{ email, deadlineHours? , deadlineAt? }} payload
+ */
+export async function assignSupplier(laborRequestId, payload) {
+  try {
+    const result = await api.post(`/laborRequest/${laborRequestId}/supplier`, payload);
+    return result.data;
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao indicar o fornecedor.');
+  }
+}
+
+/** Reenvia o convite para o mesmo e-mail (recomeça do zero). POST /laborRequest/:id/supplier/resend */
+export async function resendSupplierInvite(laborRequestId, payload) {
+  try {
+    const result = await api.post(`/laborRequest/${laborRequestId}/supplier/resend`, payload);
+    return result.data;
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao reenviar o convite.');
+  }
+}
+
+/** Novo prazo dos documentos. PUT /laborRequest/:id/supplier/deadline */
+export async function changeSupplierDeadline(laborRequestId, payload) {
+  try {
+    const result = await api.put(`/laborRequest/${laborRequestId}/supplier/deadline`, payload);
+    return result.data;
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao mudar o prazo.');
+  }
+}
+
+/**
+ * Troca o fornecedor (o atual perde o acesso; os documentos dele ficam guardados).
+ * POST /laborRequest/:id/supplier/replace  Body: { email, reason, deadlineHours? | deadlineAt? }
+ */
+export async function replaceSupplier(laborRequestId, payload) {
+  try {
+    const result = await api.post(`/laborRequest/${laborRequestId}/supplier/replace`, payload);
+    return result.data;
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao trocar o fornecedor.');
+  }
+}

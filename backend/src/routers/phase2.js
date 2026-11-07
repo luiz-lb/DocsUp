@@ -7,11 +7,15 @@ import { ACCESS } from '../constants/access.js';
 
 const router = express.Router();
 
-// Portal do fornecedor — solicitações em que ele tem link da Fase 2 (menu "Documentos (Fase 2)")
+// Portal do fornecedor — contratos (solicitações em que ele foi indicado; menu "Meus contratos")
 router.get('/supplier/requests', verificarTokenFornecedor, phase2Controller.listMyRequests);
 
-// Portal do fornecedor — busca dados da Fase 2 pelo token (exige JWT fornecedor: só o dono do link)
+// Portal do fornecedor — abre o contrato pelo link (exige JWT fornecedor: só o dono do link;
+// convite feito para um e-mail sem cadastro fica com quem abriu o link logado)
 router.get('/:token', verificarTokenFornecedor, phase2Controller.getPhase2);
+
+// Portal do fornecedor — declaração (o que a empresa tem) e termo de aceite assinado
+router.post('/:token/declaration', verificarTokenFornecedor, phase2Controller.submitDeclaration);
 
 // Portal do fornecedor — baixa um arquivo que ele mesmo enviou nesta solicitação (exige JWT fornecedor)
 router.get('/:token/documents/:documentId/download', verificarTokenFornecedor, phase2Controller.downloadDocument);

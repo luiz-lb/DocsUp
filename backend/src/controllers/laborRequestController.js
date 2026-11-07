@@ -74,6 +74,20 @@ export async function listLaborRequest(req, res) {
     }
 }
 
+/** GET /laborRequest/summary — quantidade por status e por urgência (painel inicial). */
+export async function laborRequestSummary(req, res) {
+    try {
+        const result = await laborRequestService.laborRequestSummary();
+        if (!result.success) {
+            return res.status(500).json({ success: false, body: { message: result.body.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('Erro no laborRequestSummary controller:', error);
+        return res.status(500).json({ success: false, body: { message: "Erro interno do servidor." } });
+    }
+}
+
 export async function listLaborRequestById(req, res) {
     try {
         const { id } = req.params;

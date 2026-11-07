@@ -1,15 +1,14 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LuLayoutDashboard, LuUser, LuBuilding2, LuFolderUp } from 'react-icons/lu';
+import { LuUser, LuBuilding2, LuFolderUp } from 'react-icons/lu';
 import { cn } from '../../../../utils/cn.js';
 import { ROUTES } from '../../../../constants/routes.js';
 import { SUPPLIER_USER_ROLE } from '../../../../constants/enums.js';
 import styles from './SupplierSidebar.module.css';
 
-// `section`: telas abertas a partir do item que também o deixam marcado (ex.: a cotação
-// é aberta em "Minhas cotações"; a Fase 2, em "Documentos (Fase 2)")
+// `section`: telas abertas a partir do item que também o deixam marcado (ex.: o contrato,
+// /fase2/<token>, é aberto em "Meus contratos")
 const NAV_ITEMS = [
-  { label: 'Minhas cotações', to: ROUTES.suppliers.portal, icon: LuLayoutDashboard, end: true, section: /^\/cotacoes\/responder\// },
-  { label: 'Documentos (Fase 2)', to: ROUTES.suppliers.documents, icon: LuFolderUp, section: /^\/fase2\// },
+  { label: 'Meus contratos', to: ROUTES.suppliers.portal, icon: LuFolderUp, end: true, section: /^\/fase2\// },
   { label: 'Perfil da empresa', to: ROUTES.suppliers.myProfile, icon: LuBuilding2 },
 ];
 

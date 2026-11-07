@@ -29,7 +29,8 @@ export async function getPhase2ByToken(token) {
 }
 
 /**
- * Solicitações em que o fornecedor logado tem link da Fase 2, com o prazo e o resumo dos documentos.
+ * Contratos do fornecedor logado ("Meus contratos"): solicitações em que a empresa foi indicada,
+ * com o status (aguardando declaração / ativo / pausado), o prazo e o resumo dos documentos.
  * GET /phase2/supplier/requests  (exige cookie supplier_token)
  */
 export async function listMyPhase2Requests() {
@@ -141,5 +142,22 @@ export async function listEmployees() {
   } catch (error) {
     console.error('listEmployees error:', error);
     return [];
+  }
+}
+
+/**
+ * Declaração do contrato e termo de aceite assinado.
+ * POST /phase2/:token/declaration
+ * @param {{ companyDocuments: { documentTypeId, hasDocument }[],
+ *           employeeDocuments: { documentTypeId, employeeCount }[], termAccepted: true }} payload
+ * Retorna { success, body: { status, blocked, missingDocuments, message } }
+ */
+export async function submitDeclaration(token, payload) {
+  try {
+    const result = await api.post(`/phase2/${token}/declaration`, payload);
+    return result.data;
+  } catch (error) {
+    console.error('submitDeclaration error:', error);
+    return toErrorResult(error, 'Erro ao enviar a declaração.');
   }
 }

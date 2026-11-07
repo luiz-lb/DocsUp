@@ -7,7 +7,6 @@ import cookieParser from 'cookie-parser';
 import { fileURLToPath } from 'url';
 import routes from './src/routers/index.js';
 import cors from 'cors';
-import { processExpiredPhase2Deadlines } from './src/services/phase2Service.js';
 import { scheduleDailyDocumentCheck } from './src/services/employeeSituationService.js';
 import { ensureInitialAdmin } from './src/services/bootstrapService.js';
 
@@ -92,19 +91,8 @@ app.use((err, req, res, next) => {
             console.error('[Bootstrap] Erro ao criar o Admin inicial:', err.message);
         });
 
-        // Job de expiração da Fase 2: roda a cada 5 minutos
-        // Verifica deadlines vencidos e desclassifica fornecedores que não enviaram docs
-        const PHASE2_JOB_INTERVAL_MS = 5 * 60 * 1000;
-        setInterval(async () => {
-            try {
-                const processed = await processExpiredPhase2Deadlines();
-                if (processed > 0) {
-                    console.log(`[Phase2 Job] ${processed} deadline(s) expirado(s) processado(s).`);
-                }
-            } catch (err) {
-                console.error('[Phase2 Job] Erro:', err.message);
-            }
-        }, PHASE2_JOB_INTERVAL_MS);
+        // O prazo dos documentos iniciais (definido por Compras ao indicar o fornecedor) não
+        // precisa de job: depois dele, o envio só aceita o reenvio do que o RH devolveu.
 
         // Rotina diária (00:01, horário de São Paulo): vence documentos e atualiza a situação
         // dos colaboradores (a vencer, pendente, retido por pendência da empresa)

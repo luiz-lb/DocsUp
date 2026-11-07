@@ -4,9 +4,8 @@ import { useCountdown } from '../../../../hooks/useCountdown.js';
 import styles from './Phase2CountdownBanner.module.css';
 
 /**
- * Faixa de prazo da Fase 2: se o tempo acabar sem envio, o fornecedor e'
- * desclassificado por documentacao e Suprimentos e' alertado a chamar o
- * 2o colocado - a mesma consequencia descrita no fluxo de SLA da cotacao.
+ * Faixa do prazo dos documentos iniciais (definido por Compras ao indicar o fornecedor).
+ * Depois dele, só dá para reenviar o que o RH reprovar ou pedir reenvio.
  */
 export default function Phase2CountdownBanner({ deadline }) {
   // O backend retorna os campos em snake_case (expires_at / started_at).
@@ -19,15 +18,15 @@ export default function Phase2CountdownBanner({ deadline }) {
   return (
     <Banner
       tone={isExpired ? 'danger' : 'info'}
-      title={isExpired ? 'Prazo estourado' : 'Envie os colaboradores dentro do prazo'}
+      title={isExpired ? 'Prazo encerrado' : 'Envie os documentos dentro do prazo'}
       description={
         isExpired
-          ? 'Acabou o prazo para envios de documentação. Suprimentos foi alertado.'
-          : 'Após o prazo, o fornecedor é desclassificado por documentação e perde pontos no score de qualificação.'
+          ? 'O prazo dos documentos iniciais acabou. O setor de Compras acompanha as pendências.'
+          : 'Depois do prazo, novos envios ficam bloqueados: só dá para reenviar o que o RH reprovar ou pedir reenvio.'
       }
       actions={
         <div className={styles.timer}>
-          <CountdownTimer deadline={expiresAt} startedAt={startedAt} expiredLabel="Expirado" />
+          <CountdownTimer deadline={expiresAt} startedAt={startedAt} expiredLabel="Encerrado" />
         </div>
       }
     />

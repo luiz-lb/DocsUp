@@ -137,7 +137,7 @@ function CompanyCard({ supplier, canEdit, onSaved }) {
             />
           </FormField>
         </div>
-        {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+        {feedback && <div className={styles.aviso}><Banner tone={feedback.tone} description={feedback.message} /></div>}
         {canEdit && (
           <div className={styles.cardActions}>
             <Button icon={LuSave} size="sm" isLoading={isSaving} onClick={handleSave}>
@@ -226,7 +226,7 @@ function UserBlock({ user, isSelf, canEdit, canSetPassword, onSaved }) {
           </FormField>
         )}
       </div>
-      {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+      {feedback && <div className={styles.aviso}><Banner tone={feedback.tone} description={feedback.message} /></div>}
       {canEdit && (
         <div className={styles.cardActions}>
           <Button icon={LuSave} size="sm" variant="secondary" isLoading={isSaving} onClick={handleSave}>
@@ -296,7 +296,7 @@ function MissingUserBlock({ role, onSaved }) {
           <input type="password" value={form.password} onChange={setField('password')} autoComplete="new-password" />
         </FormField>
       </div>
-      {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+      {feedback && <div className={styles.aviso}><Banner tone={feedback.tone} description={feedback.message} /></div>}
       <div className={styles.cardActions}>
         <Button icon={LuSave} size="sm" variant="secondary" isLoading={isSaving} onClick={handleSave}>
           Cadastrar {label}
@@ -359,7 +359,7 @@ function PasswordCard() {
             <input type="password" value={form.confirm} onChange={setField('confirm')} autoComplete="new-password" />
           </FormField>
         </div>
-        {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+        {feedback && <div className={styles.aviso}><Banner tone={feedback.tone} description={feedback.message} /></div>}
         <div className={styles.cardActions}>
           <Button icon={LuKeyRound} size="sm" isLoading={isSaving} onClick={handleSave}>
             Trocar senha

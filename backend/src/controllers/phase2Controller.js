@@ -56,6 +56,32 @@ export async function getPhase2(req, res) {
 }
 
 // ─────────────────────────────────────────────
+// POST /phase2/:token/declaration  (requer JWT de fornecedor)
+// Body: { companyDocuments: [{ documentTypeId, hasDocument }],
+//         employeeDocuments: [{ documentTypeId, employeeCount }], termAccepted: true }
+// ─────────────────────────────────────────────
+export async function submitDeclaration(req, res) {
+    try {
+        const result = await phase2Service.submitDeclaration(
+            req.params.token,
+            req.fornecedor,
+            req.body ?? {},
+            {
+                ipAddress: req.ip ? req.ip.replace(/^::ffff:/, '') : null,
+                userAgent: req.headers['user-agent'] ?? null,
+            },
+        );
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('submitDeclaration controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
 // GET /phase2/supplier/requests  (requer JWT de fornecedor)
 // Solicitações da Fase 2 do fornecedor logado (portal, menu "Documentos (Fase 2)")
 // ─────────────────────────────────────────────

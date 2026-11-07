@@ -30,6 +30,13 @@ export const AUDIT_ACTIONS = Object.freeze({
     SUPPLIER_USER_CREATE: 'supplier_user.create',
     SUPPLIER_USER_UPDATE: 'supplier_user.update',
     SUPPLIER_USER_PASSWORD_CHANGE: 'supplier_user.password_change',
+    // Fornecedor da solicitação (no lugar da cotação)
+    SUPPLIER_ASSIGNMENT_CREATE: 'supplier_assignment.create',
+    SUPPLIER_ASSIGNMENT_RESEND: 'supplier_assignment.resend',
+    SUPPLIER_ASSIGNMENT_DEADLINE: 'supplier_assignment.deadline_change',
+    SUPPLIER_ASSIGNMENT_REPLACE: 'supplier_assignment.replace',
+    SUPPLIER_ASSIGNMENT_DECLARE: 'supplier_assignment.declare',
+    LABOR_REQUEST_CONCLUDE: 'labor_request.conclude',
 });
 
 // audit_log.entity_type
@@ -40,4 +47,5 @@ export const AUDIT_ENTITIES = Object.freeze({
     DOCUMENT: 'document',
     EMPLOYEE: 'employee',
     SUPPLIER_USER: 'supplier_user',
+    LABOR_REQUEST: 'labor_request',
 });

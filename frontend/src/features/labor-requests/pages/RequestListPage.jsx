@@ -10,8 +10,8 @@ import { useLaborRequests } from '../hooks/useLaborRequests.js';
 import styles from './RequestListPage.module.css';
 
 // Filtro combinado usado no atalho do painel "Solicitações em aberto":
-// Em Cotação (3) + Em Contratação (5).
-const EM_ANDAMENTO_STATUS = '3,5';
+// Aguardando fornecedor (3) + Bloqueada (4) + Em Contratação (5).
+const EM_ANDAMENTO_STATUS = '3,4,5';
 
 const COLUMNS = [
   {
@@ -67,7 +67,7 @@ export default function RequestListPage() {
       <PageHeader
         eyebrow="Suprimentos & RH"
         title="Solicitações de Serviço"
-        description="Acompanhe pedidos abertos para obra, aprovações de RH/Segurança e status de cotação."
+        description="Acompanhe os pedidos da obra: aprovação da Segurança do Trabalho, fornecedor indicado por Compras e documentação."
         actions={
           <Button icon={LuPlus} onClick={() => navigate(ROUTES.laborRequests.new)}>
             Nova solicitação
@@ -89,7 +89,7 @@ export default function RequestListPage() {
         <div className={styles.filters}>
           <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filtrar por status">
             <option value="">Todos os status</option>
-            <option value={EM_ANDAMENTO_STATUS}>Em cotação / Em contratação</option>
+            <option value={EM_ANDAMENTO_STATUS}>Em andamento (fornecedor)</option>
             {Object.entries(LABOR_REQUEST_STATUS).map(([value, { label }]) => (
               <option key={value} value={value}>
                 {label}

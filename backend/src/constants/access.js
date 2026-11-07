@@ -11,4 +11,7 @@ export const ACCESS = Object.freeze({
     REQUIRED_DOCUMENTS: [DEPARTMENTS.SEGURANCA_TRABALHO],
     // Base de fornecedores (lista e detalhe)
     SUPPLIERS: [DEPARTMENTS.SUPRIMENTOS],
+    // Indicar o fornecedor de uma solicitação (e-mail e prazo), reenviar o convite, mudar o
+    // prazo e trocar o fornecedor
+    SUPPLIER_ASSIGNMENT: [DEPARTMENTS.SUPRIMENTOS],
 });

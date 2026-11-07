@@ -4,12 +4,15 @@ import {
   LuFolderCheck,
   LuTruck,
   LuTriangleAlert,
-  LuGavel,
+  LuMail,
+  LuOctagonAlert,
   LuArrowRight,
 } from 'react-icons/lu';
-import { Card, PageHeader, StatusBadge, EmptyState } from '../../../components/ui/index.js';
+import { Banner, Button, Card, PageHeader, StatusBadge, EmptyState } from '../../../components/ui/index.js';
 import {
+  DEPARTMENT_ID,
   LABOR_REQUEST_STATUS,
+  LABOR_REQUEST_STATUS_ID,
   URGENCY,
   DOCUMENT_STATUS,
 } from '../../../constants/enums.js';
@@ -19,12 +22,8 @@ import { formatDate } from '../../../utils/formatters.js';
 import { useDashboardSummary } from '../hooks/useDashboardSummary.js';
 import styles from './DashboardPage.module.css';
 
-// Departamento responsável pela aprovação (Segurança do Trabalho)
-const SEGURANCA_DEPARTMENT = 1;
-const PENDING_APPROVAL_STATUS = 0;
-const EM_COTACAO_STATUS = 3;
-// Filtro combinado: Em Cotação (3) + Em Contratação (5)
-const EM_ANDAMENTO_STATUS = '3,5';
+// Filtro combinado: Aguardando fornecedor (3) + Bloqueada (4) + Em Contratação (5)
+const EM_ANDAMENTO_STATUS = '3,4,5';
 
 export default function DashboardPage() {
   const { user, departmentLabel } = useAuth();
@@ -33,7 +32,9 @@ export default function DashboardPage() {
 
   if (isLoading || !data) return null;
 
-  const isSeguranca = user.department === SEGURANCA_DEPARTMENT;
+  const isSeguranca = user.department === DEPARTMENT_ID.SEGURANCA_TRABALHO;
+  // Compras (e Admin) indicam o fornecedor e resolvem os convites bloqueados
+  const isCompras = [DEPARTMENT_ID.SUPRIMENTOS, DEPARTMENT_ID.ADMIN].includes(user.department);
 
   const listWithStatus = (status) => `${ROUTES.laborRequests.list}?status=${status}`;
 
@@ -41,9 +42,9 @@ export default function DashboardPage() {
     {
       key: 'requests',
       icon: LuClipboardList,
-      // "Em andamento": solicitações em cotação + em contratação
-      label: 'Em cotação / contratação',
-      value: data.emCotacao.length + data.emContratacao.length,
+      // "Em andamento": aguardando fornecedor + bloqueadas + em contratação
+      label: 'Em andamento (fornecedor)',
+      value: data.awaitingSupplier + data.blocked + data.inContracting,
       to: listWithStatus(EM_ANDAMENTO_STATUS),
       tone: 'indigo',
     },
@@ -51,17 +52,25 @@ export default function DashboardPage() {
       key: 'approvals',
       icon: LuTriangleAlert,
       label: isSeguranca ? 'Aguardando sua aprovação' : 'Aguardando aprovação de Segurança do Trabalho',
-      value: data.pendingApprovals.length,
-      to: listWithStatus(PENDING_APPROVAL_STATUS),
+      value: data.pendingApprovals,
+      to: listWithStatus(LABOR_REQUEST_STATUS_ID.PENDENTE),
       tone: 'warning',
     },
     {
-      key: 'quotation',
-      icon: LuGavel,
-      label: 'Em cotação',
-      value: data.emCotacao.length,
-      to: listWithStatus(EM_COTACAO_STATUS),
+      key: 'awaitingSupplier',
+      icon: LuMail,
+      label: isCompras ? 'Aguardando você indicar o fornecedor' : 'Aguardando Compras indicar o fornecedor',
+      value: data.awaitingSupplier,
+      to: listWithStatus(LABOR_REQUEST_STATUS_ID.AGUARDANDO_FORNECEDOR),
       tone: 'info',
+    },
+    {
+      key: 'blocked',
+      icon: LuOctagonAlert,
+      label: 'Bloqueadas: fornecedor sem documento',
+      value: data.blocked,
+      to: listWithStatus(LABOR_REQUEST_STATUS_ID.BLOQUEADA),
+      tone: 'danger',
     },
     {
       key: 'docs',
@@ -95,6 +104,22 @@ export default function DashboardPage() {
         title="Painel"
         description={`Visão geral do fluxo de contratação de mão de obra para o departamento de ${departmentLabel}.`}
       />
+
+      {/* Aviso para Compras: convites pausados porque o fornecedor não tem documento da empresa */}
+      {isCompras && data.blocked > 0 && (
+        <div className={styles.alert}>
+          <Banner
+            tone="danger"
+            title={data.blocked === 1 ? '1 convite bloqueado' : `${data.blocked} convites bloqueados`}
+            description="O fornecedor declarou não ter um documento da empresa exigido. Reenvie o convite para o mesmo e-mail ou troque o fornecedor."
+            actions={(
+              <Button size="sm" variant="secondary" onClick={() => navigate(listWithStatus(LABOR_REQUEST_STATUS_ID.BLOQUEADA))}>
+                Ver solicitações
+              </Button>
+            )}
+          />
+        </div>
+      )}
 
       <div className={styles.metricGrid}>
         {metrics.map(({ key, icon: Icon, label, value, to, tone }) => (

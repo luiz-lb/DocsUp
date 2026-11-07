@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Outlet } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import DashboardLayout from '../components/layout/DashboardLayout/index.js';
 import PublicLayout from '../components/layout/PublicLayout/index.js';
 import RouteFallback from './RouteFallback.jsx';
@@ -29,7 +29,6 @@ const SupplierMfaPage = lazy(() => import('../features/suppliers/pages/SupplierM
 const SupplierRegisterPage = lazy(() => import('../features/suppliers/pages/SupplierRegisterPage.jsx'));
 const SupplierPortalPage = lazy(() => import('../features/suppliers/pages/SupplierPortalPage.jsx'));
 const SupplierMyProfilePage = lazy(() => import('../features/suppliers/pages/SupplierMyProfilePage.jsx'));
-const SupplierPhase2ListPage = lazy(() => import('../features/suppliers/pages/SupplierPhase2ListPage.jsx'));
 
 const DocumentCenterPage = lazy(() => import('../features/documents/pages/DocumentCenterPage.jsx'));
 const DocumentReviewPage = lazy(() => import('../features/documents/pages/DocumentReviewPage.jsx'));
@@ -134,7 +133,8 @@ export const router = createBrowserRouter([
         children: [
           { path: ROUTES.suppliers.portal, element: <SupplierPortalPage /> },
           { path: ROUTES.suppliers.myProfile, element: <SupplierMyProfilePage /> },
-          { path: ROUTES.suppliers.documents, element: <SupplierPhase2ListPage /> },
+          // Antigo menu "Documentos (Fase 2)": agora os contratos ficam em "Meus contratos"
+          { path: ROUTES.suppliers.documents, element: <Navigate to={ROUTES.suppliers.portal} replace /> },
           // Abertas por link de e-mail: sem sessão, o login guarda o token e volta para cá
           { path: ROUTES.quotations.submit(), element: <QuotationSubmitPage /> },
           { path: ROUTES.employees.phase2(), element: <Phase2UploadPage /> },

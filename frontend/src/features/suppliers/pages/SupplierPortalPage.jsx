@@ -1,232 +1,122 @@
 import { useNavigate } from 'react-router-dom';
-import {
-  LuFileText,
-  LuExternalLink,
-  LuClock,
-  LuSend,
-  LuTrophy,
-  LuCircleAlert,
-  LuUpload,
-} from 'react-icons/lu';
-import { StatusBadge, EmptyState, Banner, Button } from '../../../components/ui/index.js';
-import {
-  QUOTATION_INVITE_STATUS,
-  QUOTATION_STATUS,
-} from '../../../constants/enums.js';
-import { formatCurrency, formatDateTime } from '../../../utils/formatters.js';
+import { LuFilePen, LuFolderOpen } from 'react-icons/lu';
+import { Button, Banner, EmptyState, StatusBadge } from '../../../components/ui/index.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
-import { getMyQuotations } from '../api/suppliersApi.js';
-import SupplierLayout from '../components/SupplierLayout/index.js';
-import { ROUTES } from '../../../constants/routes.js';
+import { formatDateTime } from '../../../utils/formatters.js';
 import { cn } from '../../../utils/cn.js';
+import { ROUTES } from '../../../constants/routes.js';
+import { ASSIGNMENT_STATUS_ID } from '../../../constants/enums.js';
+import { listMyPhase2Requests } from '../../employees/api/employeesApi.js';
+import SupplierLayout from '../components/SupplierLayout/index.js';
+import SupplierPageHeader from '../components/SupplierPageHeader/index.js';
 import styles from './SupplierPortalPage.module.css';
 
+/** O que o fornecedor precisa fazer primeiro neste contrato. */
+function contractSituation(row) {
+  if (row.status === ASSIGNMENT_STATUS_ID.AGUARDANDO) return { label: 'Preencher a declaração', tone: 'warning' };
+  if (row.status === ASSIGNMENT_STATUS_ID.BLOQUEADO) return { label: 'Convite pausado', tone: 'danger' };
+  if (row.documentsReturned > 0) return { label: 'Reenviar documentos', tone: 'danger' };
+  if (row.documentsExpired > 0) return { label: 'Documento vencido', tone: 'danger' };
+  if (row.documentsTotal === 0) {
+    return row.isExpired ? { label: 'Prazo encerrado', tone: 'danger' } : { label: 'Nada enviado ainda', tone: 'warning' };
+  }
+  if (row.documentsPending > 0) return { label: 'Em análise', tone: 'info' };
+  return { label: 'Documentos aprovados', tone: 'success' };
+}
+
+/** '3 colaboradores · 8 documentos · 2 para reenviar' */
+function contractSummary(row) {
+  if (row.status !== ASSIGNMENT_STATUS_ID.ATIVO) return null;
+  const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+  const parts = [plural(row.employees, 'colaborador', 'colaboradores'), plural(row.documentsTotal, 'documento', 'documentos')];
+  if (row.documentsReturned) parts.push(`${row.documentsReturned} para reenviar`);
+  if (row.documentsExpired) parts.push(plural(row.documentsExpired, 'vencido', 'vencidos'));
+  return parts.join(' · ');
+}
+
 /**
- * Portal do fornecedor — lista todas as cotações e convites da empresa,
- * dentro de um shell com sidebar (espelha o painel interno da Everest).
- *
- * Ao vencer uma cotação, o fornecedor pode ir direto para a Fase 2
- * clicando no resultado — sem precisar abrir o e-mail (usamos o
- * phase2_token retornado pelo backend).
+ * Portal do fornecedor — "Meus contratos": as solicitações em que a empresa foi indicada por
+ * Compras. Cada uma abre a tela do contrato: primeiro a declaração e o termo; depois o envio
+ * dos documentos da empresa e dos colaboradores.
  */
 export default function SupplierPortalPage() {
   const navigate = useNavigate();
-  const { data: quotations, isLoading } = useAsyncData(getMyQuotations, []);
+  const { data: response, isLoading } = useAsyncData(listMyPhase2Requests, []);
+  const contracts = response?.body ?? [];
+  const loadError = response && !response.success ? response.message : null;
 
-  const rows = quotations ?? [];
-
-  // ── Classificação das linhas ──────────────────────────────────────────────
-  const now = new Date();
-
-  const isExpired = (r) =>
-    r.q_id == null && (r.i_status === 3 || (r.round_deadline && new Date(r.round_deadline) < now));
-
-  const pending  = rows.filter((r) => r.q_id == null && !isExpired(r));
-  const sent     = rows.filter((r) => r.q_id != null && r.q_status === 1);
-  const resolved = rows.filter((r) => r.q_id != null && r.q_status >= 2);
-  const expired  = rows.filter((r) => isExpired(r));
-
-  const wonCount = resolved.filter((r) => r.q_status === 2).length;
-  // Vencedoras que ainda têm a Fase 2 em aberto (status 0 = pendente)
-  const wonWithPhase2 = resolved.filter((r) => r.q_status === 2 && r.phase2_token);
-
-  const openQuotationLink = (token) => navigate(ROUTES.quotations.submit(token));
-  const openPhase2 = (token) => navigate(ROUTES.employees.phase2(token));
+  const toDeclare = contracts.filter((row) => row.status === ASSIGNMENT_STATUS_ID.AGUARDANDO).length;
+  const toResend = contracts.filter((row) => row.documentsReturned > 0).length;
 
   return (
     <SupplierLayout>
-      <div className={styles.pageHeader}>
-        <div>
-          <p className={styles.eyebrow}>Portal do Fornecedor</p>
-          <h1 className={styles.pageTitle}>Minhas cotações</h1>
-        </div>
-      </div>
+      <SupplierPageHeader
+        title="Meus contratos"
+        subtitle="Solicitações em que a sua empresa foi indicada. Declare o que a empresa tem, assine o termo e envie a documentação."
+      />
+
+      {loadError && <Banner tone="danger" description={loadError} />}
+      {toDeclare > 0 && (
+        <Banner
+          tone="warning"
+          title={`${toDeclare} ${toDeclare === 1 ? 'contrato aguardando' : 'contratos aguardando'} a sua declaração`}
+          description="Abra o contrato, informe quais documentos a empresa tem e assine o termo para liberar o envio."
+        />
+      )}
+      {toResend > 0 && (
+        <Banner
+          tone="warning"
+          title={`${toResend} ${toResend === 1 ? 'contrato' : 'contratos'} com documentos para reenviar`}
+          description="O RH reprovou ou pediu o reenvio de documentos. Abra o contrato para ver o motivo."
+        />
+      )}
 
       {isLoading ? (
-        <p className={styles.loading}>Carregando cotações…</p>
+        <p className={styles.loading}>Carregando contratos…</p>
+      ) : contracts.length === 0 ? (
+        <EmptyState
+          title="Nenhum contrato por enquanto"
+          description="Quando o setor de Compras indicar a sua empresa em uma solicitação, ela aparece aqui."
+        />
       ) : (
-        <>
-          {/* Resumo em cards */}
-          <div className={styles.statsRow}>
-            <StatCard icon={LuClock}       label="Pendentes"   value={pending.length}  tone="warning" />
-            <StatCard icon={LuSend}        label="Enviadas"    value={sent.length}     tone="info" />
-            <StatCard icon={LuTrophy}      label="Vencedoras"  value={wonCount}        tone="success" />
-            <StatCard icon={LuCircleAlert} label="Expiradas"   value={expired.length}  tone="danger" />
-          </div>
-
-          {rows.length === 0 && (
-            <EmptyState
-              title="Nenhuma cotação encontrada"
-              description="Quando você for convidado para uma cotação, ela aparecerá aqui. Confira também o e-mail cadastrado."
-            />
-          )}
-
-          {/* Aviso de vitória com atalho para a Fase 2 */}
-          {wonWithPhase2.length > 0 && (
-            <Banner
-              tone="success"
-              title={`Você venceu ${wonWithPhase2.length} cotação(ões)!`}
-              description="Clique em “Enviar documentos (Fase 2)” no resultado para enviar a documentação dos colaboradores — sem precisar abrir o e-mail."
-            />
-          )}
-
-          {/* ── Pendentes de resposta ── */}
-          {pending.length > 0 && (
-            <Section title="Pendentes de resposta" count={pending.length}>
-              {pending.map((row) => (
-                <div key={row.i_id} className={styles.item}>
-                  <div className={styles.itemInfo}>
-                    <span className={styles.itemTitle}>{row.labor_request_title}</span>
-                    <span className={styles.itemMeta}>
-                      {row.labor_request_location ?? '—'} · Prazo:{' '}
-                      {formatDateTime(row.round_deadline)}
-                    </span>
-                  </div>
-                  <StatusBadge enumMap={QUOTATION_INVITE_STATUS} value={row.i_status} />
-                  <Button
-                    size="sm"
-                    icon={LuExternalLink}
-                    onClick={() => openQuotationLink(row.i_invite_token)}
-                  >
-                    Responder
-                  </Button>
+        <div className={styles.sectionBody}>
+          {contracts.map((row) => {
+            const situation = contractSituation(row);
+            const summaryText = contractSummary(row);
+            const isWaiting = row.status === ASSIGNMENT_STATUS_ID.AGUARDANDO;
+            return (
+              <div
+                key={row.token}
+                className={cn(styles.item, row.isExpired && row.status === ASSIGNMENT_STATUS_ID.ATIVO && row.documentsReturned === 0 && styles.itemExpired)}
+              >
+                <div className={styles.itemInfo}>
+                  <span className={styles.itemTitle}>{row.laborRequestTitle}</span>
+                  <span className={styles.itemMeta}>
+                    {row.contractNumber ? `Contrato ${row.contractNumber} · ` : ''}
+                    {row.laborRequestLocation ?? '—'}
+                  </span>
+                  <span className={styles.itemMeta}>
+                    {row.status === ASSIGNMENT_STATUS_ID.BLOQUEADO
+                      ? 'Aguarde o contato do setor de Compras.'
+                      : row.isExpired
+                        ? 'Prazo dos documentos encerrado'
+                        : `Prazo dos documentos até ${formatDateTime(row.deadlineAt)}`}
+                  </span>
+                  {summaryText && <span className={styles.itemMeta}>{summaryText}</span>}
                 </div>
-              ))}
-            </Section>
-          )}
-
-          {/* ── Enviadas ── */}
-          {sent.length > 0 && (
-            <Section title="Enviadas (em avaliação)" count={sent.length}>
-              {sent.map((row) => (
-                <div key={row.i_id} className={styles.item}>
-                  <div className={styles.itemInfo}>
-                    <span className={styles.itemTitle}>{row.labor_request_title}</span>
-                    <span className={styles.itemMeta}>
-                      Enviada em {formatDateTime(row.q_submitted_at)}
-                    </span>
-                  </div>
-                  <span className={styles.value}>{formatCurrency(row.q_total_value)}</span>
-                  <StatusBadge enumMap={QUOTATION_STATUS} value={row.q_status} />
-                </div>
-              ))}
-            </Section>
-          )}
-
-          {/* ── Resultado ── */}
-          {resolved.length > 0 && (
-            <Section title="Resultado" count={resolved.length}>
-              {resolved.map((row) => {
-                const isWinner = row.q_status === 2;
-                const canGoPhase2 = isWinner && row.phase2_token;
-                return (
-                  <div
-                    key={row.i_id}
-                    className={cn(
-                      styles.item,
-                      isWinner && styles.itemWinner,
-                      canGoPhase2 && styles.itemClickable,
-                    )}
-                    role={canGoPhase2 ? 'button' : undefined}
-                    tabIndex={canGoPhase2 ? 0 : undefined}
-                    onClick={canGoPhase2 ? () => openPhase2(row.phase2_token) : undefined}
-                    onKeyDown={
-                      canGoPhase2
-                        ? (e) => (e.key === 'Enter' || e.key === ' ') && openPhase2(row.phase2_token)
-                        : undefined
-                    }
-                  >
-                    <div className={styles.itemInfo}>
-                      <span className={styles.itemTitle}>{row.labor_request_title}</span>
-                      <span className={styles.itemMeta}>
-                        Enviada em {formatDateTime(row.q_submitted_at)}
-                      </span>
-                    </div>
-                    <span className={styles.value}>{formatCurrency(row.q_total_value)}</span>
-                    <StatusBadge enumMap={QUOTATION_STATUS} value={row.q_status} />
-                    {canGoPhase2 && (
-                      <Button
-                        size="sm"
-                        icon={LuUpload}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openPhase2(row.phase2_token);
-                        }}
-                      >
-                        Enviar documentos (Fase 2)
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </Section>
-          )}
-
-          {/* ── Expiradas ── */}
-          {expired.length > 0 && (
-            <Section title="Expiradas" count={expired.length}>
-              {expired.map((row) => (
-                <div key={row.i_id} className={cn(styles.item, styles.itemExpired)}>
-                  <div className={styles.itemInfo}>
-                    <span className={styles.itemTitle}>{row.labor_request_title}</span>
-                    <span className={styles.itemMeta}>
-                      Prazo encerrado em {formatDateTime(row.round_deadline)}
-                    </span>
-                  </div>
-                  <StatusBadge enumMap={QUOTATION_INVITE_STATUS} value={3} />
-                </div>
-              ))}
-            </Section>
-          )}
-        </>
+                <StatusBadge label={situation.label} tone={situation.tone} />
+                <Button
+                  size="sm"
+                  icon={isWaiting ? LuFilePen : LuFolderOpen}
+                  onClick={() => navigate(ROUTES.employees.phase2(row.token))}
+                >
+                  {isWaiting ? 'Declarar' : 'Abrir'}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
       )}
     </SupplierLayout>
-  );
-}
-
-// ── Card de estatística ──────────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, tone }) {
-  return (
-    <div className={cn(styles.stat, styles[`stat_${tone}`])}>
-      <Icon className={styles.statIcon} aria-hidden="true" />
-      <div className={styles.statBody}>
-        <span className={styles.statValue}>{value}</span>
-        <span className={styles.statLabel}>{label}</span>
-      </div>
-    </div>
-  );
-}
-
-// ── Seção de lista ─────────────────────────────────────────────────────────
-function Section({ title, count, children }) {
-  return (
-    <div className={styles.section}>
-      <h3 className={styles.sectionTitle}>
-        <LuFileText aria-hidden="true" />
-        {title}
-        <span className={styles.sectionCount}>{count}</span>
-      </h3>
-      <div className={styles.sectionBody}>{children}</div>
-    </div>
   );
 }

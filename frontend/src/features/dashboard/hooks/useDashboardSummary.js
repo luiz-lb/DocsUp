@@ -1,14 +1,9 @@
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { ACCESS, canAccess } from '../../../constants/access.js';
-import { listLaborRequests } from '../../labor-requests/api/laborRequestsApi.js';
+import { LABOR_REQUEST_STATUS_ID } from '../../../constants/enums.js';
+import { getLaborRequestSummary, listLaborRequests } from '../../labor-requests/api/laborRequestsApi.js';
 import { listDeliveredDocuments } from '../../documents/api/documentsRealApi.js';
 import { listSuppliers } from '../../suppliers/api/suppliersApi.js';
-
-// Status de labor_request (LABOR_REQUEST_STATUS)
-const CLOSED_STATUSES = new Set([6, 7]);       // 6=Concluido, 7=Cancelado
-const PENDING_APPROVAL_STATUS = 0;             // Pendente de Aprovação
-const EM_COTACAO_STATUS = 3;                   // Em Cotação
-const EM_CONTRATACAO_STATUS = 5;               // Em Contratação
 
 // Status de documento que exigem atenção do RH/Segurança
 const DOC_NEEDS_ATTENTION = new Set([0, 1, 4]); // Pendente, Validando, Reenvio Necessário
@@ -17,9 +12,9 @@ const DOC_NEEDS_ATTENTION = new Set([0, 1, 4]); // Pendente, Validando, Reenvio 
 const SUPPLIER_ACTIVE = 1;
 
 /**
- * Agrega indicadores reais para o painel inicial a partir de três fontes:
- * solicitações, documentos entregues e fornecedores. Tudo resiliente — se uma
- * fonte falhar, os demais indicadores continuam preenchidos.
+ * Indicadores do painel inicial, de três fontes: o resumo das solicitações (contagem por
+ * status e urgência, calculada no banco), os documentos entregues e os fornecedores. Tudo
+ * resiliente — se uma fonte falhar, os demais indicadores continuam preenchidos.
  *
  * Documentos e fornecedores só são buscados por quem tem acesso a essas áreas
  * (o backend recusa os demais); `canSeeDocuments` / `canSeeSuppliers` dizem à tela o que mostrar.
@@ -29,56 +24,40 @@ export function useDashboardSummary(department) {
     const canSeeDocuments = canAccess(department, ACCESS.supplierDocuments);
     const canSeeSuppliers = canAccess(department, ACCESS.suppliers);
 
-    const [requestsResult, documents, suppliers] = await Promise.all([
-      listLaborRequests({ limit: 200 }).catch(() => ({ body: [] })),
+    const [summaryResult, recentResult, documents, suppliers] = await Promise.all([
+      getLaborRequestSummary().catch(() => ({ success: false })),
+      listLaborRequests({ page: 1, limit: 10 }).catch(() => ({ body: [] })),
       canSeeDocuments ? listDeliveredDocuments({}).catch(() => []) : [],
       canSeeSuppliers ? listSuppliers().catch(() => []) : [],
     ]);
 
-    const laborRequests = Array.isArray(requestsResult?.body) ? requestsResult.body : [];
+    const byStatus = summaryResult?.success ? summaryResult.body.byStatus ?? {} : {};
+    const byUrgency = summaryResult?.success ? summaryResult.body.byUrgency ?? {} : {};
+    const countOf = (status) => Number(byStatus[status] ?? 0);
+
+    const recentList = Array.isArray(recentResult?.body) ? recentResult.body : [];
     const docs = Array.isArray(documents) ? documents : [];
     const supplierList = Array.isArray(suppliers) ? suppliers : [];
-
-    // ── Solicitações ──────────────────────────────────────────────────────
-    const openLaborRequests = laborRequests.filter((r) => !CLOSED_STATUSES.has(r.status));
-    const pendingApprovals = laborRequests.filter((r) => r.status === PENDING_APPROVAL_STATUS);
-    const emCotacao = laborRequests.filter((r) => r.status === EM_COTACAO_STATUS);
-    const emContratacao = laborRequests.filter((r) => r.status === EM_CONTRATACAO_STATUS);
-
-    // Distribuição por status e urgência (para gráficos)
-    const statusDistribution = countBy(laborRequests, (r) => r.status);
-    const urgencyDistribution = countBy(laborRequests, (r) => r.urgency);
-
-    // 5 solicitações mais recentes
-    const recentRequests = [...laborRequests]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 5);
-
-    // ── Documentos ────────────────────────────────────────────────────────
-    const docStatusDistribution = countBy(docs, (d) => d.status);
-    const docsNeedingAttention = docs.filter((d) => DOC_NEEDS_ATTENTION.has(d.status)).length;
-    const docsRejected = docs.filter((d) => d.status === 3).length;
-
-    // ── Fornecedores ──────────────────────────────────────────────────────
-    const activeSuppliers = supplierList.filter((s) => s.status === SUPPLIER_ACTIVE).length;
-    const totalSuppliers = supplierList.length;
 
     return {
       canSeeDocuments,
       canSeeSuppliers,
-      openLaborRequests,
-      pendingApprovals,
-      emCotacao,
-      emContratacao,
-      statusDistribution,
-      urgencyDistribution,
-      recentRequests,
-      docStatusDistribution,
-      docsNeedingAttention,
-      docsRejected,
+      // ── Solicitações ──
+      pendingApprovals: countOf(LABOR_REQUEST_STATUS_ID.PENDENTE),
+      awaitingSupplier: countOf(LABOR_REQUEST_STATUS_ID.AGUARDANDO_FORNECEDOR),
+      blocked: countOf(LABOR_REQUEST_STATUS_ID.BLOQUEADA),
+      inContracting: countOf(LABOR_REQUEST_STATUS_ID.EM_CONTRATACAO),
+      statusDistribution: byStatus,
+      urgencyDistribution: byUrgency,
+      // 5 solicitações mais recentes (a lista já vem da mais nova para a mais antiga)
+      recentRequests: recentList.slice(0, 5),
+      // ── Documentos ──
+      docStatusDistribution: countBy(docs, (d) => d.status),
+      docsNeedingAttention: docs.filter((d) => DOC_NEEDS_ATTENTION.has(d.status)).length,
       totalDocuments: docs.length,
-      activeSuppliers,
-      totalSuppliers,
+      // ── Fornecedores ──
+      activeSuppliers: supplierList.filter((s) => s.status === SUPPLIER_ACTIVE).length,
+      totalSuppliers: supplierList.length,
     };
   }, [department]);
 }

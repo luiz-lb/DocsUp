@@ -1,26 +1,35 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { LuFileText, LuShieldCheck, LuPlus, LuClipboardList } from 'react-icons/lu';
+import { useParams } from 'react-router-dom';
+import { LuFileText, LuShieldCheck } from 'react-icons/lu';
 import {
   Card,
   PageHeader,
   StatusBadge,
   EmptyState,
   Banner,
-  Button,
 } from '../../../components/ui/index.js';
-import { LABOR_REQUEST_STATUS, URGENCY, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
+import {
+  LABOR_REQUEST_STATUS,
+  LABOR_REQUEST_STATUS_ID,
+  URGENCY,
+  DOCUMENT_CATEGORY,
+  DOCUMENT_CATEGORY_ID,
+} from '../../../constants/enums.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import { useLaborRequest, useLaborRequestApprovals } from '../hooks/useLaborRequests.js';
-import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { formatDate } from '../../../utils/formatters.js';
 import ApprovalTimeline from '../components/ApprovalTimeline.jsx';
 import ApprovePanel from '../components/ApprovePanel.jsx';
-import CreateRoundModal from '../../quotations/components/CreateRoundModal/index.js';
-import { getLatestRoundByLaborRequest } from '../../quotations/api/quotationsApi.js';
-import { useDisclosure } from '../../../hooks/useDisclosure.js';
-import { ROUTES } from '../../../constants/routes.js';
+import SupplierAssignmentCard from '../components/SupplierAssignmentCard/index.js';
 import styles from './RequestDetailPage.module.css';
+
+// Solicitações com fornecedor (aguardando indicação, bloqueada, em contratação, concluída)
+const SUPPLIER_STATUSES = [
+  LABOR_REQUEST_STATUS_ID.AGUARDANDO_FORNECEDOR,
+  LABOR_REQUEST_STATUS_ID.BLOQUEADA,
+  LABOR_REQUEST_STATUS_ID.EM_CONTRATACAO,
+  LABOR_REQUEST_STATUS_ID.CONCLUIDA,
+];
 
 // Ordem dos grupos de documentos exigidos (as NRs têm card próprio)
 const REQUIRED_DOC_CATEGORIES = [
@@ -35,25 +44,19 @@ const REQUIRED_DOC_CATEGORIES = [
  * - Qualquer colaborador autenticado visualiza os detalhes.
  * - Segurança do Trabalho (department === 1) vê o painel de aprovação
  *   enquanto a solicitação estiver pendente (status === 0).
+ * - Depois de aprovada: card do fornecedor (Compras indica pelo e-mail, reenvia, muda o
+ *   prazo e troca; os demais acompanham).
  */
 export default function RequestDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const { data: requestResponse, isLoading: isLoadingRequest, reload: reloadRequest } = useLaborRequest(id);
   const { data: approvalsResponse, isLoading: isLoadingApprovals, reload: reloadApprovals } = useLaborRequestApprovals(id);
 
   const [approvalDone, setApprovalDone] = useState(false);
-  const createRoundModal = useDisclosure(false);
 
-  // Busca o round mais recente para saber se existe rodada de cotação ativa
-  const { data: latestRound } = useAsyncData(
-    () => getLatestRoundByLaborRequest(id),
-    [id],
-  );
-
-  if (isLoadingRequest) return <p>Carregando solicitação...</p>;
+  if (isLoadingRequest && !requestResponse) return <p>Carregando solicitação...</p>;
 
   const request = requestResponse?.body?.result;
 
@@ -65,22 +68,15 @@ export default function RequestDetailPage() {
 
   // Departamento necessário para aprovar enquanto pendente (status=0)
   const necessaryAprove = user.department === Number(approvals[0]?.department);
-  const isSuprimentos = user.department === 2;
-  const isPending = request.status === 0;
-  const isEmCotacao = request.status === 3;
+  const isPending = request.status === LABOR_REQUEST_STATUS_ID.PENDENTE;
+  const hasSupplierStage = SUPPLIER_STATUSES.includes(request.status);
 
   const canApprove = necessaryAprove && isPending && !approvalDone;
-  const canCreateRound = isSuprimentos && isEmCotacao;
 
   const handleApprovalSuccess = () => {
     setApprovalDone(true);
     reloadRequest();
     reloadApprovals();
-  };
-
-  const handleRoundCreated = (roundId) => {
-    reloadRequest();
-    navigate(ROUTES.quotations.round(roundId));
   };
 
   // IDs sugeridos de document_types pela atividade (empresa e outros do colaborador)
@@ -106,28 +102,7 @@ export default function RequestDetailPage() {
         eyebrow={`Solicitação #${request.request_number}`}
         title={request.title}
         description={request.location}
-        actions={
-          <>
-            <StatusBadge enumMap={LABOR_REQUEST_STATUS} value={request.status} />
-            {/* Suprimentos: navega para o round mais recente quando existir */}
-            {isSuprimentos && latestRound && (
-              <Button
-                variant="secondary"
-                icon={LuClipboardList}
-                size="sm"
-                onClick={() => navigate(ROUTES.quotations.round(latestRound.id))}
-              >
-                Ver cotações
-              </Button>
-            )}
-            {/* Suprimentos: cria rodada apenas quando Em Cotação E ainda não existe round */}
-            {canCreateRound && !latestRound && (
-              <Button icon={LuPlus} size="sm" onClick={createRoundModal.open}>
-                Iniciar cotação
-              </Button>
-            )}
-          </>
-        }
+        actions={<StatusBadge enumMap={LABOR_REQUEST_STATUS} value={request.status} />}
       />
 
       {approvalDone && (
@@ -228,8 +203,16 @@ export default function RequestDetailPage() {
           )}
         </div>
 
-        {/* ── Coluna direita: aprovações (fica em baixo quando necessita de aprovação) ── */}
+        {/* ── Coluna direita: fornecedor e aprovações (em baixo quando necessita de aprovação) ── */}
         <div className={styles.rightCol}>
+          {hasSupplierStage && (
+            <SupplierAssignmentCard
+              laborRequestId={request.id}
+              requestStatus={request.status}
+              onChanged={reloadRequest}
+            />
+          )}
+
           <Card>
             <Card.Body>
               <h3 className={styles.sectionTitle}>Aprovações</h3>
@@ -257,14 +240,6 @@ export default function RequestDetailPage() {
           </Card>
         </div>
       </div>
-
-      {/* Modal de criação de rodada — disponível para Suprimentos quando Em Cotação */}
-      <CreateRoundModal
-        open={createRoundModal.isOpen}
-        onClose={createRoundModal.close}
-        laborRequestId={request.id}
-        onSuccess={handleRoundCreated}
-      />
     </div>
   );
 }

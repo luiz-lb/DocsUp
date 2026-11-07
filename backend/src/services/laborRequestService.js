@@ -141,6 +141,18 @@ export async function listLaborRequest({ page = 1, limit = 10, search = '', stat
     }
 }
 
+/** Quantidade de solicitações por status e por urgência (painel inicial). */
+export async function laborRequestSummary() {
+    try {
+        const summary = await laborRequestModel.getSummary();
+        const total = Object.values(summary.byStatus).reduce((sum, count) => sum + count, 0);
+        return { success: true, body: { ...summary, total } };
+    } catch (error) {
+        console.error('Erro no laborRequestSummary service:', error);
+        return { success: false, body: { message: "Erro ao buscar o resumo das solicitações." } };
+    }
+}
+
 export async function listLaborRequestById(id) {
     try {
         const result = await laborRequestModel.getLaborRequestById(id);

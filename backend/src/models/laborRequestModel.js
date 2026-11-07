@@ -91,6 +91,23 @@ export async function getLaborRequest({ page = 1, limit = 10, search = '', statu
     };
 }
 
+/** Quantas solicitações há por status e por urgência (painel inicial). */
+export async function getSummary() {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+        SELECT 'status' AS kind, [status] AS value, COUNT(*) AS total FROM labor_requests GROUP BY [status]
+        UNION ALL
+        SELECT 'urgency' AS kind, urgency AS value, COUNT(*) AS total FROM labor_requests GROUP BY urgency
+    `);
+    const byStatus = {};
+    const byUrgency = {};
+    for (const row of result.recordset) {
+        const target = row.kind === 'status' ? byStatus : byUrgency;
+        target[row.value ?? 'null'] = row.total;
+    }
+    return { byStatus, byUrgency };
+}
+
 export async function getLaborRequestById(id) {
     const pool = await poolPromise;
     const result = await pool.request()
@@ -228,6 +245,18 @@ export async function updateLaborRequestStatus(transaction, laborRequestId, stat
             WHERE id = @id
         `);
 
+    return result.rowsAffected[0] > 0;
+}
+
+/**
+ * Muda o status sem trocar quem atualizou por último (mudança feita pelo fornecedor ou pelo
+ * sistema, que não são usuários internos).
+ */
+export async function setStatusBySystem(transaction, laborRequestId, status) {
+    const result = await new sql.Request(transaction)
+        .input('id', sql.Int, laborRequestId)
+        .input('status', sql.TinyInt, status)
+        .query('UPDATE labor_requests SET [status] = @status, updated_at = GETDATE() WHERE id = @id');
     return result.rowsAffected[0] > 0;
 }
 

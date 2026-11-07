@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
 import { Button, FormField, FileDropzone, StatusBadge, Banner, SearchSelect } from '../../../components/ui/index.js';
-import { EMPLOYEE_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
+import { EMPLOYEE_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID, ASSIGNMENT_STATUS_ID } from '../../../constants/enums.js';
+import ContractDeclaration from '../../contracts/components/ContractDeclaration/index.js';
+import DeclarationSummary from '../../contracts/components/DeclarationSummary/index.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { getPhase2ByToken, addEmployee, uploadCompanyDocuments, downloadPhase2Document } from '../api/employeesApi.js';
 import Phase2CountdownBanner from '../components/Phase2CountdownBanner/index.js';
@@ -84,32 +86,84 @@ export default function Phase2UploadPage() {
   const [resendTarget, setResendTarget] = useState(null);
   const [docFeedback, setDocFeedback] = useState(null);
 
+  // Resultado da declaração assinada (aviso no topo depois de recarregar)
+  const [declarationResult, setDeclarationResult] = useState(null);
+
+  const header = (subtitle) => (
+    <SupplierPageHeader
+      title="Contrato · Documentos"
+      subtitle={subtitle}
+      backTo={ROUTES.suppliers.portal}
+      backLabel="Meus contratos"
+    />
+  );
+
   // O login é garantido pela rota (RequireSupplierAuth). Nos recarregamentos, mantém os dados na tela.
   if (isLoading && !response) {
     return (
       <SupplierLayout>
-        <SupplierPageHeader title="Fase 2 · Documentos" backTo={ROUTES.suppliers.documents} backLabel="Documentos (Fase 2)" />
+        {header()}
         <p className={styles.loading}>Carregando…</p>
       </SupplierLayout>
     );
   }
 
-  // Link inválido, expirado ou de outro fornecedor: mostra a mensagem do backend
+  // Link inválido, encerrado ou de outro fornecedor: mostra a mensagem do backend
   if (!response?.success) {
     return (
       <SupplierLayout>
-        <SupplierPageHeader title="Fase 2 · Documentos" backTo={ROUTES.suppliers.documents} backLabel="Documentos (Fase 2)" />
+        {header()}
         <Banner
           tone="danger"
-          title="Não foi possível abrir este link"
-          description={response?.message ?? 'O link da Fase 2 é inválido, expirado ou já foi utilizado.'}
+          title="Não foi possível abrir este contrato"
+          description={response?.message ?? 'O link é inválido ou o convite foi encerrado.'}
         />
       </SupplierLayout>
     );
   }
 
   const phase2 = response.body;
-  const { deadline } = phase2;
+  const { deadline, assignment, declaration = [] } = phase2;
+  const subtitle = deadline.contract_number
+    ? `${deadline.labor_request_title} · Contrato ${deadline.contract_number}`
+    : deadline.labor_request_title;
+
+  // ── Antes de enviar: declaração e termo de aceite ────────────────────────
+  if (assignment?.status === ASSIGNMENT_STATUS_ID.AGUARDANDO) {
+    return (
+      <SupplierLayout>
+        {header(subtitle)}
+        <div className={styles.panel}>
+          <ContractDeclaration
+            token={token}
+            items={phase2.declarationItems}
+            onDone={(result) => {
+              setDeclarationResult(result);
+              reload();
+            }}
+          />
+        </div>
+      </SupplierLayout>
+    );
+  }
+
+  // ── Convite pausado: a empresa declarou não ter documento da empresa ─────
+  if (assignment?.status === ASSIGNMENT_STATUS_ID.BLOQUEADO) {
+    const missing = declaration.filter((row) => row.has_document === false).map((row) => row.document_type_name);
+    return (
+      <SupplierLayout>
+        {header(subtitle)}
+        <div className={styles.panel}>
+          <Banner
+            tone="warning"
+            title="Convite pausado"
+            description={`A empresa declarou que não tem: ${missing.join(', ') || '—'}. O setor de Compras foi avisado e vai entrar em contato. Se o convite for reenviado, ele aparece de novo em "Meus contratos".`}
+          />
+          <DeclarationSummary declaration={declaration} assignment={assignment} />
+        </div>
+      </SupplierLayout>
+    );
+  }
   const employees = phase2.employees ?? [];
   const employeeDocumentTypes = phase2.employeeDocumentTypes ?? [];
   const companyDocumentTypes = phase2.companyDocumentTypes ?? [];
@@ -298,19 +352,17 @@ export default function Phase2UploadPage() {
 
   return (
     <SupplierLayout>
-      <SupplierPageHeader
-        title="Fase 2 · Documentos"
-        subtitle={deadline.contract_number
-          ? `${deadline.labor_request_title} · Contrato ${deadline.contract_number}`
-          : deadline.labor_request_title}
-        backTo={ROUTES.suppliers.documents}
-        backLabel="Documentos (Fase 2)"
-      />
+      {header(subtitle)}
       <div className={styles.panel}>
+        {declarationResult && !declarationResult.blocked && (
+          <Banner tone="success" description={declarationResult.message} />
+        )}
         <p className={styles.intro}>
           Envie os documentos da empresa e cadastre os colaboradores que atuarão nesta obra.
           Para cada colaborador, envie um documento por vez (ASO, certificados de NR, Ficha de EPI…).
         </p>
+
+        <DeclarationSummary declaration={declaration} assignment={assignment} employees={employees} />
 
         {/* Banner de countdown com expiração automática */}
         <Phase2CountdownBanner deadline={deadline} />

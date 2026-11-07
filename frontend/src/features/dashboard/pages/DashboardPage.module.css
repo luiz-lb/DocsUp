@@ -205,3 +205,8 @@
     font-size: 0.85rem;
     color: var(--color-textMuted, #6b7280);
 }
+
+/* Aviso de convites bloqueados (Compras) */
+.alert {
+  margin-bottom: 1.25rem;
+}

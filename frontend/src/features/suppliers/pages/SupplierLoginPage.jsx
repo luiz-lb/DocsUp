@@ -73,6 +73,14 @@ export default function SupplierLoginPage() {
         <h1 className={styles.title}>Entrar</h1>
         <p className={styles.subtitle}>Use o seu e-mail (Responsável ou Operador) e a sua senha.</p>
 
+        {fase2Token && !registeredEmail && (
+          <Banner
+            tone="info"
+            title="Você recebeu um convite de contrato"
+            description="Entre com o seu e-mail. Se a sua empresa ainda não tem cadastro, use “Ainda não tenho cadastro” e depois volte por aqui."
+          />
+        )}
+
         {registeredEmail && (
           <Banner
             tone="success"

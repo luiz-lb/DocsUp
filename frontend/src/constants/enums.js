@@ -84,15 +84,48 @@ export const URGENCY = {
   3: { label: 'Urgente', tone: 'danger' },
 };
 
+// labor_requests.status. 1 não é mais usado; 4 = fornecedor declarou não ter documento da empresa.
 export const LABOR_REQUEST_STATUS = {
   0: { label: 'Pendente de Aprovação', tone: 'warning' },
   1: { label: 'Aprovado RH', tone: 'info' },
   2: { label: 'Reprovado', tone: 'danger' },
-  3: { label: 'Em Cotação', tone: 'indigo' },
-  4: { label: 'Cotação Encerrada', tone: 'neutral' },
+  3: { label: 'Aguardando fornecedor', tone: 'indigo' },
+  4: { label: 'Bloqueada (fornecedor sem documento)', tone: 'danger' },
   5: { label: 'Em Contratação', tone: 'teal' },
   6: { label: 'Concluído', tone: 'success' },
   7: { label: 'Cancelado', tone: 'danger' },
+};
+
+// Ids do LABOR_REQUEST_STATUS por nome (mesmos valores do backend)
+export const LABOR_REQUEST_STATUS_ID = {
+  PENDENTE: 0,
+  REPROVADA: 2,
+  AGUARDANDO_FORNECEDOR: 3,
+  BLOQUEADA: 4,
+  EM_CONTRATACAO: 5,
+  CONCLUIDA: 6,
+  CANCELADA: 7,
+};
+
+// labor_request_suppliers.status: o fornecedor indicado na solicitação
+export const ASSIGNMENT_STATUS = {
+  0: { label: 'Aguardando o fornecedor', tone: 'warning' },
+  1: { label: 'Enviando documentos', tone: 'success' },
+  2: { label: 'Bloqueado: falta documento da empresa', tone: 'danger' },
+  3: { label: 'Encerrado', tone: 'neutral' },
+};
+
+export const ASSIGNMENT_STATUS_ID = {
+  AGUARDANDO: 0,
+  ATIVO: 1,
+  BLOQUEADO: 2,
+  ENCERRADO: 3,
+};
+
+// labor_request_suppliers.end_reason
+export const ASSIGNMENT_END_REASON = {
+  0: { label: 'Convite reenviado', tone: 'neutral' },
+  1: { label: 'Fornecedor trocado', tone: 'warning' },
 };
 
 export const APPROVAL_DECISION = {
@@ -242,6 +275,12 @@ export const AUDIT_ACTION = {
   'supplier_user.create': { label: 'Usuário do fornecedor cadastrado', tone: 'success' },
   'supplier_user.update': { label: 'Usuário do fornecedor editado', tone: 'info' },
   'supplier_user.password_change': { label: 'Senha do fornecedor alterada', tone: 'warning' },
+  'supplier_assignment.create': { label: 'Fornecedor indicado', tone: 'success' },
+  'supplier_assignment.resend': { label: 'Convite do fornecedor reenviado', tone: 'info' },
+  'supplier_assignment.deadline_change': { label: 'Prazo dos documentos alterado', tone: 'info' },
+  'supplier_assignment.replace': { label: 'Fornecedor trocado', tone: 'warning' },
+  'supplier_assignment.declare': { label: 'Declaração do fornecedor assinada', tone: 'info' },
+  'labor_request.conclude': { label: 'Contrato concluído', tone: 'success' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */
