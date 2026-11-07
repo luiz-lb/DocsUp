@@ -159,6 +159,19 @@ async function notifySupplierInvite({ email, request, token, deadlineAt, isNew }
     });
 }
 
+/**
+ * Solicitação concluída ou cancelada não muda mais de fornecedor nem de prazo.
+ * Retorna { request } ou { error }.
+ */
+async function loadChangeableRequest(laborRequestId) {
+    const request = await laborRequestModel.getLaborRequestById(laborRequestId);
+    if (!request) return { error: { status: 404, message: 'Solicitação não encontrada.' } };
+    if ([LABOR_REQUEST_STATUSES.CONCLUDED, LABOR_REQUEST_STATUSES.CANCELED].includes(request.status)) {
+        return { error: { status: 400, message: 'O contrato desta solicitação já foi concluído.' } };
+    }
+    return { request };
+}
+
 /** Registra na auditoria uma ação de Compras sobre o fornecedor da solicitação. */
 async function auditAssignment(transaction, context, action, laborRequestId, oldValues, newValues) {
     await auditModel.insertAuditLog(transaction, collaboratorAuditEntry(
@@ -352,6 +365,9 @@ export async function resendInvite(laborRequestId, payload = {}, actor, context 
     const deadline = resolveDeadline(payload);
     if (deadline.error) return { success: false, status: 400, message: deadline.error };
 
+    const loaded = await loadChangeableRequest(laborRequestId);
+    if (loaded.error) return { success: false, ...loaded.error };
+
     const current = await assignmentModel.getOpenByRequest(laborRequestId);
     if (!current) return { success: false, status: 404, message: 'Esta solicitação não tem fornecedor indicado.' };
     if (![ASSIGNMENT_STATUSES.WAITING_SUPPLIER, ASSIGNMENT_STATUSES.BLOCKED].includes(current.status)) {
@@ -397,8 +413,7 @@ export async function resendInvite(laborRequestId, payload = {}, actor, context 
         return { success: false, status: 500, message: 'Erro ao reenviar o convite.' };
     }
 
-    const request = await laborRequestModel.getLaborRequestById(laborRequestId);
-    await notifySupplierInvite({ email: current.invite_email, request, token, deadlineAt: deadline.value, isNew: false });
+    await notifySupplierInvite({ email: current.invite_email, request: loaded.request, token, deadlineAt: deadline.value, isNew: false });
 
     return {
         success: true,
@@ -414,6 +429,9 @@ export async function resendInvite(laborRequestId, payload = {}, actor, context 
 export async function changeDeadline(laborRequestId, payload = {}, actor, context = {}) {
     const deadline = resolveDeadline(payload);
     if (deadline.error) return { success: false, status: 400, message: deadline.error };
+
+    const loaded = await loadChangeableRequest(laborRequestId);
+    if (loaded.error) return { success: false, ...loaded.error };
 
     const current = await assignmentModel.getOpenByRequest(laborRequestId);
     if (!current) return { success: false, status: 404, message: 'Esta solicitação não tem fornecedor indicado.' };
@@ -454,6 +472,9 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
     }
     const deadline = resolveDeadline(payload);
     if (deadline.error) return { success: false, status: 400, message: deadline.error };
+
+    const loaded = await loadChangeableRequest(laborRequestId);
+    if (loaded.error) return { success: false, ...loaded.error };
 
     const current = await assignmentModel.getOpenByRequest(laborRequestId);
     if (!current) return { success: false, status: 404, message: 'Esta solicitação não tem fornecedor indicado.' };
@@ -511,8 +532,7 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
         return { success: false, status: 500, message: 'Erro ao trocar o fornecedor.' };
     }
 
-    const request = await laborRequestModel.getLaborRequestById(laborRequestId);
-    await notifySupplierInvite({ email, request, token, deadlineAt: deadline.value, isNew: true });
+    await notifySupplierInvite({ email, request: loaded.request, token, deadlineAt: deadline.value, isNew: true });
 
     return {
         success: true,

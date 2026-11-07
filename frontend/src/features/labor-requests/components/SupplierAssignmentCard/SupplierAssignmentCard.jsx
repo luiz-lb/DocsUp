@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LuCheck, LuCopy, LuMail, LuRefreshCw, LuTimer, LuTruck } from 'react-icons/lu';
+import { LuCheck, LuCopy, LuMail, LuRefreshCw, LuRepeat, LuTimer, LuTruck } from 'react-icons/lu';
 import { Banner, Button, Card, CountdownTimer, StatusBadge } from '../../../../components/ui/index.js';
 import {
   ASSIGNMENT_END_REASON,
@@ -104,7 +104,7 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
               <dt>Prazo dos documentos</dt>
               <dd className={styles.deadline}>
                 <span>{formatDateTime(current.deadlineAt)}</span>
-                {current.status !== ASSIGNMENT_STATUS_ID.BLOCKED && (
+                {current.status !== ASSIGNMENT_STATUS_ID.BLOQUEADO && (
                   <CountdownTimer deadline={current.deadlineAt} expiredLabel="Prazo encerrado" />
                 )}
               </dd>
@@ -123,7 +123,7 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
               </dd>
             </dl>
 
-            {current.status === ASSIGNMENT_STATUS_ID.BLOCKED && (
+            {current.status === ASSIGNMENT_STATUS_ID.BLOQUEADO && (
               <Banner
                 tone="danger"
                 title="Convite pausado: o fornecedor não tem documento da empresa"
@@ -171,7 +171,7 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
               </div>
             )}
 
-            {canManage && current.inviteLink && current.status !== ASSIGNMENT_STATUS_ID.BLOCKED && (
+            {canManage && current.inviteLink && current.status !== ASSIGNMENT_STATUS_ID.BLOQUEADO && (
               <div className={styles.linkBox}>
                 <span className={styles.meta}>
                   {mailEnabled
@@ -189,16 +189,20 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
 
             {canManage && (
               <div className={styles.actions}>
-                {[ASSIGNMENT_STATUS_ID.AGUARDANDO, ASSIGNMENT_STATUS_ID.BLOCKED].includes(current.status) && (
+                {[ASSIGNMENT_STATUS_ID.AGUARDANDO, ASSIGNMENT_STATUS_ID.BLOQUEADO].includes(current.status) && (
                   <Button size="sm" variant="secondary" icon={LuRefreshCw} onClick={() => setModalMode('resend')}>
-                    {current.status === ASSIGNMENT_STATUS_ID.BLOCKED ? 'Reenviar para o mesmo e-mail' : 'Reenviar convite'}
+                    {current.status === ASSIGNMENT_STATUS_ID.BLOQUEADO ? 'Reenviar para o mesmo e-mail' : 'Reenviar convite'}
                   </Button>
                 )}
-                {current.status !== ASSIGNMENT_STATUS_ID.BLOCKED && (
+                {current.status !== ASSIGNMENT_STATUS_ID.BLOQUEADO && (
                   <Button size="sm" variant="secondary" icon={LuTimer} onClick={() => setModalMode('deadline')}>
                     Mudar prazo
                   </Button>
                 )}
+                {/* Ex.: o fornecedor não está entregando os documentos ou não está apto */}
+                <Button size="sm" variant="ghost" icon={LuRepeat} onClick={() => setModalMode('replace')}>
+                  Trocar fornecedor
+                </Button>
               </div>
             )}
           </>

@@ -29,5 +29,7 @@ router.get('/:id/supplier', verificarToken, assignment.getRequestSupplier);
 router.post('/:id/supplier', verificarToken, podeGerenciarFornecedor, assignment.assignSupplier);
 router.post('/:id/supplier/resend', verificarToken, podeGerenciarFornecedor, assignment.resendInvite);
 router.put('/:id/supplier/deadline', verificarToken, podeGerenciarFornecedor, assignment.changeDeadline);
+// Troca o fornecedor (com motivo): o atual perde o acesso; os documentos dele ficam guardados
+router.post('/:id/supplier/replace', verificarToken, podeGerenciarFornecedor, assignment.replaceSupplier);
 
 export default router;
