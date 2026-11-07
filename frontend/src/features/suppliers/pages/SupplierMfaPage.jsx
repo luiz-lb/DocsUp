@@ -65,7 +65,7 @@ export default function SupplierMfaPage() {
         <p className={styles.eyebrow}>Portal do Fornecedor</p>
         <h1 className={styles.title}>Confirme sua identidade</h1>
         <p className={styles.subtitle}>
-          Enviamos um código de 6 dígitos para o e-mail do responsável legal e do responsável operacional cadastrados.
+          Enviamos um código de 6 dígitos para o seu e-mail. Ele vale por 10 minutos.
         </p>
 
         {/* Aviso de código de desenvolvimento — nunca aparece em produção */}

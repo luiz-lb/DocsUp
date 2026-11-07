@@ -8,11 +8,12 @@ const SupplierAuthContext = createContext(null);
  * Separado do AuthContext dos colaboradores internos.
  *
  * Estado exposto:
- *  - supplier       : { id, cnpj, razaoSocial, nomeFantasia, registrationComplete }
+ *  - supplier       : { supplierId, cnpj, razaoSocial, nomeFantasia, user: { id, role, name, email } }
  *  - isAuthenticated: boolean
  *  - isLoading      : boolean
- *  - loginPhase1    : (cnpj, password) => Promise<{ success, requiresMfa, devOtp? }>
+ *  - loginPhase1    : (email, password) => Promise<{ success, body: { requiresMfa, devOtp? } }>
  *  - loginPhase2    : (otp) => Promise<{ success, body }>
+ *  - refresh        : () => Promise — relê a sessão (ex.: depois de editar o perfil)
  *  - logout         : () => void
  */
 export function SupplierAuthProvider({ children }) {
@@ -20,8 +21,20 @@ export function SupplierAuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const refresh = async () => {
+    const result = await meSupplier();
+    if (result.success) {
+      setSupplier(result.body);
+      setIsAuthenticated(true);
+    } else {
+      setSupplier(null);
+      setIsAuthenticated(false);
+    }
+    return result;
+  };
+
   // Só restaura a sessão de fornecedor quando estamos na área do fornecedor
-  // (portal, login/cadastro/MFA de fornecedor, Fase 2 ou resposta de cotação). Evita chamar o
+  // (portal, login/cadastro/código de acesso ou envio de documentos). Evita chamar o
   // /supplier/auth/me nas telas internas de colaborador.
   useEffect(() => {
     const path = window.location.pathname;
@@ -34,28 +47,13 @@ export function SupplierAuthProvider({ children }) {
       return;
     }
 
-    meSupplier()
-      .then((result) => {
-        if (result.success) {
-          setSupplier(result.body);
-          setIsAuthenticated(true);
-        }
-      })
-      .finally(() => setIsLoading(false));
+    refresh().finally(() => setIsLoading(false));
   }, []);
 
-  /**
-   * Fase 1: identificador (CNPJ ou e-mail operacional) + senha.
-   * @param {string} identifier
-   * @param {string} password
-   * @param {'cnpj'|'email'} mode
-   * Retorna { success, requiresMfa, devOtp? }
-   */
-  const loginPhase1 = async (identifier, password, mode = 'cnpj') => {
-    return loginSupplier(identifier, password, mode);
-  };
+  /** Fase 1: e-mail do usuário + senha. Retorna { success, body: { requiresMfa, devOtp? } } */
+  const loginPhase1 = async (email, password) => loginSupplier(email, password);
 
-  /** Fase 2: OTP de 6 dígitos. Seta cookie e popula o contexto. */
+  /** Fase 2: código de 6 dígitos. Seta o cookie e popula o contexto. */
   const loginPhase2 = async (otp) => {
     const result = await verifyMfaCode(otp);
     if (result.success) {
@@ -72,7 +70,8 @@ export function SupplierAuthProvider({ children }) {
   };
 
   const value = useMemo(
-    () => ({ supplier, isAuthenticated, isLoading, loginPhase1, loginPhase2, logout }),
+    () => ({ supplier, isAuthenticated, isLoading, loginPhase1, loginPhase2, refresh, logout }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [supplier, isAuthenticated, isLoading],
   );
 

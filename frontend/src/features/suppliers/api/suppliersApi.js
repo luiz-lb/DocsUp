@@ -8,7 +8,7 @@ import { toErrorResult } from '../../../utils/apiError.js';
 /**
  * Valida o CNPJ na API pública via backend.
  * POST /supplier/auth/validate-cnpj
- * Retorna { valid, razaoSocial, nomeFantasia, situacao, municipio, uf }
+ * Retorna { valid, alreadyRegistered, razaoSocial, nomeFantasia, situacao }
  */
 export async function validateCnpj(cnpj) {
   try {
@@ -24,8 +24,8 @@ export async function validateCnpj(cnpj) {
  * Registra um novo fornecedor.
  * POST /supplier/auth/register
  *
- * @param {{ cnpj, razaoSocial, nomeFantasia?, password, employeeCount?,
- *           city?, state?, contacts, categoryIds?, regionIds? }} payload
+ * @param {{ cnpj, razaoSocial, nomeFantasia?, owner: { name, email },
+ *           operator: { name, email }, password }} payload
  */
 export async function registerSupplier(payload) {
   try {
@@ -38,19 +38,13 @@ export async function registerSupplier(payload) {
 }
 
 /**
- * Fase 1 do login: CNPJ OU e-mail operacional + senha → backend envia OTP.
+ * Fase 1 do login: e-mail do usuário (Responsável ou Operador) + senha → backend envia o código.
  * POST /supplier/auth/login
- * @param {string} identifier  — CNPJ ou e-mail operacional
- * @param {string} password
- * @param {'cnpj'|'email'} mode
  * Retorna { success: true, body: { requiresMfa: true, devOtp? } }
  */
-export async function loginSupplier(identifier, password, mode = 'cnpj') {
+export async function loginSupplier(email, password) {
   try {
-    const payload = mode === 'email'
-      ? { email: identifier, password }
-      : { cnpj: identifier, password };
-    const result = await api.post('/supplier/auth/login', payload);
+    const result = await api.post('/supplier/auth/login', { email, password });
     return result.data;
   } catch (error) {
     console.error('loginSupplier error:', error);
@@ -99,7 +93,7 @@ export async function meSupplier() {
 }
 
 /**
- * Busca o perfil completo do fornecedor autenticado (dados, contatos, regiões).
+ * Perfil do fornecedor autenticado: { supplier, users, currentUserId }.
  * GET /supplier/auth/profile
  */
 export async function getSupplierProfile() {
@@ -114,16 +108,59 @@ export async function getSupplierProfile() {
 }
 
 /**
- * Atualiza o perfil do fornecedor autenticado.
- * PUT /supplier/auth/profile
+ * Dados da empresa (nome fantasia; só o Responsável).
+ * PUT /supplier/auth/profile  Body: { nomeFantasia }
  */
-export async function updateSupplierProfile(payload) {
+export async function updateSupplierCompany(payload) {
   try {
     const result = await api.put('/supplier/auth/profile', payload);
     return result.data;
   } catch (error) {
-    console.error('updateSupplierProfile error:', error);
-    return toErrorResult(error, 'Erro ao atualizar perfil.');
+    console.error('updateSupplierCompany error:', error);
+    return toErrorResult(error, 'Erro ao atualizar os dados da empresa.');
+  }
+}
+
+/**
+ * Nome e e-mail de um usuário do fornecedor (o próprio; o Responsável também edita o
+ * Operador e pode definir uma nova senha para ele).
+ * PUT /supplier/auth/users/:id  Body: { name, email, password? }
+ */
+export async function updateSupplierUser(userId, payload) {
+  try {
+    const result = await api.put(`/supplier/auth/users/${userId}`, payload);
+    return result.data;
+  } catch (error) {
+    console.error('updateSupplierUser error:', error);
+    return toErrorResult(error, 'Erro ao atualizar o usuário.');
+  }
+}
+
+/**
+ * Cadastra o usuário que falta (Responsável ou Operador) de um fornecedor antigo.
+ * POST /supplier/auth/users  Body: { role, name, email, password }
+ */
+export async function createSupplierUser(payload) {
+  try {
+    const result = await api.post('/supplier/auth/users', payload);
+    return result.data;
+  } catch (error) {
+    console.error('createSupplierUser error:', error);
+    return toErrorResult(error, 'Erro ao cadastrar o usuário.');
+  }
+}
+
+/**
+ * Troca a senha do usuário logado.
+ * PUT /supplier/auth/password  Body: { currentPassword, newPassword }
+ */
+export async function changeSupplierPassword(currentPassword, newPassword) {
+  try {
+    const result = await api.put('/supplier/auth/password', { currentPassword, newPassword });
+    return result.data;
+  } catch (error) {
+    console.error('changeSupplierPassword error:', error);
+    return toErrorResult(error, 'Erro ao trocar a senha.');
   }
 }
 
@@ -152,7 +189,7 @@ export async function listSuppliers(filters = {}) {
 /**
  * Detalhe completo de um fornecedor (painel interno).
  * GET /suppliers/:id
- * @returns {{ supplier, contacts, regions, categories } | null}
+ * @returns {{ supplier, users } | null}
  */
 export async function getSupplierDetail(id) {
   try {
@@ -162,57 +199,6 @@ export async function getSupplierDetail(id) {
   } catch (error) {
     console.error('getSupplierDetail error:', error);
     return null;
-  }
-}
-
-// ─────────────────────────────────────────────
-// Dados de referência públicos (portal do fornecedor)
-// ─────────────────────────────────────────────
-
-/**
- * Busca activity_types sem autenticação interna.
- * GET /docRequired/public/activity_types
- */
-export async function getActivityTypesPublic() {
-  try {
-    const result = await api.get('/docRequired/public/activity_types');
-    return result.data.body?.result ?? [];
-  } catch (error) {
-    console.error('getActivityTypesPublic error:', error);
-    return [];
-  }
-}
-
-/**
- * Busca regiões com filtro de cidade e/ou estado (autocomplete).
- * GET /docRequired/public/regions?state=SP&city=Camp
- * @returns {{ id, city, state }[]}
- */
-export async function searchRegions({ state, city } = {}) {
-  try {
-    const params = new URLSearchParams();
-    if (state) params.append('state', state);
-    if (city)  params.append('city',  city);
-    const result = await api.get(`/docRequired/public/regions?${params.toString()}`);
-    return result.data.body?.result ?? [];
-  } catch (error) {
-    console.error('searchRegions error:', error);
-    return [];
-  }
-}
-
-/**
- * Busca todos os IDs de regiões de um estado inteiro.
- * GET /docRequired/public/regions/state/:state
- * @returns {number[]} array de IDs
- */
-export async function getRegionIdsByState(state) {
-  try {
-    const result = await api.get(`/docRequired/public/regions/state/${state}`);
-    return result.data.body?.ids ?? [];
-  } catch (error) {
-    console.error('getRegionIdsByState error:', error);
-    return [];
   }
 }
 

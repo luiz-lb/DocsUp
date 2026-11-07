@@ -1,10 +1,11 @@
 import { useParams } from 'react-router-dom';
-import { Card, PageHeader, StatusBadge, ScoreGauge, EmptyState } from '../../../components/ui/index.js';
-import { SUPPLIER_STATUS, CONTACT_TYPE } from '../../../constants/enums.js';
-import { formatCnpj } from '../../../utils/formatters.js';
+import { Card, PageHeader, StatusBadge, EmptyState } from '../../../components/ui/index.js';
+import { SUPPLIER_STATUS, SUPPLIER_USER_ROLE } from '../../../constants/enums.js';
+import { formatCnpj, formatDate } from '../../../utils/formatters.js';
 import { useSupplier } from '../hooks/useSuppliers.js';
 import styles from './SupplierProfilePage.module.css';
 
+/** Detalhe do fornecedor (Suprimentos): dados da empresa e os dois usuários do portal. */
 export default function SupplierProfilePage() {
   const { id } = useParams();
   const { data, isLoading } = useSupplier(id);
@@ -12,71 +13,39 @@ export default function SupplierProfilePage() {
   if (isLoading) return null;
   if (!data?.supplier) return <EmptyState title="Fornecedor não encontrado" />;
 
-  const { supplier, contacts = [], regions = [], categories = [] } = data;
-
-  const localidade = supplier.city
-    ? `${supplier.city}/${supplier.state ?? ''}`.replace(/\/$/, '')
-    : '—';
+  const { supplier, users = [] } = data;
 
   return (
     <div>
       <PageHeader
         eyebrow={formatCnpj(supplier.cnpj)}
         title={supplier.razao_social}
-        description={`${localidade} · ${supplier.employee_count ?? 0} funcionários`}
+        description={[
+          supplier.nome_fantasia,
+          supplier.created_at ? `Cadastrado em ${formatDate(supplier.created_at)}` : null,
+        ].filter(Boolean).join(' · ')}
         actions={<StatusBadge enumMap={SUPPLIER_STATUS} value={supplier.status} />}
       />
 
-      <div className={styles.layout}>
-        <Card>
-          <Card.Body className={styles.scoreBody}>
-            <ScoreGauge score={Number(supplier.overall_score ?? 0)} size={120} label="Score geral" />
-          </Card.Body>
-        </Card>
-
-        <Card>
-          <Card.Body>
-            <h3 className={styles.sectionTitle}>Contatos</h3>
-            {contacts.length === 0 ? (
-              <p className={styles.emptyMsg}>Nenhum contato cadastrado.</p>
-            ) : (
-              <ul className={styles.contactList}>
-                {contacts.map((contact) => (
-                  <li key={contact.email}>
-                    <StatusBadge enumMap={CONTACT_TYPE} value={contact.contact_type} />
-                    <span>{contact.name || contact.email}</span>
-                    <span className={styles.contactEmail}>{contact.email}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <h3 className={styles.sectionTitle}>Atuação</h3>
-            {categories.length === 0 ? (
-              <p className={styles.emptyMsg}>Nenhuma atividade cadastrada.</p>
-            ) : (
-              <div className={styles.tagRow}>
-                {categories.map((category) => (
-                  <span key={category.id} className={styles.tag}>{category.name}</span>
-                ))}
-              </div>
-            )}
-
-            <h3 className={styles.sectionTitle}>Regiões atendidas</h3>
-            {regions.length === 0 ? (
-              <p className={styles.emptyMsg}>Nenhuma região cadastrada.</p>
-            ) : (
-              <div className={styles.tagRow}>
-                {regions.map((region) => (
-                  <span key={region.id} className={styles.tag}>
-                    {region.city ? `${region.city}/${region.state}` : region.state}
-                  </span>
-                ))}
-              </div>
-            )}
-          </Card.Body>
-        </Card>
-      </div>
+      <Card>
+        <Card.Body>
+          <h3 className={styles.sectionTitle}>Usuários do portal</h3>
+          {users.length === 0 ? (
+            <p className={styles.emptyMsg}>Nenhum usuário cadastrado.</p>
+          ) : (
+            <ul className={styles.contactList}>
+              {users.map((user) => (
+                <li key={user.id}>
+                  <StatusBadge enumMap={SUPPLIER_USER_ROLE} value={user.role} />
+                  <span>{user.name || user.email}</span>
+                  <span className={styles.contactEmail}>{user.email}</span>
+                  {!user.is_active && <StatusBadge label="Inativo" tone="neutral" />}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card.Body>
+      </Card>
     </div>
   );
 }

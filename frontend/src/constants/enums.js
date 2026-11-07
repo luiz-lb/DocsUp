@@ -23,10 +23,16 @@ export const DEPARTMENT_ID = {
   ADMIN: 6,
 };
 
-export const CONTACT_TYPE = {
-  0: { label: 'Legal', tone: 'indigo' },
-  1: { label: 'Operacional', tone: 'info' },
-  2: { label: 'Financeiro', tone: 'success' },
+// supplier_users.role: os dois usuários que entram no portal do fornecedor
+export const SUPPLIER_USER_ROLE = {
+  0: { label: 'Responsável', tone: 'indigo' },
+  1: { label: 'Operador', tone: 'info' },
+};
+
+// Ids do SUPPLIER_USER_ROLE por nome (mesmos valores do backend)
+export const SUPPLIER_USER_ROLE_ID = {
+  RESPONSAVEL: 0,
+  OPERADOR: 1,
 };
 
 export const SUPPLIER_STATUS = {
@@ -233,6 +239,9 @@ export const AUDIT_ACTION = {
   'document.status_change': { label: 'Status de documento alterado', tone: 'info' },
   'document.expired': { label: 'Documento vencido (rotina diária)', tone: 'danger' },
   'employee.status_change': { label: 'Situação do colaborador alterada', tone: 'info' },
+  'supplier_user.create': { label: 'Usuário do fornecedor cadastrado', tone: 'success' },
+  'supplier_user.update': { label: 'Usuário do fornecedor editado', tone: 'info' },
+  'supplier_user.password_change': { label: 'Senha do fornecedor alterada', tone: 'warning' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */

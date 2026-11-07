@@ -11,11 +11,15 @@ router.post('/login', supplierAuth.login);
 router.post('/verify-mfa', supplierAuth.verifyMfa);
 router.post('/logout', supplierAuth.logout);
 
-// Rota protegida — retorna dados do fornecedor logado
+// Rota protegida — retorna dados do fornecedor e do usuário logado
 router.get('/me', verificarTokenFornecedor, supplierAuth.getMe);
 
-// Perfil do fornecedor (edição de dados da empresa)
+// Perfil: dados da empresa (nome fantasia, só o Responsável), usuários e a própria senha
 router.get('/profile', verificarTokenFornecedor, supplierAuth.getProfile);
 router.put('/profile', verificarTokenFornecedor, supplierAuth.updateProfile);
+router.put('/users/:id', verificarTokenFornecedor, supplierAuth.updateUser);
+// Cadastra o usuário que falta (fornecedor antigo que ficou sem Responsável ou sem Operador)
+router.post('/users', verificarTokenFornecedor, supplierAuth.createUser);
+router.put('/password', verificarTokenFornecedor, supplierAuth.changePassword);
 
 export default router;

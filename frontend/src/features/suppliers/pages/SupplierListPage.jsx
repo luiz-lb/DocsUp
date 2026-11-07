@@ -2,9 +2,19 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader, DataTable, StatusBadge } from '../../../components/ui/index.js';
 import { SUPPLIER_STATUS } from '../../../constants/enums.js';
 import { ROUTES } from '../../../constants/routes.js';
-import { formatCnpj } from '../../../utils/formatters.js';
+import { formatCnpj, formatDate } from '../../../utils/formatters.js';
 import { useSuppliers } from '../hooks/useSuppliers.js';
 import styles from './SupplierListPage.module.css';
+
+function UserCell({ name, email }) {
+  if (!email) return '—';
+  return (
+    <div>
+      <span>{name || email}</span>
+      {name && <div className={styles.cnpj}>{email}</div>}
+    </div>
+  );
+}
 
 const COLUMNS = [
   {
@@ -18,12 +28,16 @@ const COLUMNS = [
     ),
   },
   {
-    key: 'city',
-    header: 'Cidade',
-    render: (row) => (row.city ? `${row.city}/${row.state ?? ''}`.replace(/\/$/, '') : '—'),
+    key: 'owner',
+    header: 'Responsável',
+    render: (row) => <UserCell name={row.owner_name} email={row.owner_email} />,
   },
-  { key: 'employee_count', header: 'Funcionários', render: (row) => row.employee_count ?? '—' },
-  { key: 'overall_score', header: 'Score', render: (row) => (row.overall_score != null ? Number(row.overall_score).toFixed(1) : '-') },
+  {
+    key: 'operator',
+    header: 'Operador',
+    render: (row) => <UserCell name={row.operator_name} email={row.operator_email} />,
+  },
+  { key: 'created_at', header: 'Cadastrado em', render: (row) => formatDate(row.created_at) },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge enumMap={SUPPLIER_STATUS} value={row.status} /> },
 ];
 
@@ -36,7 +50,7 @@ export default function SupplierListPage() {
       <PageHeader
         eyebrow="Suprimentos"
         title="Fornecedores"
-        description="Base de fornecedores cadastrados, com score de qualificação e status de documentação."
+        description="Fornecedores cadastrados no portal, com o Responsável e o Operador de cada um."
       />
       <DataTable
         columns={COLUMNS}
@@ -44,6 +58,7 @@ export default function SupplierListPage() {
         isLoading={isLoading}
         onRowClick={(row) => navigate(ROUTES.suppliers.profile(row.id))}
         emptyTitle="Nenhum fornecedor cadastrado"
+        stackOnMobile
       />
     </div>
   );

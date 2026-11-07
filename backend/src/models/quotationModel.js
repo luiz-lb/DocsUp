@@ -131,14 +131,14 @@ export async function findExistingInviteForEmail(roundId, email) {
                     -- OU o convite pertence ao fornecedor dono deste e-mail de contato
                     OR i.supplier_id IN (
                         SELECT sc.supplier_id
-                        FROM supplier_contacts AS sc
+                        FROM supplier_users AS sc
                         WHERE LOWER(sc.email) = LOWER(@email)
                     )
                     -- OU já existe convite (por e-mail) para outro contato do MESMO fornecedor
                     OR EXISTS (
                         SELECT 1
-                        FROM supplier_contacts AS sc_target
-                        INNER JOIN supplier_contacts AS sc_invited
+                        FROM supplier_users AS sc_target
+                        INNER JOIN supplier_users AS sc_invited
                             ON sc_invited.supplier_id = sc_target.supplier_id
                         WHERE LOWER(sc_target.email) = LOWER(@email)
                           AND LOWER(sc_invited.email) = LOWER(i.invite_email)
@@ -175,7 +175,7 @@ export async function getSupplierBriefByContactEmail(email) {
         .query(`
             SELECT TOP 1 s.id, s.cnpj, s.razao_social, s.nome_fantasia
             FROM suppliers AS s
-            INNER JOIN supplier_contacts AS sc ON sc.supplier_id = s.id
+            INNER JOIN supplier_users AS sc ON sc.supplier_id = s.id
             WHERE LOWER(sc.email) = LOWER(@email)
             ORDER BY s.id ASC
         `);
@@ -655,7 +655,7 @@ export async function getQuotationsBySupplierId(supplierId) {
                 -- 2. convite por email: casa com email de contato do fornecedor
                 OR EXISTS (
                     SELECT 1
-                    FROM supplier_contacts AS sc
+                    FROM supplier_users AS sc
                     WHERE sc.supplier_id = @supplier_id
                       AND LOWER(sc.email) = LOWER(i.invite_email)
                 )

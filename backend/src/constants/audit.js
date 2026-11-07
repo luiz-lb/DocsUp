@@ -27,6 +27,9 @@ export const AUDIT_ACTIONS = Object.freeze({
     DOCUMENT_STATUS_CHANGE: 'document.status_change',
     DOCUMENT_EXPIRED: 'document.expired',
     EMPLOYEE_STATUS_CHANGE: 'employee.status_change',
+    SUPPLIER_USER_CREATE: 'supplier_user.create',
+    SUPPLIER_USER_UPDATE: 'supplier_user.update',
+    SUPPLIER_USER_PASSWORD_CHANGE: 'supplier_user.password_change',
 });
 
 // audit_log.entity_type
@@ -36,4 +39,5 @@ export const AUDIT_ENTITIES = Object.freeze({
     ACTIVITY: 'activity',
     DOCUMENT: 'document',
     EMPLOYEE: 'employee',
+    SUPPLIER_USER: 'supplier_user',
 });

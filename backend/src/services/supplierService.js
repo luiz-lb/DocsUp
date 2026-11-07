@@ -1,4 +1,5 @@
 import * as supplierModel from '../models/supplierModel.js';
+import * as supplierUserModel from '../models/supplierUserModel.js';
 
 // ─────────────────────────────────────────────
 // Painel interno — listagem e detalhe de fornecedores
@@ -18,7 +19,7 @@ export async function listSuppliers(filters = {}) {
 }
 
 /**
- * Detalhe completo de um fornecedor: dados, contatos, regiões e categorias.
+ * Detalhe de um fornecedor: dados da empresa e os usuários (Responsável e Operador).
  */
 export async function getSupplierDetail(supplierId) {
     try {
@@ -26,13 +27,8 @@ export async function getSupplierDetail(supplierId) {
         if (!supplier) {
             return { success: false, message: 'Fornecedor não encontrado.' };
         }
-        const [contacts, regions, categories] = await Promise.all([
-            supplierModel.getSupplierContacts(supplierId),
-            supplierModel.getSupplierRegions(supplierId),
-            supplierModel.getSupplierCategories(supplierId),
-        ]);
-
-        return { success: true, body: { supplier, contacts, regions, categories } };
+        const users = await supplierUserModel.listUsersBySupplier(supplierId);
+        return { success: true, body: { supplier, users } };
     } catch (error) {
         console.error('getSupplierDetail service error:', error);
         return { success: false, message: 'Erro ao buscar o fornecedor.' };

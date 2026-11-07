@@ -74,6 +74,7 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-}
       USER_ADMIN: ${USER_ADMIN:-}
       SENHA_ADMIN: ${SENHA_ADMIN:-}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}

@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LuLayoutDashboard, LuUser, LuBuilding2, LuFolderUp } from 'react-icons/lu';
 import { cn } from '../../../../utils/cn.js';
 import { ROUTES } from '../../../../constants/routes.js';
+import { SUPPLIER_USER_ROLE } from '../../../../constants/enums.js';
 import styles from './SupplierSidebar.module.css';
 
 // `section`: telas abertas a partir do item que também o deixam marcado (ex.: a cotação
@@ -27,6 +28,11 @@ export default function SupplierSidebar({ onNavigate, supplier }) {
         <span className={styles.supplierLabel}>Fornecedor</span>
         <span className={styles.supplierName}>{supplier?.razaoSocial ?? '—'}</span>
         {supplier?.cnpj && <span className={styles.supplierCnpj}>CNPJ: {supplier.cnpj}</span>}
+        {supplier?.user?.name && (
+          <span className={styles.supplierCnpj}>
+            {supplier.user.name} · {SUPPLIER_USER_ROLE[supplier.user.role]?.label ?? 'Usuário'}
+          </span>
+        )}
       </div>
 
       <nav className={styles.nav}>

@@ -1,4 +1,4 @@
-import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, EMPLOYEE_STATUS, RISK_LEVEL, VALIDATION_METHOD } from '../../constants/enums.js';
+import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, EMPLOYEE_STATUS, RISK_LEVEL, SUPPLIER_USER_ROLE, VALIDATION_METHOD } from '../../constants/enums.js';
 
 // Nome dos campos gravados em old_values / new_values
 const FIELD_LABELS = {
@@ -27,13 +27,15 @@ const FIELD_LABELS = {
   validation_method: 'Método de validação',
   api_endpoint: 'Integração de API',
   ai_instructions: 'Instrução para a IA',
+  role: 'Papel',
+  by_owner: 'Definida pelo Responsável',
 };
 
 // Campos com lista de ids, mostrados como '#1, #2'
 const ID_LIST_FIELDS = new Set(['document_type_ids', 'document_ids', 'missing_document_ids']);
 
 // Campos sim/não: podem vir como boolean ou como 1/0 (BIT do banco)
-const BOOLEAN_FIELDS = new Set(['is_active', 'has_expiration']);
+const BOOLEAN_FIELDS = new Set(['is_active', 'has_expiration', 'by_owner']);
 
 /** Quem fez a ação: { title, subtitle }. */
 export function describeActor(row) {
@@ -48,6 +50,9 @@ export function describeTarget(row) {
   if (row.entity_type === 'user') {
     if (row.target_name) return { title: row.target_name, subtitle: row.target_email };
     return { title: `Usuário #${row.entity_id}`, subtitle: null };
+  }
+  if (row.entity_type === 'supplier_user') {
+    return { title: row.target_name ?? `Usuário do fornecedor #${row.entity_id}`, subtitle: row.target_email ?? 'Usuário do fornecedor' };
   }
   if (row.entity_type === 'document_type') {
     return { title: row.target_name ?? `Tipo de documento #${row.entity_id}`, subtitle: 'Tipo de documento' };
@@ -85,6 +90,7 @@ function formatValue(field, value, entityType) {
   // 'AAAA-MM-DDTHH:mm' (gravado sem fuso) → 'DD/MM/AAAA HH:mm'
   if (field === 'integration_at') return String(value).replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}).*$/, '$3/$2/$1 $4');
   if (field === 'department') return DEPARTMENT[value]?.label ?? String(value);
+  if (field === 'role' && entityType === 'supplier_user') return SUPPLIER_USER_ROLE[value]?.label ?? String(value);
   if (field === 'category') return DOCUMENT_CATEGORY[value]?.label ?? String(value);
   if (field === 'validation_method') return VALIDATION_METHOD[value]?.label ?? String(value);
   if (field === 'status') return DOCUMENT_STATUS[value]?.label ?? String(value);

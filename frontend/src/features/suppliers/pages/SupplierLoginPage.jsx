@@ -4,12 +4,15 @@ import { LuLogIn, LuUserPlus } from 'react-icons/lu';
 import { Card, Button, FormField, Banner } from '../../../components/ui/index.js';
 import { ROUTES } from '../../../constants/routes.js';
 import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
-import CnpjField from '../components/CnpjField.jsx';
 import styles from '../../../styles/authCard.module.css';
 
-// Login por CNPJ ou por e-mail operacional
-const IDENTIFIER = { CNPJ: 'cnpj', EMAIL: 'email' };
-
+/**
+ * Login do fornecedor: e-mail do usuário (Responsável ou Operador) e senha. Depois vem o
+ * código de 6 dígitos enviado para o e-mail (tela de código).
+ *
+ * Os tokens da URL (?fase2 / ?tokenProposta) vêm dos links abertos sem sessão: seguem para o
+ * cadastro e, depois do login, a tela de código volta para o link.
+ */
 export default function SupplierLoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,12 +24,12 @@ export default function SupplierLoginPage() {
   const fase2Token = searchParams.get('fase2');
   // Rota de origem quando o guard redirecionou para o login
   const returnTo = location.state?.returnTo ?? null;
+  // Vindo do cadastro: e-mail do Responsável já preenchido e aviso de cadastro concluído
+  const registeredEmail = location.state?.registeredEmail ?? '';
 
   const { loginPhase1 } = useSupplierAuth();
 
-  const [mode, setMode] = useState(IDENTIFIER.CNPJ);
-  const [cnpj, setCnpj] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(registeredEmail);
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,18 +39,16 @@ export default function SupplierLoginPage() {
     setError('');
     setIsLoading(true);
 
-    // Identifica por CNPJ ou por e-mail operacional
-    const identifier = mode === IDENTIFIER.CNPJ ? cnpj : email;
-    const result = await loginPhase1(identifier, password, mode);
+    const result = await loginPhase1(email.trim(), password);
     setIsLoading(false);
 
     if (!result.success) {
-      setError(result.body?.message ?? 'Não foi possível autenticar. Verifique os dados e a senha.');
+      setError(result.body?.message ?? 'Não foi possível entrar. Confira o e-mail e a senha.');
       return;
     }
 
     if (result.body?.requiresMfa) {
-      // Propaga o devOtp (dev) e os tokens (proposta / fase 2) para a tela de MFA
+      // Leva o devOtp (só fora de produção) e os tokens (proposta / fase 2) para a tela de código
       navigate(ROUTES.suppliers.mfa, {
         state: {
           devOtp: result.body?.devOtp ?? null,
@@ -60,8 +61,8 @@ export default function SupplierLoginPage() {
   };
 
   const buildRegisterUrl = () => {
-    if (tokenProposta) return `${ROUTES.suppliers.register}?tokenProposta=${tokenProposta}`;
-    if (fase2Token) return `${ROUTES.suppliers.register}?fase2=${fase2Token}`;
+    if (tokenProposta) return `${ROUTES.suppliers.register}?tokenProposta=${encodeURIComponent(tokenProposta)}`;
+    if (fase2Token) return `${ROUTES.suppliers.register}?fase2=${encodeURIComponent(fase2Token)}`;
     return ROUTES.suppliers.register;
   };
 
@@ -70,44 +71,26 @@ export default function SupplierLoginPage() {
       <Card.Body>
         <p className={styles.eyebrow}>Portal do Fornecedor</p>
         <h1 className={styles.title}>Entrar</h1>
-        <p className={styles.subtitle}>Acesse com o CNPJ ou e-mail operacional e a senha cadastrados.</p>
+        <p className={styles.subtitle}>Use o seu e-mail (Responsável ou Operador) e a sua senha.</p>
 
-        {/* Alternância entre CNPJ e e-mail operacional */}
-        <div className={styles.segmented} role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === IDENTIFIER.CNPJ}
-            className={mode === IDENTIFIER.CNPJ ? styles.segmentActive : styles.segment}
-            onClick={() => { setMode(IDENTIFIER.CNPJ); setError(''); }}
-          >
-            CNPJ
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === IDENTIFIER.EMAIL}
-            className={mode === IDENTIFIER.EMAIL ? styles.segmentActive : styles.segment}
-            onClick={() => { setMode(IDENTIFIER.EMAIL); setError(''); }}
-          >
-            E-mail operacional
-          </button>
-        </div>
+        {registeredEmail && (
+          <Banner
+            tone="success"
+            title="Cadastro concluído"
+            description="Entre com o e-mail e a senha que você acabou de cadastrar."
+          />
+        )}
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          {mode === IDENTIFIER.CNPJ ? (
-            <CnpjField value={cnpj} onChange={setCnpj} />
-          ) : (
-            <FormField label="E-mail operacional" required>
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="operacional@empresa.com.br"
-                autoComplete="email"
-              />
-            </FormField>
-          )}
+          <FormField label="E-mail" required>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="voce@empresa.com.br"
+              autoComplete="email"
+            />
+          </FormField>
 
           <FormField label="Senha" required>
             <input
@@ -121,7 +104,7 @@ export default function SupplierLoginPage() {
 
           {error && <Banner tone="danger" description={error} />}
 
-          <Button type="submit" icon={LuLogIn} isLoading={isLoading} fullWidth>
+          <Button type="submit" icon={LuLogIn} isLoading={isLoading} fullWidth disabled={!email.trim() || !password}>
             Entrar
           </Button>
         </form>

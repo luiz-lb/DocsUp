@@ -1,242 +1,371 @@
 import { useEffect, useState } from 'react';
-import { LuSave, LuBuilding2, LuMail, LuMapPin } from 'react-icons/lu';
-import { Card, Button, FormField, Banner } from '../../../components/ui/index.js';
+import { LuBuilding2, LuKeyRound, LuSave, LuUsers } from 'react-icons/lu';
+import { Card, Button, FormField, Banner, StatusBadge } from '../../../components/ui/index.js';
 import SupplierLayout from '../components/SupplierLayout/index.js';
-import SearchSelectList from '../components/SearchSelectList/index.js';
-import { getSupplierProfile, updateSupplierProfile, searchRegions } from '../api/suppliersApi.js';
-import { UFS } from '../../../constants/ufs.js';
+import SupplierPageHeader from '../components/SupplierPageHeader/index.js';
+import {
+  changeSupplierPassword,
+  createSupplierUser,
+  getSupplierProfile,
+  updateSupplierCompany,
+  updateSupplierUser,
+} from '../api/suppliersApi.js';
+import { useSupplierAuth } from '../../../contexts/SupplierAuthContext.jsx';
+import { SUPPLIER_USER_ROLE, SUPPLIER_USER_ROLE_ID } from '../../../constants/enums.js';
+import { getPasswordPolicyError, isValidEmail, PASSWORD_RULE_HINT } from '../../../utils/validators.js';
 import styles from './SupplierMyProfilePage.module.css';
 
-// Tipos de contato (espelha CONTACT_TYPE do schema)
-const CONTACT_TYPES = [
-  { type: 0, label: 'Responsável legal', required: true },
-  { type: 1, label: 'Responsável operacional', required: true },
-  { type: 2, label: 'Responsável financeiro', required: false },
-];
-
-const EMPTY_CONTACT = { name: '', email: '', phone: '' };
-
+/**
+ * Perfil no portal do fornecedor:
+ *  - Empresa: CNPJ e razão social fixos; nome fantasia (só o Responsável altera).
+ *  - Usuários: cada um edita o próprio nome e e-mail; o Responsável também edita o Operador
+ *    e pode definir uma nova senha para ele (ex.: o Operador mudou de pessoa).
+ *  - Minha senha: troca a senha de quem está logado (as outras sessões dele caem).
+ */
 export default function SupplierMyProfilePage() {
-  const [company, setCompany] = useState({
-    razaoSocial: '', cnpj: '', nomeFantasia: '', employeeCount: '',
-    address: '', city: '', state: '', zipCode: '', phone: '', website: '',
-  });
-  // contatos por tipo: { 0: {...}, 1: {...}, 2: {...} }
-  const [contacts, setContacts] = useState({ 0: { ...EMPTY_CONTACT }, 1: { ...EMPTY_CONTACT }, 2: { ...EMPTY_CONTACT } });
-  const [regions, setRegions] = useState([]); // [{ id, label, sublabel }]
-
+  const { refresh } = useSupplierAuth();
+  const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     getSupplierProfile().then((data) => {
-      if (!active || !data) { setIsLoading(false); return; }
-
-      const s = data.supplier;
-      setCompany({
-        razaoSocial: s.razao_social ?? '',
-        cnpj: s.cnpj ?? '',
-        nomeFantasia: s.nome_fantasia ?? '',
-        employeeCount: s.employee_count ?? '',
-        address: s.address ?? '',
-        city: s.city ?? '',
-        state: s.state ?? '',
-        zipCode: s.zip_code ?? '',
-        phone: s.phone ?? '',
-        website: s.website ?? '',
-      });
-
-      const nextContacts = { 0: { ...EMPTY_CONTACT }, 1: { ...EMPTY_CONTACT }, 2: { ...EMPTY_CONTACT } };
-      for (const c of data.contacts ?? []) {
-        nextContacts[c.contact_type] = { name: c.name ?? '', email: c.email ?? '', phone: c.phone ?? '' };
-      }
-      setContacts(nextContacts);
-
-      setRegions((data.regions ?? []).map((r) => ({
-        id: r.id,
-        label: r.city ?? r.state,
-        sublabel: r.state,
-      })));
-
+      if (!active) return;
+      setProfile(data);
       setIsLoading(false);
     });
     return () => { active = false; };
-  }, []);
+  }, [reloadKey]);
 
-  const setContactField = (type, field) => (e) =>
-    setContacts((prev) => ({ ...prev, [type]: { ...prev[type], [field]: e.target.value } }));
-
-  const setCompanyField = (field) => (e) =>
-    setCompany((prev) => ({ ...prev, [field]: e.target.value }));
-
-  const fetchRegions = async (query) => {
-    const results = await searchRegions({ city: query });
-    return results.map((r) => ({ id: r.id, label: r.city, sublabel: r.state }));
+  const reload = () => {
+    setReloadKey((key) => key + 1);
+    refresh();
   };
 
-  const addRegion = (item) => setRegions((prev) => [...prev, item]);
-  const removeRegion = (id) => setRegions((prev) => prev.filter((r) => r.id !== id));
-
-  const handleSave = async () => {
-    setError('');
-    setSuccess('');
-
-    if (!contacts[0].email || !contacts[1].email) {
-      setError('Os e-mails do responsável legal e operacional são obrigatórios.');
-      return;
-    }
-
-    setIsSaving(true);
-    const payload = {
-      nomeFantasia: company.nomeFantasia,
-      employeeCount: company.employeeCount ? Number(company.employeeCount) : null,
-      address: company.address,
-      city: company.city,
-      state: company.state,
-      zipCode: company.zipCode,
-      phone: company.phone,
-      website: company.website,
-      contacts: CONTACT_TYPES.map(({ type }) => ({
-        contactType: type,
-        name: contacts[type].name,
-        email: contacts[type].email,
-        phone: contacts[type].phone,
-      })),
-      regionIds: regions.map((r) => r.id),
-    };
-
-    const result = await updateSupplierProfile(payload);
-    setIsSaving(false);
-
-    if (!result.success) {
-      setError(result.body?.message ?? 'Erro ao salvar o perfil.');
-      return;
-    }
-    setSuccess('Perfil atualizado com sucesso.');
-  };
+  const currentUser = profile?.users?.find((user) => user.id === profile.currentUserId) ?? null;
+  const isOwner = currentUser?.role === SUPPLIER_USER_ROLE_ID.RESPONSAVEL;
+  // Cadastro antigo pode ter ficado sem um dos dois usuários: dá para cadastrar o que falta
+  const missingRoles = [SUPPLIER_USER_ROLE_ID.RESPONSAVEL, SUPPLIER_USER_ROLE_ID.OPERADOR]
+    .filter((role) => !profile?.users?.some((user) => user.role === role));
 
   return (
     <SupplierLayout>
-      <div className={styles.pageHeader}>
-        <div>
-          <p className={styles.eyebrow}>Portal do Fornecedor</p>
-          <h1 className={styles.pageTitle}>Perfil da empresa</h1>
-        </div>
-        <Button icon={LuSave} isLoading={isSaving} onClick={handleSave} disabled={isLoading}>
-          Salvar alterações
-        </Button>
-      </div>
-      
-        {error && <Banner tone="danger" className={styles.aviso} description={error} />}
-        {success && <Banner tone="success" className={styles.aviso} description={success} />}
+      <SupplierPageHeader
+        title="Perfil da empresa"
+        subtitle="Dados da empresa e das duas pessoas que entram no portal."
+      />
 
       {isLoading ? (
         <p className={styles.loading}>Carregando perfil…</p>
+      ) : !profile ? (
+        <Banner tone="danger" description="Não foi possível carregar o perfil. Tente novamente." />
       ) : (
         <div className={styles.grid}>
-          {/* Dados da empresa */}
+          <CompanyCard supplier={profile.supplier} canEdit={isOwner} onSaved={reload} />
+
           <Card>
             <Card.Body>
-              <h3 className={styles.sectionTitle}><LuBuilding2 /> Dados da empresa</h3>
-
-              <div className={styles.fieldGrid}>
-                <FormField label="Razão social">
-                  <input value={company.razaoSocial} disabled readOnly />
-                </FormField>
-                <FormField label="CNPJ">
-                  <input value={company.cnpj} disabled readOnly />
-                </FormField>
-                <FormField label="Nome fantasia">
-                  <input value={company.nomeFantasia} onChange={setCompanyField('nomeFantasia')} />
-                </FormField>
-                <FormField label="Quantidade de colaboradores">
-                  <input
-                    type="number"
-                    min="0"
-                    value={company.employeeCount}
-                    onChange={setCompanyField('employeeCount')}
-                  />
-                </FormField>
-                <FormField label="Telefone">
-                  <input value={company.phone} onChange={setCompanyField('phone')} placeholder="(00) 00000-0000" />
-                </FormField>
-                <FormField label="Website">
-                  <input value={company.website} onChange={setCompanyField('website')} placeholder="https://" />
-                </FormField>
-              </div>
-
-              <h4 className={styles.subTitle}>Endereço</h4>
-              <div className={styles.fieldGrid}>
-                <FormField label="Logradouro" className={styles.spanTwo}>
-                  <input value={company.address} onChange={setCompanyField('address')} />
-                </FormField>
-                <FormField label="Cidade">
-                  <input value={company.city} onChange={setCompanyField('city')} />
-                </FormField>
-                <FormField label="UF">
-                  <select value={company.state} onChange={setCompanyField('state')}>
-                    <option value="">—</option>
-                    {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
-                  </select>
-                </FormField>
-                <FormField label="CEP">
-                  <input value={company.zipCode} onChange={setCompanyField('zipCode')} placeholder="00000-000" />
-                </FormField>
-              </div>
-            </Card.Body>
-          </Card>
-
-          {/* Contatos */}
-          <Card>
-            <Card.Body>
-              <h3 className={styles.sectionTitle}><LuMail /> Contatos</h3>
-              {CONTACT_TYPES.map(({ type, label, required }) => (
-                <div key={type} className={styles.contactBlock}>
-                  <p className={styles.contactLabel}>
-                    {label}{required && <span className={styles.required}> *</span>}
-                  </p>
-                  <div className={styles.fieldGrid}>
-                    <FormField label="Nome">
-                      <input value={contacts[type].name} onChange={setContactField(type, 'name')} />
-                    </FormField>
-                    <FormField label="E-mail" required={required}>
-                      <input
-                        type="email"
-                        value={contacts[type].email}
-                        onChange={setContactField(type, 'email')}
-                        placeholder="email@empresa.com.br"
-                      />
-                    </FormField>
-                    <FormField label="Telefone">
-                      <input value={contacts[type].phone} onChange={setContactField(type, 'phone')} />
-                    </FormField>
-                  </div>
-                </div>
+              <h3 className={styles.sectionTitle}><LuUsers /> Usuários do portal</h3>
+              <p className={styles.sectionNote}>
+                Cada usuário entra com o próprio e-mail e senha. {isOwner
+                  ? 'Como Responsável, você também pode alterar os dados do Operador.'
+                  : 'Os dados do Responsável só ele altera.'}
+              </p>
+              {profile.users.map((user) => (
+                <UserBlock
+                  key={user.id}
+                  user={user}
+                  isSelf={user.id === profile.currentUserId}
+                  canEdit={user.id === profile.currentUserId || isOwner}
+                  canSetPassword={isOwner && user.id !== profile.currentUserId}
+                  onSaved={reload}
+                />
+              ))}
+              {missingRoles.map((role) => (
+                <MissingUserBlock key={role} role={role} onSaved={reload} />
               ))}
             </Card.Body>
           </Card>
 
-          {/* Regiões atendidas */}
-          <Card>
-            <Card.Body>
-              <h3 className={styles.sectionTitle}><LuMapPin /> Regiões atendidas</h3>
-              <SearchSelectList
-                label="Cidades atendidas"
-                placeholder="Pesquisar cidade…"
-                selected={regions}
-                onAdd={addRegion}
-                onRemove={removeRegion}
-                fetchOptions={fetchRegions}
-                minChars={2}
-                emptyHint="Nenhuma cidade adicionada ainda."
-              />
-            </Card.Body>
-          </Card>
+          <PasswordCard />
         </div>
       )}
     </SupplierLayout>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empresa
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CompanyCard({ supplier, canEdit, onSaved }) {
+  const [nomeFantasia, setNomeFantasia] = useState(supplier.nome_fantasia ?? '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  const handleSave = async () => {
+    setFeedback(null);
+    setIsSaving(true);
+    const result = await updateSupplierCompany({ nomeFantasia: nomeFantasia.trim() || null });
+    setIsSaving(false);
+    if (!result.success) {
+      setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao salvar.' });
+      return;
+    }
+    setFeedback({ tone: 'success', message: result.body?.message ?? 'Dados da empresa atualizados.' });
+    onSaved();
+  };
+
+  return (
+    <Card>
+      <Card.Body>
+        <h3 className={styles.sectionTitle}><LuBuilding2 /> Dados da empresa</h3>
+        <div className={styles.fieldGrid}>
+          <FormField label="Razão social">
+            <input value={supplier.razao_social ?? ''} disabled readOnly />
+          </FormField>
+          <FormField label="CNPJ">
+            <input value={supplier.cnpj ?? ''} disabled readOnly />
+          </FormField>
+          <FormField label="Nome fantasia" hint={canEdit ? undefined : 'Só o Responsável altera.'}>
+            <input
+              value={nomeFantasia}
+              onChange={(event) => setNomeFantasia(event.target.value)}
+              disabled={!canEdit}
+              maxLength={300}
+            />
+          </FormField>
+        </div>
+        {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+        {canEdit && (
+          <div className={styles.cardActions}>
+            <Button icon={LuSave} size="sm" isLoading={isSaving} onClick={handleSave}>
+              Salvar dados da empresa
+            </Button>
+          </div>
+        )}
+      </Card.Body>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Usuário (Responsável / Operador)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function UserBlock({ user, isSelf, canEdit, canSetPassword, onSaved }) {
+  const [name, setName] = useState(user.name ?? '');
+  const [email, setEmail] = useState(user.email ?? '');
+  const [password, setPassword] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  const handleSave = async () => {
+    setFeedback(null);
+    if (!name.trim() || !isValidEmail(email.trim())) {
+      setFeedback({ tone: 'danger', message: 'Informe o nome e um e-mail válido.' });
+      return;
+    }
+    if (password) {
+      const passwordError = getPasswordPolicyError(password);
+      if (passwordError) {
+        setFeedback({ tone: 'danger', message: passwordError });
+        return;
+      }
+    }
+
+    setIsSaving(true);
+    const result = await updateSupplierUser(user.id, {
+      name: name.trim(),
+      email: email.trim(),
+      ...(password ? { password } : {}),
+    });
+    setIsSaving(false);
+
+    if (!result.success) {
+      setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao salvar.' });
+      return;
+    }
+    setPassword('');
+    setFeedback({ tone: 'success', message: result.body?.message ?? 'Dados atualizados.' });
+    onSaved();
+  };
+
+  return (
+    <div className={styles.contactBlock}>
+      <p className={styles.contactLabel}>
+        <StatusBadge enumMap={SUPPLIER_USER_ROLE} value={user.role} />
+        {isSelf && <span className={styles.youTag}>você</span>}
+      </p>
+      <div className={styles.fieldGrid}>
+        <FormField label="Nome" required>
+          <input value={name} onChange={(event) => setName(event.target.value)} disabled={!canEdit} maxLength={200} />
+        </FormField>
+        <FormField label="E-mail" required hint={canEdit ? 'É o login dele no portal.' : undefined}>
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            disabled={!canEdit}
+            maxLength={200}
+          />
+        </FormField>
+        {canSetPassword && (
+          <FormField
+            label="Nova senha do Operador (opcional)"
+            hint={`Use quando o Operador mudar de pessoa. ${PASSWORD_RULE_HINT}`}
+            className={styles.spanTwo}
+          >
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+            />
+          </FormField>
+        )}
+      </div>
+      {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+      {canEdit && (
+        <div className={styles.cardActions}>
+          <Button icon={LuSave} size="sm" variant="secondary" isLoading={isSaving} onClick={handleSave}>
+            Salvar {user.role === SUPPLIER_USER_ROLE_ID.RESPONSAVEL ? 'Responsável' : 'Operador'}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Usuário que falta (cadastro antigo)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MissingUserBlock({ role, onSaved }) {
+  const label = SUPPLIER_USER_ROLE[role]?.label ?? 'Usuário';
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  const setField = (field) => (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
+
+  const handleSave = async () => {
+    setFeedback(null);
+    if (!form.name.trim() || !isValidEmail(form.email.trim())) {
+      setFeedback({ tone: 'danger', message: 'Informe o nome e um e-mail válido.' });
+      return;
+    }
+    const passwordError = getPasswordPolicyError(form.password);
+    if (passwordError) {
+      setFeedback({ tone: 'danger', message: passwordError });
+      return;
+    }
+    setIsSaving(true);
+    const result = await createSupplierUser({
+      role,
+      name: form.name.trim(),
+      email: form.email.trim(),
+      password: form.password,
+    });
+    setIsSaving(false);
+    if (!result.success) {
+      setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao cadastrar.' });
+      return;
+    }
+    onSaved();
+  };
+
+  return (
+    <div className={styles.contactBlock}>
+      <p className={styles.contactLabel}>
+        <StatusBadge enumMap={SUPPLIER_USER_ROLE} value={role} />
+        <span className={styles.youTag}>não cadastrado</span>
+      </p>
+      <p className={styles.sectionNote}>
+        A empresa ainda não tem {label}. Cadastre o nome, o e-mail e uma senha inicial para ele entrar no portal.
+      </p>
+      <div className={styles.fieldGrid}>
+        <FormField label="Nome" required>
+          <input value={form.name} onChange={setField('name')} maxLength={200} />
+        </FormField>
+        <FormField label="E-mail" required>
+          <input type="email" value={form.email} onChange={setField('email')} maxLength={200} />
+        </FormField>
+        <FormField label="Senha inicial" required hint={PASSWORD_RULE_HINT} className={styles.spanTwo}>
+          <input type="password" value={form.password} onChange={setField('password')} autoComplete="new-password" />
+        </FormField>
+      </div>
+      {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+      <div className={styles.cardActions}>
+        <Button icon={LuSave} size="sm" variant="secondary" isLoading={isSaving} onClick={handleSave}>
+          Cadastrar {label}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Minha senha
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PasswordCard() {
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+
+  const setField = (field) => (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
+
+  const handleSave = async () => {
+    setFeedback(null);
+    const passwordError = getPasswordPolicyError(form.next);
+    if (!form.current) {
+      setFeedback({ tone: 'danger', message: 'Informe a senha atual.' });
+      return;
+    }
+    if (passwordError) {
+      setFeedback({ tone: 'danger', message: passwordError });
+      return;
+    }
+    if (form.next !== form.confirm) {
+      setFeedback({ tone: 'danger', message: 'A confirmação não confere com a nova senha.' });
+      return;
+    }
+
+    setIsSaving(true);
+    const result = await changeSupplierPassword(form.current, form.next);
+    setIsSaving(false);
+    if (!result.success) {
+      setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao trocar a senha.' });
+      return;
+    }
+    setForm({ current: '', next: '', confirm: '' });
+    setFeedback({ tone: 'success', message: 'Senha alterada. As outras sessões abertas com o seu e-mail foram encerradas.' });
+  };
+
+  return (
+    <Card>
+      <Card.Body>
+        <h3 className={styles.sectionTitle}><LuKeyRound /> Minha senha</h3>
+        <div className={styles.fieldGrid}>
+          <FormField label="Senha atual" required className={styles.spanTwo}>
+            <input type="password" value={form.current} onChange={setField('current')} autoComplete="current-password" />
+          </FormField>
+          <FormField label="Nova senha" required hint={PASSWORD_RULE_HINT}>
+            <input type="password" value={form.next} onChange={setField('next')} autoComplete="new-password" />
+          </FormField>
+          <FormField label="Confirmar nova senha" required>
+            <input type="password" value={form.confirm} onChange={setField('confirm')} autoComplete="new-password" />
+          </FormField>
+        </div>
+        {feedback && <Banner tone={feedback.tone} className={styles.aviso} description={feedback.message} />}
+        <div className={styles.cardActions}>
+          <Button icon={LuKeyRound} size="sm" isLoading={isSaving} onClick={handleSave}>
+            Trocar senha
+          </Button>
+        </div>
+      </Card.Body>
+    </Card>
   );
 }

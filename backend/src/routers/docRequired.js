@@ -11,12 +11,4 @@ router.get('/document_types',  verificarToken, docRequired.document_types);
 // Básicos e outros do colaborador (painel de aprovação da Segurança do Trabalho)
 router.get('/employee_document_types', verificarToken, docRequired.employee_document_types);
 
-// ── Rotas públicas (portal do fornecedor — sem JWT interno) ────────────────
-// Atividades: usadas no step "Atuação" do cadastro de fornecedor
-router.get('/public/activity_types', docRequired.activityTypesPublic);
-
-// Regiões: busca por cidade/estado para o autocomplete do cadastro
-router.get('/public/regions',              docRequired.searchRegions);
-router.get('/public/regions/state/:state', docRequired.getRegionIdsByState);
-
 export default router;

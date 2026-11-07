@@ -2,10 +2,30 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import axios from 'axios';
-import nodemailer from 'nodemailer';
 import * as supplierModel from '../models/supplierModel.js';
+import * as supplierUserModel from '../models/supplierUserModel.js';
+import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
 import { getSupplierJwtSecret } from '../config/jwtSecrets.js';
+import { sendMail, escapeHtml } from './mailService.js';
+import { cnpjDigits, formatCnpj, isValidCnpj } from '../utils/cnpj.js';
+import { normalizeEmail } from '../utils/email.js';
+import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
+import { SUPPLIER_STATUSES, SUPPLIER_USER_ROLES, SUPPLIER_USER_ROLE_LABELS } from '../constants/supplierUsers.js';
+import { AUDIT_ACTIONS, AUDIT_ACTOR_TYPES, AUDIT_ENTITIES } from '../constants/audit.js';
+
+const NAME_MAX_LENGTH = 200;
+const COMPANY_NAME_MAX_LENGTH = 300;
+const OTP_TTL_MS = 10 * 60 * 1000;   // código vale 10 minutos
+const OTP_MAX_ATTEMPTS = 5;          // depois disso, volta para o login
+const SQL_DUPLICATE_KEY_ERRORS = [2601, 2627];
+
+const INVALID_CREDENTIALS = 'E-mail ou senha incorretos.';
+const EMAIL_IN_USE = 'Este e-mail já tem cadastro no portal. Use outro e-mail.';
+
+// Comparação com hash fictício quando o e-mail não existe: o tempo de resposta do login não
+// revela se o e-mail tem cadastro
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 12);
 
 // ─────────────────────────────────────────────
 // Helpers internos
@@ -13,38 +33,78 @@ import { getSupplierJwtSecret } from '../config/jwtSecrets.js';
 
 /** Gera OTP numérico de 6 dígitos */
 function generateOtp() {
-    return String(Math.floor(100000 + crypto.randomInt(900000)));
+    return String(crypto.randomInt(100000, 1000000));
 }
 
-/** Retorna o transporte de email configurado pelas env vars */
-function createMailTransport() {
-    // TODO: SMTP desativado temporariamente (Gmail recusando credenciais — 535 BadCredentials).
-    // Descomentar quando SMTP_USER/SMTP_PASS estiverem corretos no .env.
-    // return nodemailer.createTransport({
-    //     host: process.env.SMTP_HOST,
-    //     port: Number(process.env.SMTP_PORT || 587),
-    //     secure: process.env.SMTP_SECURE === 'true',
-    //     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    // });
+/**
+ * Emite o JWT de fornecedor (tipo separado do JWT de colaborador). Leva o usuário que entrou;
+ * os dados do fornecedor são relidos do banco a cada requisição (verificarTokenFornecedor).
+ */
+function signSupplierToken(user) {
+    return jwt.sign(
+        { type: 'supplier', supplierId: user.supplier_id, supplierUserId: user.id, role: user.role },
+        getSupplierJwtSecret(),
+        { expiresIn: '4h' },
+    );
+}
+
+/** Texto obrigatório (ou opcional), sem espaços nas pontas e com limite. Retorna { value } ou { error }. */
+function cleanText(value, { label, max, required = true }) {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text) return required ? { error: `Informe ${label}.` } : { value: null };
+    if (text.length > max) return { error: `${label[0].toUpperCase()}${label.slice(1)} pode ter no máximo ${max} caracteres.` };
+    return { value: text };
+}
+
+/** Nome e e-mail de um usuário do cadastro. Retorna { name, email } ou { error }. */
+function resolveUserData(data, roleLabel) {
+    const name = cleanText(data?.name, { label: `o nome do ${roleLabel}`, max: NAME_MAX_LENGTH });
+    if (name.error) return { error: name.error };
+    const email = normalizeEmail(data?.email);
+    if (!email) return { error: `Informe um e-mail válido para o ${roleLabel}.` };
+    return { name: name.value, email };
+}
+
+/** Usuário como a tela vê (sem hash nem controle de sessão). */
+function publicUser(user) {
     return {
-        sendMail: async ({ to, subject }) => {
-            console.log(`[SMTP DESATIVADO] Email não enviado → para: ${to} | assunto: ${subject}`);
-        },
+        id: user.id,
+        role: user.role,
+        roleLabel: SUPPLIER_USER_ROLE_LABELS[user.role] ?? '',
+        name: user.name,
+        email: user.email,
     };
 }
 
-/** Emite um JWT de fornecedor (tipo separado do JWT de colaborador) */
-function signSupplierToken(supplier) {
-    return jwt.sign(
-        {
-            type: 'supplier',
-            supplierId: supplier.id,
-            cnpj: supplier.cnpj,
-            razaoSocial: supplier.razao_social,
-        },
-        getSupplierJwtSecret(),
-        { expiresIn: '4h' }
-    );
+/** Dados da sessão do fornecedor (resposta do login e do /me). */
+export function sessionPayload(user) {
+    return {
+        supplierId: user.supplier_id,
+        cnpj: user.cnpj,
+        razaoSocial: user.razao_social,
+        nomeFantasia: user.nome_fantasia,
+        user: publicUser(user),
+    };
+}
+
+/** Registro de auditoria de uma ação do fornecedor (autor: o fornecedor). */
+function supplierAuditEntry(context, supplierId, action, entityId, oldValues, newValues) {
+    return {
+        actorType: AUDIT_ACTOR_TYPES.SUPPLIER,
+        actorId: supplierId,
+        action,
+        entityType: AUDIT_ENTITIES.SUPPLIER_USER,
+        entityId,
+        oldValues,
+        newValues,
+        ipAddress: context.ipAddress ?? null,
+        userAgent: context.userAgent ?? null,
+    };
+}
+
+/** Instante atual alinhado ao segundo (o iat do JWT tem precisão de segundo). */
+function nowToTheSecond() {
+    return new Date(Math.floor(Date.now() / 1000) * 1000);
 }
 
 // ─────────────────────────────────────────────
@@ -52,139 +112,114 @@ function signSupplierToken(supplier) {
 // ─────────────────────────────────────────────
 
 /**
- * Consulta o CNPJ na API da ReceitaWS.
- * Retorna { valid, razaoSocial, situacao } ou { valid: false } em caso de erro.
+ * Confere os dígitos do CNPJ e consulta a ReceitaWS para preencher a razão social.
+ * Retorna { valid, alreadyRegistered, razaoSocial, nomeFantasia, situacao }.
+ * Se a API externa falhar, o CNPJ (com dígitos certos) continua válido, sem dados.
  */
 export async function validateCnpjPublicApi(cnpj) {
+    const digits = cnpjDigits(cnpj);
+    if (!isValidCnpj(digits)) {
+        return { valid: false, alreadyRegistered: false, razaoSocial: null, nomeFantasia: null, situacao: null };
+    }
+
+    const alreadyRegistered = await supplierModel.supplierExistsByCnpj(formatCnpj(digits));
+
     try {
-        const digits = cnpj.replace(/\D/g, '');
-        const { data } = await axios.get(`https://receitaws.com.br/v1/cnpj/${digits}`, {
-            timeout: 8000,
-        });
-
+        const { data } = await axios.get(`https://receitaws.com.br/v1/cnpj/${digits}`, { timeout: 8000 });
         if (data.status === 'ERROR') {
-            return { valid: false, razaoSocial: null, situacao: null };
+            return { valid: false, alreadyRegistered, razaoSocial: null, nomeFantasia: null, situacao: null };
         }
-
         return {
             valid: true,
+            alreadyRegistered,
             razaoSocial: data.nome ?? null,
-            nomeFantasia: data.fantasia ?? null,
+            nomeFantasia: data.fantasia || null,
             situacao: data.situacao ?? null,
-            municipio: data.municipio ?? null,
-            uf: data.uf ?? null,
         };
     } catch (error) {
         console.error('validateCnpjPublicApi error:', error.message);
-        // Falha na API externa não deve bloquear o cadastro; retornamos válido sem dados
-        return { valid: true, razaoSocial: null, nomeFantasia: null, situacao: 'DESCONHECIDO' };
+        return { valid: true, alreadyRegistered, razaoSocial: null, nomeFantasia: null, situacao: 'DESCONHECIDO' };
     }
 }
 
 // ─────────────────────────────────────────────
-// Registro de fornecedor
+// Cadastro do fornecedor
 // ─────────────────────────────────────────────
 
 /**
- * Registra um novo fornecedor no sistema.
+ * Cadastro simplificado: CNPJ, razão social (nome fantasia opcional), os dois usuários
+ * (Responsável e Operador, com nome e e-mail, e-mails diferentes) e a senha. A senha do
+ * cadastro é a senha inicial dos dois; cada um troca a sua depois, no Perfil.
  *
- * Payload esperado:
- *  cnpj, razaoSocial, nomeFantasia?, password,
- *  employeeCount?, city?, state?,
- *  contacts: [{ name, email, phone?, contactType, isPrimary }],
- *  categoryIds?: number[],
- *  regionIds?:   number[]
+ * Payload: { cnpj, razaoSocial, nomeFantasia?, owner: { name, email },
+ *            operator: { name, email }, password }
+ * Retorna { success, supplierId } ou { success: false, status, message }.
  */
-export async function registerSupplier(payload) {
-    const {
-        cnpj, razaoSocial, nomeFantasia, password,
-        employeeCount, city, state,
-        contacts = [],
-        categoryIds = [],
-        regionIds = [],
-    } = payload;
-
-    // Validações básicas
-    if (!cnpj || !razaoSocial || !password) {
-        return { success: false, message: 'cnpj, razaoSocial e password são obrigatórios.' };
+export async function registerSupplier(payload = {}) {
+    const digits = cnpjDigits(payload.cnpj);
+    if (!isValidCnpj(digits)) {
+        return { success: false, status: 400, message: 'CNPJ inválido. Confira os dígitos.' };
     }
 
-    const cleanCnpj = cnpj.replace(/\D/g, '');
-    const formattedCnpj = cleanCnpj.replace(
-        /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
-        '$1.$2.$3/$4-$5'
-    );
+    const razaoSocial = cleanText(payload.razaoSocial, { label: 'a razão social', max: COMPANY_NAME_MAX_LENGTH });
+    if (razaoSocial.error) return { success: false, status: 400, message: razaoSocial.error };
+    const nomeFantasia = cleanText(payload.nomeFantasia, { label: 'o nome fantasia', max: COMPANY_NAME_MAX_LENGTH, required: false });
+    if (nomeFantasia.error) return { success: false, status: 400, message: nomeFantasia.error };
 
-    // Verifica duplicidade
-    const exists = await supplierModel.supplierExistsByCnpj(formattedCnpj);
-    if (exists) {
-        return { success: false, message: 'CNPJ já cadastrado. Acesse com seu login.' };
+    const owner = resolveUserData(payload.owner, 'Responsável');
+    if (owner.error) return { success: false, status: 400, message: owner.error };
+    const operator = resolveUserData(payload.operator, 'Operador');
+    if (operator.error) return { success: false, status: 400, message: operator.error };
+    if (owner.email === operator.email) {
+        return { success: false, status: 400, message: 'O Responsável e o Operador precisam ter e-mails diferentes.' };
     }
 
-    // Contatos obrigatórios: legal (0) e operacional (1)
-    const legalContact    = contacts.find((c) => c.contactType === 0);
-    const opContact       = contacts.find((c) => c.contactType === 1);
-    if (!legalContact?.email || !opContact?.email) {
-        return { success: false, message: 'Emails do responsável legal e operacional são obrigatórios.' };
+    const passwordError = getPasswordPolicyError(payload.password);
+    if (passwordError) return { success: false, status: 400, message: passwordError };
+
+    const cnpj = formatCnpj(digits);
+    if (await supplierModel.supplierExistsByCnpj(cnpj)) {
+        return {
+            success: false,
+            status: 409,
+            message: 'CNPJ já cadastrado. Entre com o e-mail do Responsável ou do Operador.',
+        };
+    }
+    for (const user of [owner, operator]) {
+        if (await supplierUserModel.emailInUse(user.email)) {
+            return { success: false, status: 409, message: `O e-mail ${user.email} já tem cadastro no portal. Use outro e-mail ou entre com ele.` };
+        }
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    let transaction;
-    let transactionDone = false;
+    const passwordHash = await bcrypt.hash(payload.password, 12);
 
     try {
-        transaction = await trasaction.iniciarTransacao();
+        const supplierId = await trasaction.executarEmTransacao(async (transaction) => {
+            const id = await supplierModel.insertSupplier(transaction, {
+                cnpj,
+                razaoSocial: razaoSocial.value,
+                nomeFantasia: nomeFantasia.value,
+            });
+            if (!id) throw new Error('Fornecedor não foi criado.');
 
-        const supplierId = await supplierModel.insertSupplier(transaction, {
-            cnpj: formattedCnpj,
-            razaoSocial,
-            nomeFantasia,
-            employeeCount,
-            city,
-            state,
-            passwordHash,
+            await supplierUserModel.insertUser(transaction, {
+                supplierId: id, role: SUPPLIER_USER_ROLES.OWNER, name: owner.name, email: owner.email, passwordHash,
+            });
+            await supplierUserModel.insertUser(transaction, {
+                supplierId: id, role: SUPPLIER_USER_ROLES.OPERATOR, name: operator.name, email: operator.email, passwordHash,
+            });
+            return id;
         });
 
-        if (!supplierId) {
-            await trasaction.finalizarTransacao(transaction, false);
-            transactionDone = true;
-            return { success: false, message: 'Erro ao criar fornecedor no banco de dados.' };
-        }
-
-        // Insere contatos
-        for (const contact of contacts) {
-            await supplierModel.insertSupplierContact(transaction, {
-                supplierId,
-                name: contact.name ?? '',
-                email: contact.email,
-                phone: contact.phone ?? null,
-                contactType: contact.contactType,
-                isPrimary: contact.isPrimary ?? false,
-            });
-        }
-
-        // Insere categorias
-        for (const catId of categoryIds) {
-            await supplierModel.insertSupplierCategory(transaction, supplierId, catId);
-        }
-
-        // Insere regiões
-        for (const regId of regionIds) {
-            await supplierModel.insertSupplierRegion(transaction, supplierId, regId);
-        }
-
-        await trasaction.finalizarTransacao(transaction, true);
-        transactionDone = true;
-
-        console.log(`Fornecedor registrado com sucesso: CNPJ ${formattedCnpj}, ID ${supplierId}`);
+        console.log(`Fornecedor cadastrado: CNPJ ${cnpj}, ID ${supplierId}.`);
         return { success: true, supplierId };
     } catch (error) {
-        if (transaction && !transactionDone) {
-            await trasaction.finalizarTransacao(transaction, false);
+        // Dois cadastros ao mesmo tempo com o mesmo CNPJ ou e-mail
+        if (SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
+            return { success: false, status: 409, message: 'CNPJ ou e-mail já cadastrado.' };
         }
         console.error('registerSupplier error:', error);
-        return { success: false, message: 'Erro interno ao registrar fornecedor.' };
+        return { success: false, status: 500, message: 'Erro interno ao cadastrar o fornecedor.' };
     }
 }
 
@@ -193,203 +228,301 @@ export async function registerSupplier(payload) {
 // ─────────────────────────────────────────────
 
 /**
- * Retorna o perfil completo do fornecedor: dados da empresa, contatos e regiões.
+ * Dados da empresa e os dois usuários. `currentUserId` diz quem está logado.
  */
-export async function getSupplierProfile(supplierId) {
+export async function getSupplierProfile(supplierId, currentUserId) {
     try {
         const supplier = await supplierModel.getSupplierProfile(supplierId);
         if (!supplier) {
-            return { success: false, message: 'Fornecedor não encontrado.' };
+            return { success: false, status: 404, message: 'Fornecedor não encontrado.' };
         }
-        const contacts = await supplierModel.getSupplierContacts(supplierId);
-        const regions = await supplierModel.getSupplierRegions(supplierId);
-
-        return { success: true, body: { supplier, contacts, regions } };
+        const users = await supplierUserModel.listUsersBySupplier(supplierId);
+        return {
+            success: true,
+            body: {
+                supplier: {
+                    id: supplier.id,
+                    cnpj: supplier.cnpj,
+                    razao_social: supplier.razao_social,
+                    nome_fantasia: supplier.nome_fantasia,
+                    status: supplier.status,
+                },
+                users: users.map(publicUser),
+                currentUserId,
+            },
+        };
     } catch (error) {
         console.error('getSupplierProfile error:', error);
-        return { success: false, message: 'Erro ao buscar perfil.' };
+        return { success: false, status: 500, message: 'Erro ao buscar o perfil.' };
     }
 }
 
 /**
- * Atualiza o perfil do fornecedor: dados da empresa, contatos (por tipo) e regiões.
- *
- * @param {number} supplierId
- * @param {object} payload — { nomeFantasia, employeeCount, address, city, state, zipCode,
- *                             phone, website, contacts: [{ name,email,phone,contactType,isPrimary }],
- *                             regionIds: number[] }
+ * Nome fantasia da empresa (só o Responsável altera; CNPJ e razão social ficam fixos).
+ * @param {{ supplierId, supplierUserId, role }} actor — fornecedor logado
  */
-export async function updateSupplierProfile(supplierId, payload) {
-    const { contacts = [], regionIds, ...companyData } = payload;
-
-    // Valida os contatos obrigatórios (legal e operacional precisam de email)
-    const legal = contacts.find((c) => Number(c.contactType) === 0);
-    const op = contacts.find((c) => Number(c.contactType) === 1);
-    if (contacts.length > 0) {
-        if (legal && !legal.email) {
-            return { success: false, message: 'O e-mail do responsável legal é obrigatório.' };
-        }
-        if (op && !op.email) {
-            return { success: false, message: 'O e-mail do responsável operacional é obrigatório.' };
-        }
+export async function updateCompany(actor, payload = {}) {
+    if (actor.role !== SUPPLIER_USER_ROLES.OWNER) {
+        return { success: false, status: 403, message: 'Só o Responsável altera os dados da empresa.' };
     }
-
-    let transaction;
-    let transactionDone = false;
+    const nomeFantasia = cleanText(payload.nomeFantasia, { label: 'o nome fantasia', max: COMPANY_NAME_MAX_LENGTH, required: false });
+    if (nomeFantasia.error) return { success: false, status: 400, message: nomeFantasia.error };
 
     try {
-        transaction = await trasaction.iniciarTransacao();
-
-        await supplierModel.updateSupplierProfile(transaction, supplierId, companyData);
-
-        for (const contact of contacts) {
-            if (!contact.email) continue; // ignora contatos vazios (ex.: financeiro não preenchido)
-            await supplierModel.upsertSupplierContactByType(transaction, supplierId, {
-                name: contact.name,
-                email: contact.email,
-                phone: contact.phone,
-                contactType: Number(contact.contactType),
-                isPrimary: contact.isPrimary ?? false,
-            });
-        }
-
-        if (Array.isArray(regionIds)) {
-            await supplierModel.replaceSupplierRegions(transaction, supplierId, regionIds.map(Number));
-        }
-
-        await trasaction.finalizarTransacao(transaction, true);
-        transactionDone = true;
-
-        return { success: true, body: { message: 'Perfil atualizado com sucesso.' } };
+        await trasaction.executarEmTransacao((transaction) =>
+            supplierModel.updateCompany(transaction, actor.supplierId, { nomeFantasia: nomeFantasia.value }));
+        return { success: true, body: { message: 'Dados da empresa atualizados.' } };
     } catch (error) {
-        if (transaction && !transactionDone) {
-            await trasaction.finalizarTransacao(transaction, false);
+        console.error('updateCompany error:', error);
+        return { success: false, status: 500, message: 'Erro ao atualizar os dados da empresa.' };
+    }
+}
+
+/**
+ * Edita nome e e-mail de um usuário do fornecedor. Cada usuário edita os próprios dados; o
+ * Responsável também edita os do Operador e pode definir uma nova senha para ele (ex.: o
+ * Operador mudou de pessoa). Nova senha definida pelo Responsável encerra as sessões do Operador.
+ *
+ * @param {{ supplierId, supplierUserId, role }} actor
+ * @param {number} targetUserId
+ * @param {{ name, email, password? }} payload
+ * @param {{ ipAddress, userAgent }} context
+ */
+export async function updateSupplierUser(actor, targetUserId, payload = {}, context = {}) {
+    const target = await supplierUserModel.getUserById(targetUserId);
+    if (!target || target.supplier_id !== actor.supplierId) {
+        return { success: false, status: 404, message: 'Usuário não encontrado.' };
+    }
+    const isSelf = target.id === actor.supplierUserId;
+    if (!isSelf && actor.role !== SUPPLIER_USER_ROLES.OWNER) {
+        return { success: false, status: 403, message: 'Você só pode alterar os seus próprios dados.' };
+    }
+
+    const roleLabel = SUPPLIER_USER_ROLE_LABELS[target.role] ?? 'usuário';
+    const data = resolveUserData(payload, roleLabel);
+    if (data.error) return { success: false, status: 400, message: data.error };
+
+    const hasNewPassword = typeof payload.password === 'string' && payload.password !== '';
+    if (hasNewPassword && isSelf) {
+        return { success: false, status: 400, message: 'Para trocar a sua senha, use "Trocar senha".' };
+    }
+    if (hasNewPassword) {
+        const passwordError = getPasswordPolicyError(payload.password);
+        if (passwordError) return { success: false, status: 400, message: passwordError };
+    }
+
+    if (data.email !== target.email && await supplierUserModel.emailInUse(data.email, target.id)) {
+        return { success: false, status: 409, message: EMAIL_IN_USE };
+    }
+
+    const oldValues = { name: target.name, email: target.email };
+    const newValues = { name: data.name, email: data.email };
+    const changed = oldValues.name !== newValues.name || oldValues.email !== newValues.email;
+    if (!changed && !hasNewPassword) {
+        return { success: true, body: { message: 'Nenhuma alteração para salvar.' } };
+    }
+
+    const passwordHash = hasNewPassword ? await bcrypt.hash(payload.password, 12) : null;
+
+    try {
+        await trasaction.executarEmTransacao(async (transaction) => {
+            if (changed) {
+                await supplierUserModel.updateUser(transaction, target.id, data);
+                await auditModel.insertAuditLog(transaction, supplierAuditEntry(
+                    context, actor.supplierId, AUDIT_ACTIONS.SUPPLIER_USER_UPDATE, target.id,
+                    { ...oldValues, role: target.role }, { ...newValues, role: target.role },
+                ));
+            }
+            if (hasNewPassword) {
+                await supplierUserModel.updatePassword(transaction, target.id, passwordHash, nowToTheSecond());
+                await auditModel.insertAuditLog(transaction, supplierAuditEntry(
+                    context, actor.supplierId, AUDIT_ACTIONS.SUPPLIER_USER_PASSWORD_CHANGE, target.id,
+                    null, { role: target.role, by_owner: true },
+                ));
+            }
+        });
+        return { success: true, body: { message: `Dados do ${roleLabel} atualizados.` } };
+    } catch (error) {
+        if (SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
+            return { success: false, status: 409, message: EMAIL_IN_USE };
         }
-        console.error('updateSupplierProfile error:', error);
-        return { success: false, message: 'Erro ao atualizar perfil.' };
+        console.error('updateSupplierUser error:', error);
+        return { success: false, status: 500, message: 'Erro ao atualizar o usuário.' };
+    }
+}
+
+/**
+ * Cadastra o usuário que falta (Responsável ou Operador). Acontece com fornecedores antigos:
+ * na migração, um contato sem e-mail ou com e-mail repetido não virou usuário. Qualquer
+ * usuário da empresa pode cadastrar o que falta, com nome, e-mail e senha inicial.
+ *
+ * @param {{ supplierId }} actor
+ * @param {{ role, name, email, password }} payload
+ */
+export async function createMissingUser(actor, payload = {}, context = {}) {
+    const role = Number(payload.role);
+    if (![SUPPLIER_USER_ROLES.OWNER, SUPPLIER_USER_ROLES.OPERATOR].includes(role)) {
+        return { success: false, status: 400, message: 'Escolha Responsável ou Operador.' };
+    }
+    const roleLabel = SUPPLIER_USER_ROLE_LABELS[role];
+
+    const users = await supplierUserModel.listUsersBySupplier(actor.supplierId);
+    if (users.some((user) => user.role === role)) {
+        return { success: false, status: 409, message: `A empresa já tem um ${roleLabel}.` };
+    }
+
+    const data = resolveUserData(payload, roleLabel);
+    if (data.error) return { success: false, status: 400, message: data.error };
+    const passwordError = getPasswordPolicyError(payload.password);
+    if (passwordError) return { success: false, status: 400, message: passwordError };
+    if (await supplierUserModel.emailInUse(data.email)) {
+        return { success: false, status: 409, message: EMAIL_IN_USE };
+    }
+
+    const passwordHash = await bcrypt.hash(payload.password, 12);
+    try {
+        await trasaction.executarEmTransacao(async (transaction) => {
+            const userId = await supplierUserModel.insertUser(transaction, {
+                supplierId: actor.supplierId, role, name: data.name, email: data.email, passwordHash,
+            });
+            await auditModel.insertAuditLog(transaction, supplierAuditEntry(
+                context, actor.supplierId, AUDIT_ACTIONS.SUPPLIER_USER_CREATE, userId,
+                null, { role, name: data.name, email: data.email },
+            ));
+        });
+        return { success: true, body: { message: `${roleLabel} cadastrado.` } };
+    } catch (error) {
+        if (SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
+            return { success: false, status: 409, message: 'Este e-mail ou papel já foi cadastrado.' };
+        }
+        console.error('createMissingUser error:', error);
+        return { success: false, status: 500, message: 'Erro ao cadastrar o usuário.' };
+    }
+}
+
+/**
+ * O usuário logado troca a própria senha (confere a senha atual). Encerra as outras
+ * sessões dele; quem chama reemite o cookie desta sessão (token devolvido).
+ */
+export async function changeOwnPassword(actor, payload = {}, context = {}) {
+    const { currentPassword, newPassword } = payload;
+    if (typeof currentPassword !== 'string' || !currentPassword) {
+        return { success: false, status: 400, message: 'Informe a senha atual.' };
+    }
+    const passwordError = getPasswordPolicyError(newPassword);
+    if (passwordError) return { success: false, status: 400, message: passwordError };
+
+    const currentHash = await supplierUserModel.getPasswordHash(actor.supplierUserId);
+    if (!currentHash || !(await bcrypt.compare(currentPassword, currentHash))) {
+        return { success: false, status: 400, message: 'A senha atual não confere.' };
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const validAfter = nowToTheSecond();
+
+    try {
+        await trasaction.executarEmTransacao(async (transaction) => {
+            await supplierUserModel.updatePassword(transaction, actor.supplierUserId, passwordHash, validAfter);
+            await auditModel.insertAuditLog(transaction, supplierAuditEntry(
+                context, actor.supplierId, AUDIT_ACTIONS.SUPPLIER_USER_PASSWORD_CHANGE, actor.supplierUserId,
+                null, { role: actor.role, by_owner: false },
+            ));
+        });
+
+        // Nova sessão para quem trocou (as anteriores a validAfter deixam de valer)
+        const user = await supplierUserModel.getUserById(actor.supplierUserId);
+        return { success: true, token: signSupplierToken(user), body: { message: 'Senha alterada.' } };
+    } catch (error) {
+        console.error('changeOwnPassword error:', error);
+        return { success: false, status: 500, message: 'Erro ao trocar a senha.' };
     }
 }
 
 // ─────────────────────────────────────────────
-// Login — Fase 1: valida credenciais e envia OTP
+// Login — Fase 1: e-mail + senha → código por e-mail
 // ─────────────────────────────────────────────
 
 /**
- * Fase 1 do login: verifica credenciais (por CNPJ ou e-mail operacional)
- * e envia OTP por email. O OTP é armazenado (hash + expiração) na sessão.
+ * Fase 1 do login: confere e-mail e senha do usuário e envia o código (OTP) para o e-mail
+ * dele. O hash do código fica na sessão (express-session), com validade e tentativas.
  *
- * @param {{ cnpj?: string, email?: string }} identifier
+ * @param {string} email
  * @param {string} password
- * @param {object} session  — req.session do Express
+ * @param {object} session — req.session do Express
  */
-export async function loginPhase1(identifier, password, session) {
-    const { cnpj, email } = identifier ?? {};
-
-    let supplier = null;
-
-    if (email) {
-        // Login por e-mail operacional (contact_type = 1)
-        supplier = await supplierModel.getSupplierByOperationalEmail(email.trim());
-        if (!supplier) {
-            return { success: false, message: 'E-mail operacional não encontrado.' };
-        }
-    } else {
-        const cleanCnpj = String(cnpj ?? '').replace(/\D/g, '');
-        const formattedCnpj = cleanCnpj.replace(
-            /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
-            '$1.$2.$3/$4-$5'
-        );
-        supplier = await supplierModel.getSupplierByCnpj(formattedCnpj);
-        if (!supplier) {
-            return { success: false, message: 'CNPJ não cadastrado.' };
-        }
+export async function loginPhase1(email, password, session) {
+    const normalized = normalizeEmail(email);
+    if (!normalized || typeof password !== 'string' || !password) {
+        return { success: false, status: 400, message: 'Informe o e-mail e a senha.' };
     }
 
-    if (supplier.status === 3) {
-        return { success: false, message: 'Fornecedor bloqueado. Entre em contato com Suprimentos.' };
+    const user = await supplierUserModel.getUserForLogin(normalized);
+    const passwordMatch = await bcrypt.compare(password, user?.password_hash ?? DUMMY_PASSWORD_HASH);
+    if (!user || !passwordMatch || !user.is_active) {
+        return { success: false, status: 401, message: INVALID_CREDENTIALS };
+    }
+    if (user.supplier_status === SUPPLIER_STATUSES.BLOCKED) {
+        return { success: false, status: 403, message: 'Fornecedor bloqueado. Entre em contato com Suprimentos.' };
+    }
+    if (user.supplier_status === SUPPLIER_STATUSES.INACTIVE) {
+        return { success: false, status: 403, message: 'Fornecedor inativo. Entre em contato com Suprimentos.' };
     }
 
-    const passwordMatch = await bcrypt.compare(password, supplier.password_hash);
-    if (!passwordMatch) {
-        return { success: false, message: 'Senha incorreta.' };
-    }
-
-    // Gera OTP e salva o hash na sessão (nunca o OTP em texto puro)
+    // Gera o código e guarda só o hash na sessão (nunca o código em texto)
     const otp = generateOtp();
-    const otpHash = await bcrypt.hash(otp, 8);
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutos
-
     session.mfaPending = {
-        supplierId: supplier.id,
-        otpHash,
-        expiresAt,
+        supplierUserId: user.id,
+        otpHash: await bcrypt.hash(otp, 8),
+        expiresAt: Date.now() + OTP_TTL_MS,
+        attempts: 0,
     };
 
-    // Busca emails dos contatos para enviar o código
-    const contacts = await supplierModel.getSupplierContactEmails(supplier.id);
-    const emailsToNotify = contacts.map((c) => c.email).filter(Boolean);
+    const sent = await sendMail({
+        to: user.email,
+        subject: 'Seu código de acesso ao Portal do Fornecedor',
+        html: `
+            <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
+                <h2 style="color: #004643;">Portal do Fornecedor</h2>
+                <p>Olá, ${escapeHtml(user.name)}. Um acesso foi solicitado para ${escapeHtml(user.razao_social)}.</p>
+                <p>Seu código de verificação é:</p>
+                <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;
+                            background: #f3f4f6; padding: 1rem 2rem;
+                            border-radius: 8px; text-align: center; margin: 1rem 0;">
+                    ${otp}
+                </div>
+                <p style="color: #6b7280; font-size: 0.875rem;">
+                    Este código expira em 10 minutos. Se não foi você, ignore este e-mail.
+                </p>
+            </div>
+        `,
+    });
 
-    if (emailsToNotify.length === 0) {
-        console.warn(`Fornecedor ID ${supplier.id} não tem emails de contato cadastrados.`);
-        // Em ambiente de desenvolvimento, logamos o OTP para não travar o fluxo
-        if (process.env.NODE_ENV !== 'production') {
-            console.log(`[DEV] OTP para CNPJ ${supplier.cnpj}: ${otp}`);
-        }
-    } else {
-        try {
-            const transporter = createMailTransport();
-            await transporter.sendMail({
-                from: `"DocsUp" <${process.env.SMTP_USER}>`,
-                to: emailsToNotify.join(', '),
-                subject: 'Seu código de acesso ao Portal do Fornecedor',
-                html: `
-                    <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
-                        <h2 style="color: #004643;">Portal do Fornecedor</h2>
-                        <p>Um novo acesso foi solicitado para o CNPJ <strong>${supplier.cnpj}</strong>.</p>
-                        <p>Seu código de verificação é:</p>
-                        <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;
-                                    background: #f3f4f6; padding: 1rem 2rem;
-                                    border-radius: 8px; text-align: center; margin: 1rem 0;">
-                            ${otp}
-                        </div>
-                        <p style="color: #6b7280; font-size: 0.875rem;">
-                            Este código expira em 10 minutos. Se não foi você, ignore este email.
-                        </p>
-                    </div>
-                `,
-            });
-        } catch (emailError) {
-            console.error('Erro ao enviar email MFA:', emailError.message);
-            // Não bloqueia o fluxo — em desenvolvimento o OTP fica no log
-            if (process.env.NODE_ENV !== 'production') {
-                console.log(`[DEV] OTP para CNPJ ${supplier.cnpj}: ${otp}`);
-            }
-        }
+    if (!sent && process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV] Código de acesso para ${user.email}: ${otp}`);
     }
 
     return {
         success: true,
         requiresMfa: true,
-        // Em DEV enviamos o OTP na resposta para facilitar testes sem SMTP configurado
+        // Fora de produção o código volta na resposta (para testar sem SMTP)
         ...(process.env.NODE_ENV !== 'production' && { devOtp: otp }),
     };
 }
 
 // ─────────────────────────────────────────────
-// Login — Fase 2: valida OTP e emite JWT
+// Login — Fase 2: confere o código e emite o JWT
 // ─────────────────────────────────────────────
 
 /**
- * Fase 2 do login: valida o OTP e emite o JWT de fornecedor.
+ * Fase 2 do login: confere o código (até 5 tentativas, dentro da validade) e emite o JWT.
  *
  * @param {string} otp
  * @param {object} session — req.session do Express
  */
 export async function loginPhase2(otp, session) {
     const pending = session.mfaPending;
-
-    if (!pending) {
-        return { success: false, message: 'Sessão de MFA não iniciada. Faça login novamente.' };
+    if (!pending?.supplierUserId) {
+        return { success: false, message: 'Sessão de verificação não iniciada. Faça login novamente.' };
     }
 
     if (Date.now() > pending.expiresAt) {
@@ -397,32 +530,23 @@ export async function loginPhase2(otp, session) {
         return { success: false, message: 'Código expirado. Faça login novamente.' };
     }
 
-    const otpMatch = await bcrypt.compare(otp, pending.otpHash);
+    const otpMatch = typeof otp === 'string' && /^\d{6}$/.test(otp) && await bcrypt.compare(otp, pending.otpHash);
     if (!otpMatch) {
+        pending.attempts = (pending.attempts ?? 0) + 1;
+        if (pending.attempts >= OTP_MAX_ATTEMPTS) {
+            delete session.mfaPending;
+            return { success: false, message: 'Muitas tentativas com código errado. Faça login novamente.' };
+        }
         return { success: false, message: 'Código inválido.' };
     }
 
-    // OTP válido — limpa a sessão de MFA
-    const supplierId = pending.supplierId;
     delete session.mfaPending;
 
-    // Busca dados completos para o payload do token
-    const supplier = await supplierModel.getSupplierById(supplierId);
-    if (!supplier) {
-        return { success: false, message: 'Fornecedor não encontrado.' };
+    const user = await supplierUserModel.getUserById(pending.supplierUserId);
+    if (!user || !user.is_active
+        || [SUPPLIER_STATUSES.INACTIVE, SUPPLIER_STATUSES.BLOCKED].includes(user.supplier_status)) {
+        return { success: false, message: 'Acesso não permitido. Entre em contato com Suprimentos.' };
     }
 
-    const token = signSupplierToken(supplier);
-
-    return {
-        success: true,
-        token,
-        supplier: {
-            id: supplier.id,
-            cnpj: supplier.cnpj,
-            razaoSocial: supplier.razao_social,
-            nomeFantasia: supplier.nome_fantasia,
-            registrationComplete: supplier.registration_complete,
-        },
-    };
+    return { success: true, token: signSupplierToken(user), supplier: sessionPayload(user) };
 }

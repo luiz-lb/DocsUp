@@ -1,21 +1,25 @@
 import * as supplierAuthService from '../services/supplierAuthService.js';
+import { SUPPLIER_COOKIE_OPTIONS } from '../config/authCookies.js';
 
-// Opções do cookie do JWT de fornecedor
-const SUPPLIER_COOKIE_OPTIONS = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Lax',
-    maxAge: 4 * 60 * 60 * 1000, // 4 horas
-};
+/** IP e navegador de quem fez a ação (auditoria). Atrás de proxy, depende do TRUST_PROXY. */
+function supplierContext(req) {
+    return {
+        ipAddress: req.ip ? req.ip.replace(/^::ffff:/, '') : null,
+        userAgent: req.headers['user-agent'] ?? null,
+    };
+}
+
+function fail(res, result, fallbackStatus = 400) {
+    return res.status(result.status ?? fallbackStatus).json({ success: false, body: { message: result.message } });
+}
 
 // ─────────────────────────────────────────────
-// Validação de CNPJ (chamada pública durante o registro)
+// Validação de CNPJ (pública, durante o cadastro)
 // POST /supplier/auth/validate-cnpj
 // ─────────────────────────────────────────────
 export async function validateCnpj(req, res) {
     try {
-        const { cnpj } = req.body;
-
+        const { cnpj } = req.body ?? {};
         if (!cnpj) {
             return res.status(400).json({ success: false, body: { message: 'CNPJ é obrigatório.' } });
         }
@@ -29,33 +33,14 @@ export async function validateCnpj(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// Registro
+// Cadastro
 // POST /supplier/auth/register
+// Body: { cnpj, razaoSocial, nomeFantasia?, owner: { name, email }, operator: { name, email }, password }
 // ─────────────────────────────────────────────
 export async function register(req, res) {
     try {
-        const {
-            cnpj, razaoSocial, nomeFantasia, password,
-            employeeCount, city, state,
-            contacts, categoryIds, regionIds,
-        } = req.body;
-
-        if (!cnpj || !razaoSocial || !password) {
-            return res.status(400).json({
-                success: false,
-                body: { message: 'cnpj, razaoSocial e password são obrigatórios.' },
-            });
-        }
-
-        const result = await supplierAuthService.registerSupplier({
-            cnpj, razaoSocial, nomeFantasia, password,
-            employeeCount, city, state,
-            contacts, categoryIds, regionIds,
-        });
-
-        if (!result.success) {
-            return res.status(400).json({ success: false, body: { message: result.message } });
-        }
+        const result = await supplierAuthService.registerSupplier(req.body ?? {});
+        if (!result.success) return fail(res, result);
 
         return res.status(201).json({
             success: true,
@@ -68,36 +53,21 @@ export async function register(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// Login Fase 1: CNPJ + senha → envia OTP
+// Login Fase 1: e-mail + senha → envia o código
 // POST /supplier/auth/login
 // ─────────────────────────────────────────────
 export async function login(req, res) {
     try {
-        const { cnpj, email, password } = req.body;
-
-        if ((!cnpj && !email) || !password) {
-            return res.status(400).json({
-                success: false,
-                body: { message: 'Informe o CNPJ ou e-mail operacional e a senha.' },
-            });
-        }
-
-        const result = await supplierAuthService.loginPhase1(
-            { cnpj, email },
-            password,
-            req.session,
-        );
-
-        if (!result.success) {
-            return res.status(401).json({ success: false, body: { message: result.message } });
-        }
+        const { email, password } = req.body ?? {};
+        const result = await supplierAuthService.loginPhase1(email, password, req.session);
+        if (!result.success) return fail(res, result, 401);
 
         return res.status(200).json({
             success: true,
             body: {
-                message: 'Código enviado para os emails cadastrados.',
+                message: 'Código enviado para o seu e-mail.',
                 requiresMfa: true,
-                // Apenas em desenvolvimento para facilitar testes
+                // Apenas fora de produção, para testar sem SMTP
                 ...(result.devOtp && { devOtp: result.devOtp }),
             },
         });
@@ -108,34 +78,27 @@ export async function login(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// Login Fase 2: valida OTP e emite JWT
+// Login Fase 2: confere o código e emite o JWT
 // POST /supplier/auth/verify-mfa
 // ─────────────────────────────────────────────
 export async function verifyMfa(req, res) {
     try {
-        const { otp } = req.body;
-
+        const { otp } = req.body ?? {};
         if (!otp) {
-            return res.status(400).json({ success: false, body: { message: 'Código OTP é obrigatório.' } });
+            return res.status(400).json({ success: false, body: { message: 'Informe o código de verificação.' } });
         }
 
-        const result = await supplierAuthService.loginPhase2(otp, req.session);
-
+        const result = await supplierAuthService.loginPhase2(String(otp), req.session);
         if (!result.success) {
             return res.status(401).json({ success: false, body: { message: result.message } });
         }
 
-        // Seta o JWT em cookie HttpOnly separado do cookie de colaboradores
+        // JWT em cookie HttpOnly separado do cookie de colaboradores
         res.cookie('supplier_token', result.token, SUPPLIER_COOKIE_OPTIONS);
-
-        console.log(`Fornecedor ID ${result.supplier.id} autenticado com MFA.`);
 
         return res.status(200).json({
             success: true,
-            body: {
-                message: 'Autenticado com sucesso.',
-                supplier: result.supplier,
-            },
+            body: { message: 'Autenticado com sucesso.', supplier: result.supplier },
         });
     } catch (error) {
         console.error('verifyMfa controller error:', error);
@@ -148,7 +111,7 @@ export async function verifyMfa(req, res) {
 // POST /supplier/auth/logout
 // ─────────────────────────────────────────────
 export async function logout(req, res) {
-    res.clearCookie('supplier_token');
+    res.clearCookie('supplier_token', SUPPLIER_COOKIE_OPTIONS);
     if (req.session) {
         delete req.session.mfaPending;
     }
@@ -156,15 +119,30 @@ export async function logout(req, res) {
 }
 
 // ─────────────────────────────────────────────
+// Me — dados da sessão do fornecedor
+// GET /supplier/auth/me
+// ─────────────────────────────────────────────
+export async function getMe(req, res) {
+    const f = req.fornecedor;
+    return res.status(200).json({
+        success: true,
+        body: {
+            supplierId: f.supplierId,
+            cnpj: f.cnpj,
+            razaoSocial: f.razaoSocial,
+            nomeFantasia: f.nomeFantasia,
+            user: { id: f.supplierUserId, role: f.role, name: f.name, email: f.email },
+        },
+    });
+}
+
+// ─────────────────────────────────────────────
 // Perfil — GET /supplier/auth/profile
 // ─────────────────────────────────────────────
 export async function getProfile(req, res) {
     try {
-        const supplierId = req.fornecedor.supplierId;
-        const result = await supplierAuthService.getSupplierProfile(supplierId);
-        if (!result.success) {
-            return res.status(404).json({ success: false, body: { message: result.message } });
-        }
+        const result = await supplierAuthService.getSupplierProfile(req.fornecedor.supplierId, req.fornecedor.supplierUserId);
+        if (!result.success) return fail(res, result, 404);
         return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
         console.error('getProfile controller error:', error);
@@ -173,15 +151,12 @@ export async function getProfile(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// Perfil — PUT /supplier/auth/profile
+// Dados da empresa — PUT /supplier/auth/profile  Body: { nomeFantasia }
 // ─────────────────────────────────────────────
 export async function updateProfile(req, res) {
     try {
-        const supplierId = req.fornecedor.supplierId;
-        const result = await supplierAuthService.updateSupplierProfile(supplierId, req.body ?? {});
-        if (!result.success) {
-            return res.status(400).json({ success: false, body: { message: result.message } });
-        }
+        const result = await supplierAuthService.updateCompany(req.fornecedor, req.body ?? {});
+        if (!result.success) return fail(res, result);
         return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
         console.error('updateProfile controller error:', error);
@@ -190,21 +165,52 @@ export async function updateProfile(req, res) {
 }
 
 // ─────────────────────────────────────────────
-// Me — retorna dados do fornecedor autenticado
-// GET /supplier/auth/me
+// Usuário — PUT /supplier/auth/users/:id  Body: { name, email, password? }
 // ─────────────────────────────────────────────
-export async function getMe(req, res) {
+export async function updateUser(req, res) {
     try {
-        return res.status(200).json({
-            success: true,
-            body: {
-                supplierId: req.fornecedor.supplierId,
-                cnpj: req.fornecedor.cnpj,
-                razaoSocial: req.fornecedor.razaoSocial,
-            },
-        });
+        const targetUserId = Number(req.params.id);
+        if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+            return res.status(400).json({ success: false, body: { message: 'Usuário inválido.' } });
+        }
+        const result = await supplierAuthService.updateSupplierUser(
+            req.fornecedor, targetUserId, req.body ?? {}, supplierContext(req),
+        );
+        if (!result.success) return fail(res, result);
+        return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
-        console.error('getMe supplier controller error:', error);
+        console.error('updateUser supplier controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
+// Usuário que falta — POST /supplier/auth/users  Body: { role, name, email, password }
+// ─────────────────────────────────────────────
+export async function createUser(req, res) {
+    try {
+        const result = await supplierAuthService.createMissingUser(req.fornecedor, req.body ?? {}, supplierContext(req));
+        if (!result.success) return fail(res, result);
+        return res.status(201).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('createUser supplier controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
+// Própria senha — PUT /supplier/auth/password  Body: { currentPassword, newPassword }
+// ─────────────────────────────────────────────
+export async function changePassword(req, res) {
+    try {
+        const result = await supplierAuthService.changeOwnPassword(req.fornecedor, req.body ?? {}, supplierContext(req));
+        if (!result.success) return fail(res, result);
+
+        // As sessões anteriores caem: esta continua com um token novo
+        res.cookie('supplier_token', result.token, SUPPLIER_COOKIE_OPTIONS);
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('changePassword supplier controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }
