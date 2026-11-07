@@ -11,7 +11,10 @@ import {
 import { DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import styles from './ApprovePanel.module.css';
 
-const STEPS = ['Documentos da empresa', 'Documentos dos colaboradores'];
+const STEPS = ['Contrato', 'Documentos da empresa', 'Documentos dos colaboradores'];
+
+// Mesmo limite do backend (labor_requests.contract_number NVARCHAR(50))
+const CONTRACT_NUMBER_MAX_LENGTH = 50;
 
 /** Texto sem acentos e em minúsculas, para a busca de NRs. */
 function normalize(value) {
@@ -38,10 +41,11 @@ function initialSelection(suggestedIds) {
 }
 
 /**
- * Painel de aprovação da Segurança do Trabalho — 2 etapas.
+ * Painel de aprovação da Segurança do Trabalho — 3 etapas.
  *
- * Etapa 0 — Documentos da empresa (ao menos um).
- * Etapa 1 — Documentos dos colaboradores:
+ * Etapa 0 — Número do contrato da obra (obrigatório; fica fixo depois da aprovação).
+ * Etapa 1 — Documentos da empresa (ao menos um).
+ * Etapa 2 — Documentos dos colaboradores:
  *   - Básicos: sempre exigidos (marcados e travados); o backend grava todos os ativos.
  *   - NRs e Outros: os sugeridos pela atividade já vêm marcados e podem ser desmarcados.
  *   Inclui campo de comentário livre antes do envio.
@@ -63,6 +67,7 @@ export default function ApprovePanel({
   const { data: nrData, isLoading: isLoadingNrs } = useAsyncData(getNrTypes, []);
 
   const [step, setStep] = useState(0);
+  const [contractNumber, setContractNumber] = useState('');
 
   // Sugeridos da atividade: empresa e outros vêm juntos em activityDocTypeIds
   const [selectedDocIds, setSelectedDocIds] = useState(() => initialSelection(activityDocTypeIds));
@@ -105,14 +110,32 @@ export default function ApprovePanel({
   const toggleDoc = toggle(setSelectedDocIds);
   const toggleNr = toggle(setSelectedNrIds);
 
-  // ── Avançar etapa 0 → etapa 1 ────────────────────────────────────────────
-  const handleNext = () => {
+  const goTo = (nextStep) => {
     setError('');
+    setStep(nextStep);
+  };
+
+  // ── Avançar etapa 0 → etapa 1: número do contrato ───────────────────────
+  const handleContractNext = () => {
+    const value = contractNumber.trim();
+    if (!value) {
+      setError('Informe o número do contrato para continuar.');
+      return;
+    }
+    if (value.length > CONTRACT_NUMBER_MAX_LENGTH) {
+      setError(`O número do contrato pode ter no máximo ${CONTRACT_NUMBER_MAX_LENGTH} caracteres.`);
+      return;
+    }
+    goTo(1);
+  };
+
+  // ── Avançar etapa 1 → etapa 2: documentos da empresa ─────────────────────
+  const handleCompanyNext = () => {
     if (companyCount === 0) {
       setError('Selecione ao menos um documento da empresa para continuar.');
       return;
     }
-    setStep(1);
+    goTo(2);
   };
 
   // ── Envio final ──────────────────────────────────────────────────────────
@@ -126,7 +149,14 @@ export default function ApprovePanel({
         .map((doc) => doc.id);
       const nrTypeIds = nrTypes.filter((nr) => selectedNrIds.has(nr.id)).map((nr) => nr.id);
 
-      const result = await submitApproval(laborRequestId, 2, comments, documentTypeIds, nrTypeIds);
+      const result = await submitApproval(
+        laborRequestId,
+        2,
+        comments,
+        documentTypeIds,
+        nrTypeIds,
+        contractNumber.trim(),
+      );
 
       if (!result.success) {
         setError(result.body?.message ?? 'Erro ao registrar decisão.');
@@ -143,8 +173,43 @@ export default function ApprovePanel({
     <div className={styles.panel}>
       <WizardStepper steps={STEPS} activeStep={step} />
 
-      {/* ── Etapa 0: Documentos da empresa ──────────────────────────────── */}
+      {/* ── Etapa 0: Número do contrato ─────────────────────────────────── */}
       {step === 0 && (
+        <>
+          <Section
+            title="Número do contrato"
+            note="Contrato da obra a que esta solicitação pertence. Compras e RH usam o número para encontrar os documentos. Depois de aprovar, ele não pode ser alterado por aqui."
+          >
+            <FormField label="Nº do contrato" required>
+              <input
+                type="text"
+                value={contractNumber}
+                maxLength={CONTRACT_NUMBER_MAX_LENGTH}
+                onChange={(event) => setContractNumber(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleContractNext();
+                  }
+                }}
+                placeholder="Ex.: CT-2026-0142"
+                autoComplete="off"
+              />
+            </FormField>
+          </Section>
+
+          {error && <p className={styles.error}>{error}</p>}
+
+          <div className={styles.actions}>
+            <Button icon={LuArrowRight} iconPosition="right" onClick={handleContractNext}>
+              Próximo: documentos da empresa
+            </Button>
+          </div>
+        </>
+      )}
+
+      {/* ── Etapa 1: Documentos da empresa ──────────────────────────────── */}
+      {step === 1 && (
         <>
           <Section title="Documentos da empresa" count={companyCount}>
             {isLoadingCompany ? (
@@ -169,10 +234,13 @@ export default function ApprovePanel({
           {error && <p className={styles.error}>{error}</p>}
 
           <div className={styles.actions}>
+            <Button variant="ghost" icon={LuArrowLeft} onClick={() => goTo(0)}>
+              Voltar
+            </Button>
             <Button
               icon={LuArrowRight}
               iconPosition="right"
-              onClick={handleNext}
+              onClick={handleCompanyNext}
               disabled={isLoadingCompany}
             >
               Próximo: documentos dos colaboradores
@@ -181,8 +249,8 @@ export default function ApprovePanel({
         </>
       )}
 
-      {/* ── Etapa 1: Documentos dos colaboradores ───────────────────────── */}
-      {step === 1 && (
+      {/* ── Etapa 2: Documentos dos colaboradores ───────────────────────── */}
+      {step === 2 && (
         <>
           <Section
             title="Básicos do colaborador"
@@ -275,7 +343,7 @@ export default function ApprovePanel({
             <Button
               variant="ghost"
               icon={LuArrowLeft}
-              onClick={() => { setError(''); setStep(0); }}
+              onClick={() => goTo(1)}
               disabled={isSubmitting}
             >
               Voltar

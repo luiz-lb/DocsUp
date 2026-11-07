@@ -60,6 +60,7 @@ export async function listDocumentsWithValidation({ supplierId, laborRequestId, 
             d.labor_request_id,
             lr.title             AS labor_request_title,
             lr.[location]        AS labor_request_location,
+            lr.contract_number,
             /* Última validação */
             dv.id                AS validation_id,
             dv.validation_type,

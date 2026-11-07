@@ -39,7 +39,7 @@ export async function getLaborRequest({ page = 1, limit = 10, search = '', statu
 
     if (search) {
         request.input('search', sql.VarChar, `%${search}%`);
-        conditions.push('(r.title LIKE @search OR r.[location] LIKE @search OR u.[name] LIKE @search OR a.[name] LIKE @search)');
+        conditions.push('(r.title LIKE @search OR r.[location] LIKE @search OR u.[name] LIKE @search OR a.[name] LIKE @search OR r.contract_number LIKE @search)');
     }
 
     if (status !== undefined && status !== null) {
@@ -69,6 +69,7 @@ export async function getLaborRequest({ page = 1, limit = 10, search = '', statu
             a.[name] as activity_name,
             r.[location],
             r.title,
+            r.contract_number,
             r.urgency,
             r.[status],
             r.created_at,
@@ -125,6 +126,7 @@ export async function getLaborRequestById(id) {
                       And dt.is_active = 1
                 ) as activity_nr_type_id,
                 r.title,
+                r.contract_number,
                 r.[description],
                 r.[location],
                 r.start_date,
@@ -225,6 +227,20 @@ export async function updateLaborRequestStatus(transaction, laborRequestId, stat
                 update_by_id = @updater_id
             WHERE id = @id
         `);
+
+    return result.rowsAffected[0] > 0;
+}
+
+/**
+ * Grava o número do contrato (na aprovação da Segurança do Trabalho). Depois disso fica
+ * fixo: não há outra rota que altere a coluna.
+ */
+export async function setContractNumber(transaction, laborRequestId, contractNumber) {
+    const request = new sql.Request(transaction);
+    const result = await request
+        .input('id', sql.Int, laborRequestId)
+        .input('contract_number', sql.NVarChar(50), contractNumber)
+        .query('UPDATE labor_requests SET contract_number = @contract_number WHERE id = @id');
 
     return result.rowsAffected[0] > 0;
 }

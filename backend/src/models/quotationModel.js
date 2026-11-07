@@ -723,6 +723,7 @@ export async function listPhase2DeadlinesBySupplier(supplierId) {
                 lr.id            AS labor_request_id,
                 lr.title         AS labor_request_title,
                 lr.[location]    AS labor_request_location,
+                lr.contract_number,
                 ISNULL(emp.employees, 0)   AS employees,
                 ISNULL(docs.total, 0)      AS documents_total,
                 ISNULL(docs.pending, 0)    AS documents_pending,
@@ -764,7 +765,8 @@ export async function getPhase2DeadlineByToken(token) {
                 p.link_token, p.deadline_hours, p.started_at, p.expires_at,
                 p.[status], p.completed_at,
                 s.razao_social AS supplier_name,
-                lr.title AS labor_request_title
+                lr.title AS labor_request_title,
+                lr.contract_number
             FROM phase2_deadlines AS p
             INNER JOIN suppliers AS s ON s.id = p.supplier_id
             INNER JOIN labor_requests AS lr ON lr.id = p.labor_request_id

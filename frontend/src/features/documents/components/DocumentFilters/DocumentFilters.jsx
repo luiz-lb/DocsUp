@@ -7,13 +7,13 @@ import { EMPTY_DOCUMENT_FILTERS, hasActiveFilters } from './documentFilters.js';
 import styles from './DocumentFilters.module.css';
 
 /**
- * Busca e filtros da aba Documentos: fornecedor, obra (local), solicitação, documento, status,
+ * Busca e filtros da aba Documentos: contrato, fornecedor, obra (local), solicitação, documento, status,
  * escopo (empresa / colaborador) e data de envio. Fornecedor e documento têm busca.
  *
  * Props:
  *  - filters         : ver EMPTY_DOCUMENT_FILTERS
  *  - onFiltersChange : (filters) => void
- *  - options         : { suppliers, locations, requests, documentTypes } (buildFilterOptions)
+ *  - options         : { contracts, suppliers, locations, requests, documentTypes } (buildFilterOptions)
  *  - resultCount     : quantos documentos passaram nos filtros
  */
 export default function DocumentFilters({ filters, onFiltersChange, options, resultCount }) {
@@ -32,7 +32,7 @@ export default function DocumentFilters({ filters, onFiltersChange, options, res
           <LuSearch className={styles.searchIcon} aria-hidden="true" />
           <input
             type="text"
-            placeholder="Buscar por colaborador, documento, arquivo ou fornecedor..."
+            placeholder="Buscar por colaborador, documento, arquivo, fornecedor ou contrato..."
             value={filters.search}
             onChange={setFromEvent('search')}
           />
@@ -60,6 +60,16 @@ export default function DocumentFilters({ filters, onFiltersChange, options, res
       </div>
 
       <div className={cn(styles.grid, isOpen && styles.gridOpen)}>
+        <FormField label="Contrato" className={styles.field}>
+          <SearchSelect
+            options={options.contracts}
+            value={filters.contract}
+            onChange={(value) => set('contract', value)}
+            placeholder="Todos"
+            emptyMessage="Nenhum contrato encontrado."
+          />
+        </FormField>
+
         <FormField label="Fornecedor" className={styles.field}>
           <SearchSelect
             options={options.suppliers}

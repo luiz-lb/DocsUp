@@ -6,7 +6,7 @@ import { useAsyncData } from '../../../../hooks/useAsyncData.js';
 import { formatDateOnly, formatDateTime } from '../../../../utils/formatters.js';
 import { listEmployeeSituations } from '../../api/documentsRealApi.js';
 import EmployeeSituationModal from '../EmployeeSituationModal/index.js';
-import { EMPTY_EMPLOYEE_FILTERS } from './employeeFilters.js';
+import { EMPTY_EMPLOYEE_FILTERS, NO_CONTRACT } from './employeeFilters.js';
 import styles from './EmployeeSituationTab.module.css';
 
 // Integração agendada e Retido por pendência mostram um detalhe embaixo da etiqueta
@@ -42,7 +42,7 @@ function documentsSummary(row) {
  * tela, eles voltam ao padrão. A lista vem inteira e é filtrada aqui.
  *
  * Props:
- *  - filters         : { search, status, supplierId }
+ *  - filters         : { search, status, supplierId, contract }
  *  - onFiltersChange : (filters) => void
  */
 export default function EmployeeSituationTab({ filters = EMPTY_EMPLOYEE_FILTERS, onFiltersChange }) {
@@ -63,17 +63,28 @@ export default function EmployeeSituationTab({ filters = EMPTY_EMPLOYEE_FILTERS,
       .map(([value, label]) => ({ value, label }));
   }, [allEmployees]);
 
+  // Contratos da lista, para o filtro com busca
+  const contractOptions = useMemo(() => {
+    const contracts = new Set(allEmployees.map((row) => row.contract_number?.trim() || NO_CONTRACT));
+    return [...contracts]
+      .map((value) => ({ value, label: value === NO_CONTRACT ? 'Sem contrato' : value }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  }, [allEmployees]);
+
   const employees = useMemo(() => {
     const term = normalize(filters.search.trim());
+    const contractFilter = filters.contract ?? '';
     return allEmployees.filter((row) => {
+      if (contractFilter !== '' && (row.contract_number?.trim() || NO_CONTRACT) !== contractFilter) return false;
       if (filters.supplierId !== '' && String(row.supplier_id) !== filters.supplierId) return false;
       if (filters.status !== '' && String(row.status) !== filters.status) return false;
-      if (term && !normalize(`${row.full_name} ${row.cpf ?? ''} ${row.supplier_name}`).includes(term)) return false;
+      if (term && !normalize(`${row.full_name} ${row.cpf ?? ''} ${row.supplier_name} ${row.contract_number ?? ''}`).includes(term)) return false;
       return true;
     });
   }, [allEmployees, filters]);
 
-  const hasFilters = filters.search !== '' || filters.status !== '' || filters.supplierId !== '';
+  const hasFilters = filters.search !== '' || filters.status !== '' || filters.supplierId !== ''
+    || (filters.contract ?? '') !== '';
 
   const handleSuccess = (employee, message) => {
     setTarget(null);
@@ -105,6 +116,7 @@ export default function EmployeeSituationTab({ filters = EMPTY_EMPLOYEE_FILTERS,
         <div className={styles.cell}>
           <span>{row.supplier_name}</span>
           <span className={styles.meta}>{row.labor_request_title ?? '—'}</span>
+          {row.contract_number && <span className={styles.meta}>Contrato {row.contract_number}</span>}
         </div>
       ),
     },
@@ -152,11 +164,20 @@ export default function EmployeeSituationTab({ filters = EMPTY_EMPLOYEE_FILTERS,
           <LuSearch className={styles.searchIcon} aria-hidden="true" />
           <input
             type="text"
-            placeholder="Buscar por nome, CPF ou fornecedor..."
+            placeholder="Buscar por nome, CPF, fornecedor ou contrato..."
             value={filters.search}
             onChange={setFilter('search')}
           />
         </label>
+        <FormField className={styles.supplierField}>
+          <SearchSelect
+            options={contractOptions}
+            value={filters.contract ?? ''}
+            onChange={(contract) => onFiltersChange({ ...filters, contract })}
+            placeholder="Todos os contratos"
+            emptyMessage="Nenhum contrato encontrado."
+          />
+        </FormField>
         {/* Fornecedor: com busca (SearchSelect usa o estilo de campo do FormField); o X limpa */}
         <FormField className={styles.supplierField}>
           <SearchSelect

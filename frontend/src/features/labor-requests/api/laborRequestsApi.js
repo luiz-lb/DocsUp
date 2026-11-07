@@ -76,8 +76,9 @@ export async function getApprovals(laborRequestId) {
  * @param {string}   comments
  * @param {number[]} documentTypeIds - obrigatório ao aprovar (decision=2)
  * @param {number[]} nrTypeIds       - NRs exigidas, obrigatório ao aprovar (decision=2)
+ * @param {string}   contractNumber  - número do contrato, obrigatório ao aprovar (decision=2)
  */
-export async function submitApproval(laborRequestId, decision, comments, documentTypeIds, nrTypeIds) {
+export async function submitApproval(laborRequestId, decision, comments, documentTypeIds, nrTypeIds, contractNumber) {
   try {
     const result = await api.post('/laborRequest/approveRequest', {
       laborRequestId,
@@ -85,6 +86,7 @@ export async function submitApproval(laborRequestId, decision, comments, documen
       comments,
       documentTypeIds,
       nrTypeIds,
+      contractNumber,
     });
     return result.data;
   } catch (error) {

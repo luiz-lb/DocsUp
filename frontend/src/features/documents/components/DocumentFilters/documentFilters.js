@@ -2,6 +2,7 @@
 // estiver aberta (também ao trocar de aba); a lista vem inteira e é filtrada aqui.
 export const EMPTY_DOCUMENT_FILTERS = {
   search: '',
+  contract: '',
   supplierId: '',
   location: '',
   requestId: '',
@@ -14,6 +15,9 @@ export const EMPTY_DOCUMENT_FILTERS = {
 
 // Valor da opção "Sem local" (documentos sem solicitação ou solicitação sem local)
 export const NO_LOCATION = '__sem_local__';
+
+// Valor da opção "Sem contrato" (solicitação aprovada antes de o número do contrato existir)
+export const NO_CONTRACT = '__sem_contrato__';
 
 /** Texto sem acentos e em minúsculas, para a busca. */
 function normalize(value) {
@@ -39,8 +43,12 @@ export function hasActiveFilters(filters) {
 export function filterDocuments(documents, filters) {
   const term = normalize(filters.search.trim());
   return documents.filter((doc) => {
-    if (term && !normalize(`${doc.document_type_name} ${doc.employee_name ?? ''} ${doc.file_name} ${doc.supplier_name ?? ''}`).includes(term)) {
+    if (term && !normalize(`${doc.document_type_name} ${doc.employee_name ?? ''} ${doc.file_name} ${doc.supplier_name ?? ''} ${doc.contract_number ?? ''}`).includes(term)) {
       return false;
+    }
+    if (filters.contract) {
+      const contract = doc.contract_number?.trim() || NO_CONTRACT;
+      if (contract !== filters.contract) return false;
     }
     if (filters.supplierId && String(doc.supplier_id) !== filters.supplierId) return false;
     if (filters.location) {
@@ -63,12 +71,14 @@ export function filterDocuments(documents, filters) {
 
 /** Opções dos filtros a partir de todos os documentos (não mudam conforme se filtra). */
 export function buildFilterOptions(documents) {
+  const contracts = new Set();
   const suppliers = new Map();
   const locations = new Set();
   const requests = new Map();
   const documentTypes = new Map();
 
   for (const doc of documents) {
+    contracts.add(doc.contract_number?.trim() || NO_CONTRACT);
     if (doc.supplier_id) suppliers.set(String(doc.supplier_id), doc.supplier_name ?? `Fornecedor ${doc.supplier_id}`);
     locations.add(doc.labor_request_location?.trim() || NO_LOCATION);
     if (doc.labor_request_id) requests.set(String(doc.labor_request_id), doc.labor_request_title ?? `Solicitação ${doc.labor_request_id}`);
@@ -79,6 +89,9 @@ export function buildFilterOptions(documents) {
   const toOptions = (map) => [...map.entries()].map(([value, label]) => ({ value, label })).sort(byLabel);
 
   return {
+    contracts: [...contracts]
+      .map((value) => ({ value, label: value === NO_CONTRACT ? 'Sem contrato' : value }))
+      .sort(byLabel),
     suppliers: toOptions(suppliers),
     locations: [...locations]
       .map((value) => ({ value, label: value === NO_LOCATION ? 'Sem local' : value }))

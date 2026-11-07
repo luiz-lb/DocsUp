@@ -162,7 +162,8 @@ export async function getAllEmployees() {
                 e.role_function,
                 e.[status],
                 s.razao_social AS supplier_name,
-                lr.title       AS labor_request_title
+                lr.title       AS labor_request_title,
+                lr.contract_number
             FROM employees AS e
             INNER JOIN suppliers AS s    ON s.id  = e.supplier_id
             LEFT  JOIN labor_requests lr ON lr.id = e.labor_request_id

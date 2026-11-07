@@ -126,11 +126,12 @@ export async function listApprovals(req, res) {
  * Registra a decisão de aprovação (Segurança do Trabalho).
  * POST /laborRequest/approveRequest
  *
- * Body: { laborRequestId, decision, comments, documentTypeIds[], nrTypeIds[] }
+ * Body: { laborRequestId, decision, comments, contractNumber, documentTypeIds[], nrTypeIds[] }
+ * (contractNumber, documentTypeIds e nrTypeIds só valem ao aprovar)
  */
 export async function approveRequest(req, res) {
     try {
-        const { laborRequestId, decision, comments, documentTypeIds, nrTypeIds } = req.body;
+        const { laborRequestId, decision, comments, documentTypeIds, nrTypeIds, contractNumber } = req.body;
         const approverId = req.usuario.id;
         const department = req.usuario.department;
 
@@ -150,7 +151,8 @@ export async function approveRequest(req, res) {
             decisionNum,
             comments,
             documentTypeIds,
-            nrTypeIds
+            nrTypeIds,
+            contractNumber
         );
 
         if (result.success) {

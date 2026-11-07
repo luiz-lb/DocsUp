@@ -9,6 +9,26 @@ import { toInteger } from '../utils/parse.js'
 // Os básicos entram sempre (todos os ativos); as NRs vêm em nrTypeIds.
 const CHOSEN_DOCUMENT_CATEGORIES = [DOCUMENT_CATEGORIES.COMPANY, DOCUMENT_CATEGORIES.EMPLOYEE_OTHER];
 
+export const CONTRACT_NUMBER_MAX_LENGTH = 50;
+
+/**
+ * Número do contrato informado na aprovação: texto obrigatório, sem espaços nas pontas,
+ * até 50 caracteres e sem caracteres de controle. Retorna { value } ou { error }.
+ */
+function resolveContractNumber(value) {
+    if (typeof value !== 'string' || !value.trim()) {
+        return { error: "Informe o número do contrato para aprovar." }
+    }
+    const contractNumber = value.trim();
+    if (contractNumber.length > CONTRACT_NUMBER_MAX_LENGTH) {
+        return { error: `O número do contrato pode ter no máximo ${CONTRACT_NUMBER_MAX_LENGTH} caracteres.` }
+    }
+    if (/[\u0000-\u001f\u007f]/.test(contractNumber)) {
+        return { error: "Número do contrato inválido." }
+    }
+    return { value: contractNumber }
+}
+
 // Lista de ids inteiros positivos, sem repetição; null se algum item for inválido
 function uniqueIds(values) {
     const ids = values.map(toInteger);
@@ -161,11 +181,12 @@ export async function listApprovals(laborRequestId) {
  *  - Aprovação  → status 3 (Em Cotação)
  *
  * Ao aprovar (decision=2), a Segurança do Trabalho define:
+ *  - contractNumber    → número do contrato (obrigatório; fica fixo depois)
  *  - documentTypeIds[] → empresa (ao menos um) e outros do colaborador, persistidos em
  *                        labor_request_documents junto com todos os básicos ativos
  *  - nrTypeIds[]       → NRs (opcionais), persistidas em labor_request_NRs
  */
-export async function approveRequest(laborRequestId, approverId, department, decision, comments, documentTypeIds, nrTypeIds) {
+export async function approveRequest(laborRequestId, approverId, department, decision, comments, documentTypeIds, nrTypeIds, contractNumber) {
     let transaction;
     let transactionDone = false;
 
@@ -182,7 +203,13 @@ export async function approveRequest(laborRequestId, approverId, department, dec
         // Ao aprovar: ao menos um documento da empresa; NRs e outros do colaborador são
         // opcionais; os básicos ativos entram sempre
         let requirements = null;
+        let contract = null;
         if (decision === 2) {
+            contract = resolveContractNumber(contractNumber);
+            if (contract.error) {
+                return {success: false, body: { message: contract.error }}
+            }
+
             requirements = await resolveApprovalRequirements(documentTypeIds, nrTypeIds);
             if (requirements.error) {
                 return {success: false, body: { message: requirements.error }}
@@ -203,6 +230,8 @@ export async function approveRequest(laborRequestId, approverId, department, dec
         }
 
         if (decision === 2) {
+            await laborRequestModel.setContractNumber(transaction, laborRequestId, contract.value);
+
             // Salva documentos obrigatórios (labor_request_documents): empresa, outros e básicos
             await laborRequestModel.deleteLaborRequestDocuments(transaction, laborRequestId);
             for (const docTypeId of requirements.documentTypeIds) {

@@ -71,6 +71,7 @@ export default function SupplierPhase2ListPage() {
                 <div className={styles.itemInfo}>
                   <span className={styles.itemTitle}>{row.labor_request_title}</span>
                   <span className={styles.itemMeta}>
+                    {row.contract_number ? `Contrato ${row.contract_number} · ` : ''}
                     {row.labor_request_location ?? '—'} ·{' '}
                     {row.isExpired ? 'Prazo encerrado' : `Prazo até ${formatDateTime(row.expires_at)}`}
                   </span>

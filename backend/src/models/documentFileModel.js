@@ -26,6 +26,7 @@ export async function getDocumentFilesByIds(ids) {
             s.razao_social   AS supplier_name,
             d.labor_request_id,
             lr.title         AS labor_request_title,
+            lr.contract_number,
             d.employee_id,
             e.full_name      AS employee_name,
             dt.[name]        AS document_type_name,

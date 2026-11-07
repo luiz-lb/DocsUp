@@ -17,7 +17,7 @@ export async function listEmployeeSituations({ search = '', status } = {}) {
 
     if (search) {
         request.input('search', sql.NVarChar(210), `%${search}%`);
-        conditions.push('(e.full_name LIKE @search OR e.cpf LIKE @search OR s.razao_social LIKE @search)');
+        conditions.push('(e.full_name LIKE @search OR e.cpf LIKE @search OR s.razao_social LIKE @search OR lr.contract_number LIKE @search)');
     }
     if (status !== undefined) {
         request.input('status', sql.TinyInt, status);
@@ -38,6 +38,7 @@ export async function listEmployeeSituations({ search = '', status } = {}) {
             e.labor_request_id,
             lr.title         AS labor_request_title,
             lr.[location]    AS labor_request_location,
+            lr.contract_number,
             ISNULL(docs.total, 0)    AS documents_total,
             ISNULL(docs.approved, 0) AS documents_approved,
             ISNULL(docs.pending, 0)  AS documents_pending,

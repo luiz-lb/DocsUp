@@ -300,7 +300,9 @@ export default function Phase2UploadPage() {
     <SupplierLayout>
       <SupplierPageHeader
         title="Fase 2 · Documentos"
-        subtitle={deadline.labor_request_title}
+        subtitle={deadline.contract_number
+          ? `${deadline.labor_request_title} · Contrato ${deadline.contract_number}`
+          : deadline.labor_request_title}
         backTo={ROUTES.suppliers.documents}
         backLabel="Documentos (Fase 2)"
       />

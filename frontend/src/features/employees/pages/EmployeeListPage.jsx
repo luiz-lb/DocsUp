@@ -6,6 +6,7 @@ import { listEmployees } from '../api/employeesApi.js';
 const COLUMNS = [
   { key: 'full_name', header: 'Colaborador' },
   { key: 'supplier_name', header: 'Fornecedor' },
+  { key: 'contract_number', header: 'Contrato', render: (row) => row.contract_number ?? '—' },
   { key: 'labor_request_title', header: 'Solicitação' },
   { key: 'role_function', header: 'Função' },
   {

@@ -25,6 +25,11 @@ import styles from './SupplierDocumentsPage.module.css';
 
 // Modos de agrupamento
 const GROUP_BY = {
+  contract: {
+    label: 'Contrato',
+    keyOf: (d) => `c:${d.contract_number?.trim() ?? ''}`,
+    titleOf: (d) => d.contract_number?.trim() || 'Sem contrato',
+  },
   supplier: {
     label: 'Fornecedor',
     keyOf: (d) => `s:${d.supplier_id}`,
@@ -202,10 +207,19 @@ export default function SupplierDocumentsPage() {
   ];
 
   // ── Colunas da tabela de documentos (visão detalhada) ───────────────────
+  // Solicitação com o número do contrato embaixo (quando o agrupamento ainda não diz o contrato)
+  const requestCell = (row) => (
+    <div className={styles.docCell}>
+      <span>{row.labor_request_title ?? '—'}</span>
+      {groupBy !== 'contract' && row.contract_number && (
+        <span className={styles.meta}>Contrato {row.contract_number}</span>
+      )}
+    </div>
+  );
+
   // Coluna de origem conforme o agrupamento (o que o grupo aberto ainda não diz)
   const originColumn = {
-    supplier: { header: 'Solicitação', render: (row) => row.labor_request_title ?? '—' },
-    location: {
+    contract: {
       header: 'Fornecedor · Solicitação',
       render: (row) => (
         <div className={styles.docCell}>
@@ -214,7 +228,28 @@ export default function SupplierDocumentsPage() {
         </div>
       ),
     },
-    request: { header: 'Fornecedor', render: (row) => row.supplier_name ?? '—' },
+    supplier: { header: 'Solicitação', render: requestCell },
+    location: {
+      header: 'Fornecedor · Solicitação',
+      render: (row) => (
+        <div className={styles.docCell}>
+          <span>{row.supplier_name ?? '—'}</span>
+          <span className={styles.meta}>
+            {row.labor_request_title ?? '—'}
+            {row.contract_number ? ` · Contrato ${row.contract_number}` : ''}
+          </span>
+        </div>
+      ),
+    },
+    request: {
+      header: 'Fornecedor',
+      render: (row) => (
+        <div className={styles.docCell}>
+          <span>{row.supplier_name ?? '—'}</span>
+          {row.contract_number && <span className={styles.meta}>Contrato {row.contract_number}</span>}
+        </div>
+      ),
+    },
   }[groupBy];
 
   const docColumns = [

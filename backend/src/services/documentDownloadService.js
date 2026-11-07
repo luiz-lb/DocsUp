@@ -56,14 +56,19 @@ function zipFileName(document) {
 }
 
 /**
- * Pasta do documento no ZIP:
- *   <Fornecedor>/<Solicitação N - Título>/Empresa/
- *   <Fornecedor>/<Solicitação N - Título>/Colaboradores/<Nome do colaborador>/
+ * Pasta do documento no ZIP (o contrato entra no nome da pasta da solicitação, quando existe):
+ *   <Fornecedor>/<Contrato X - Solicitação N - Título>/Empresa/
+ *   <Fornecedor>/<Contrato X - Solicitação N - Título>/Colaboradores/<Nome do colaborador>/
  */
 function zipFolder(document) {
     const supplier = safeName(document.supplier_name, `Fornecedor ${document.supplier_id}`);
+    const contract = document.contract_number ? `Contrato ${document.contract_number} - ` : '';
     const request = document.labor_request_id
-        ? safeName(`Solicitação ${document.labor_request_id} - ${document.labor_request_title ?? ''}`, `Solicitação ${document.labor_request_id}`)
+        ? safeName(
+            `${contract}Solicitação ${document.labor_request_id} - ${document.labor_request_title ?? ''}`,
+            `Solicitação ${document.labor_request_id}`,
+            120,
+        )
         : 'Sem solicitação';
     if (!document.employee_id) return `${supplier}/${request}/Empresa`;
     const employee = safeName(document.employee_name, `Colaborador ${document.employee_id}`);

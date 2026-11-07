@@ -146,6 +146,9 @@ export default function RequestDetailPage() {
           <Card>
             <Card.Body>
               <dl className={styles.infoGrid}>
+                <dt>Nº do contrato</dt>
+                <dd>{request.contract_number ?? (isPending ? 'Definido na aprovação da Segurança do Trabalho' : '—')}</dd>
+
                 <dt>Atividade</dt>
                 <dd>{request.activity_type_name ?? '—'}</dd>
 

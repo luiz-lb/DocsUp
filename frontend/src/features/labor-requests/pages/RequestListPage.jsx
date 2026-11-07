@@ -24,6 +24,7 @@ const COLUMNS = [
       </div>
     ),
   },
+  { key: 'contract', header: 'Contrato', render: (row) => row.contract_number ?? '—' },
   { key: 'activity', header: 'Atividade', render: (row) => row.activity_name},
   { key: 'urgency', header: 'Urgência', render: (row) => <StatusBadge enumMap={URGENCY} value={row.urgency} /> },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge enumMap={LABOR_REQUEST_STATUS} value={row.status} /> },
@@ -79,7 +80,7 @@ export default function RequestListPage() {
           <LuSearch className={styles.searchIcon} />
           <input
             type="text"
-            placeholder="Buscar por título, local, solicitante ou atividade..."
+            placeholder="Buscar por título, local, solicitante, atividade ou contrato..."
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
           />
