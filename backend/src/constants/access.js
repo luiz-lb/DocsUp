@@ -14,4 +14,6 @@ export const ACCESS = Object.freeze({
     // Indicar o fornecedor de uma solicitação (e-mail e prazo), reenviar o convite, mudar o
     // prazo e trocar o fornecedor
     SUPPLIER_ASSIGNMENT: [DEPARTMENTS.SUPRIMENTOS],
+    // Concluir o contrato (encerra a cobrança dos documentos mensais)
+    CONCLUDE_CONTRACT: [DEPARTMENTS.RH, DEPARTMENTS.SUPRIMENTOS],
 });

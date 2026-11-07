@@ -5,6 +5,7 @@ import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
 import {
     DOCUMENT_CATEGORIES,
     DOCUMENT_CATEGORY_IDS,
+    DOCUMENT_SCOPES,
     scopeForCategory,
 } from '../constants/documentCategories.js';
 import { changedFields, collaboratorAuditEntry } from '../utils/audit.js';
@@ -49,7 +50,13 @@ function badRequest(message) {
 // Validação
 // ─────────────────────────────────────────────
 
-// Categoria válida (0 a 3) ou null
+/** Escopo do documento mensal: 0 (empresa) ou 1 (cada colaborador). Retorna o número ou null. */
+function parseMonthlyScope(value) {
+    const scope = toInteger(value);
+    return Object.values(DOCUMENT_SCOPES).includes(scope) ? scope : null;
+}
+
+// Categoria válida (0 a 4) ou null
 function parseCategory(value) {
     const category = toInteger(value);
     return DOCUMENT_CATEGORY_IDS.includes(category) ? category : null;
@@ -179,6 +186,9 @@ function auditSnapshot(documentType) {
     if (documentType.category === DOCUMENT_CATEGORIES.EMPLOYEE_NR) {
         snapshot.code = documentType.code ?? null;
     }
+    if (documentType.category === DOCUMENT_CATEGORIES.MONTHLY) {
+        snapshot.scope = documentType.scope ?? null;
+    }
     snapshot.is_active = Boolean(documentType.is_active);
     return snapshot;
 }
@@ -211,6 +221,13 @@ export async function createDocumentType(payload = {}, context = {}) {
 
     const isNr = category === DOCUMENT_CATEGORIES.EMPLOYEE_NR;
 
+    // Mensal: da empresa ou de cada colaborador (fixo depois de criado)
+    let monthlyScope = null;
+    if (category === DOCUMENT_CATEGORIES.MONTHLY) {
+        monthlyScope = parseMonthlyScope(payload.scope);
+        if (monthlyScope === null) return badRequest('Escolha se o documento mensal é da empresa ou de cada colaborador.');
+    }
+
     let code = null;
     if (isNr) {
         const codeResult = validateNrCode(payload.code);
@@ -234,7 +251,7 @@ export async function createDocumentType(payload = {}, context = {}) {
         name: nameResult.name,
         description: descriptionResult.value,
         category,
-        scope: scopeForCategory(category),
+        scope: scopeForCategory(category, monthlyScope),
         validationMethod: validation.validationMethod,
         apiEndpoint: validation.apiEndpoint,
         aiInstructions: validation.aiInstructions,
@@ -281,6 +298,7 @@ export async function createDocumentType(payload = {}, context = {}) {
                     api_endpoint: data.apiEndpoint,
                     ai_instructions: data.aiInstructions,
                     code,
+                    scope: data.scope,
                     is_active: true,
                 }),
             ));
@@ -361,6 +379,7 @@ export async function updateDocumentType(id, payload = {}, context = {}) {
             api_endpoint: validation.apiEndpoint,
             ai_instructions: validation.aiInstructions,
             code,
+            scope: before.scope,
             is_active: before.is_active,
         };
 
@@ -391,7 +410,8 @@ export async function updateDocumentType(id, payload = {}, context = {}) {
                 name: after.name,
                 description,
                 category,
-                scope: scopeForCategory(category),
+                // Mensal: o escopo escolhido na criação não muda
+                scope: scopeForCategory(category, before.scope),
                 hasExpiration: after.has_expiration,
                 validityDays: after.validity_days,
                 validationMethod: after.validation_method,

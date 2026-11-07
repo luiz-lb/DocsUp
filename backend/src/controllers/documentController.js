@@ -4,6 +4,7 @@ import * as documentValidationService from '../services/documentValidationServic
 import * as documentDownloadService from '../services/documentDownloadService.js';
 import * as deliveryService from '../services/deliveryService.js';
 import * as employeeSituationService from '../services/employeeSituationService.js';
+import * as monthlyService from '../services/monthlyService.js';
 import { EMPLOYEE_STATUS_IDS } from '../constants/employeeStatus.js';
 import { requestAuditContext } from '../utils/audit.js';
 import { sendPrivateFile, setPrivateFileHeaders } from '../utils/fileResponse.js';
@@ -298,6 +299,24 @@ export async function receiveAiResult(req, res) {
         return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
         console.error('receiveAiResult controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
+ * GET /documents/monthly?month=YYYY-MM — documentos trabalhistas mensais de um mês em todos os
+ * contratos com fornecedor ativo (sem mês: o mês anterior, que vence neste mês).
+ */
+export async function monthlyOverview(req, res) {
+    try {
+        const month = typeof req.query.month === 'string' ? req.query.month : null;
+        const result = await monthlyService.getMonthlyOverview(month);
+        if (!result.success) {
+            return res.status(result.status ?? 500).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('monthlyOverview controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }

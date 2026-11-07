@@ -23,6 +23,9 @@ router.get('/listById/:id', verificarToken, laborRequest.listLaborRequestById);
 router.post('/approveRequest', verificarToken, requireRole(...ACCESS.REQUIRED_DOCUMENTS), laborRequest.approveRequest)
 router.get('/listApprovals/:id', verificarToken, laborRequest.listApprovals)
 
+// Conclui o contrato (RH ou Compras): encerra a cobrança dos documentos mensais
+router.post('/:id/conclude', verificarToken, requireRole(...ACCESS.CONCLUDE_CONTRACT), laborRequest.concludeRequest);
+
 // Fornecedor da solicitação (no lugar da cotação): todos veem; Compras indica e troca
 router.get('/supplier-lookup', verificarToken, podeGerenciarFornecedor, assignment.lookupSupplierEmail);
 router.get('/:id/supplier', verificarToken, assignment.getRequestSupplier);

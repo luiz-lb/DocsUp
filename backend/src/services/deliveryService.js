@@ -17,14 +17,21 @@ export async function getDocumentHistory(documentId) {
     }
 }
 
+/** Mês de referência na chave da vaga ('' nos documentos iniciais). */
+function monthPart(referenceMonth) {
+    if (!referenceMonth) return '';
+    const date = new Date(referenceMonth);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
 /**
- * Agrupa as entregas de um fornecedor numa solicitação por documento (tipo + colaborador).
- * Retorna um Map 'tipo:colaborador' → entregas (mais nova primeiro).
+ * Agrupa as entregas de um fornecedor numa solicitação por documento (tipo + colaborador e,
+ * nos mensais, o mês). Retorna um Map 'tipo:colaborador:mês' → entregas (mais nova primeiro).
  */
 export function groupDeliveriesBySlot(deliveries) {
     const bySlot = new Map();
-    for (const { document_type_id: typeId, employee_id: employeeId, ...delivery } of deliveries) {
-        const key = `${typeId}:${employeeId ?? 'empresa'}`;
+    for (const { document_type_id: typeId, employee_id: employeeId, reference_month: referenceMonth, ...delivery } of deliveries) {
+        const key = `${typeId}:${employeeId ?? 'empresa'}:${monthPart(referenceMonth)}`;
         if (!bySlot.has(key)) bySlot.set(key, []);
         bySlot.get(key).push(delivery);
     }
@@ -49,5 +56,5 @@ export function toSupplierDelivery(delivery) {
 
 /** Chave da vaga de um documento atual (mesma regra de groupDeliveriesBySlot). */
 export function slotKey(document) {
-    return `${document.document_type_id}:${document.employee_id ?? 'empresa'}`;
+    return `${document.document_type_id}:${document.employee_id ?? 'empresa'}:${monthPart(document.reference_month)}`;
 }

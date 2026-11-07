@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { LuFileText, LuShieldCheck } from 'react-icons/lu';
+import { LuCircleCheckBig, LuFileText, LuShieldCheck } from 'react-icons/lu';
 import {
   Card,
   PageHeader,
   StatusBadge,
   EmptyState,
   Banner,
+  Button,
+  ConfirmDialog,
 } from '../../../components/ui/index.js';
+import { ACCESS, canAccess } from '../../../constants/access.js';
+import { concludeLaborRequest } from '../api/laborRequestsApi.js';
 import {
   LABOR_REQUEST_STATUS,
   LABOR_REQUEST_STATUS_ID,
@@ -17,7 +21,7 @@ import {
 } from '../../../constants/enums.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import { useLaborRequest, useLaborRequestApprovals } from '../hooks/useLaborRequests.js';
-import { formatDate } from '../../../utils/formatters.js';
+import { formatDate, formatDateTime } from '../../../utils/formatters.js';
 import ApprovalTimeline from '../components/ApprovalTimeline.jsx';
 import ApprovePanel from '../components/ApprovePanel.jsx';
 import SupplierAssignmentCard from '../components/SupplierAssignmentCard/index.js';
@@ -55,6 +59,10 @@ export default function RequestDetailPage() {
   const { data: approvalsResponse, isLoading: isLoadingApprovals, reload: reloadApprovals } = useLaborRequestApprovals(id);
 
   const [approvalDone, setApprovalDone] = useState(false);
+  // Concluir contrato: confirmação, envio e o aviso do resultado
+  const [concludeOpen, setConcludeOpen] = useState(false);
+  const [isConcluding, setIsConcluding] = useState(false);
+  const [feedback, setFeedback] = useState(null);
 
   if (isLoadingRequest && !requestResponse) return <p>Carregando solicitação...</p>;
 
@@ -72,11 +80,25 @@ export default function RequestDetailPage() {
   const hasSupplierStage = SUPPLIER_STATUSES.includes(request.status);
 
   const canApprove = necessaryAprove && isPending && !approvalDone;
+  // RH e Compras concluem o contrato de uma solicitação em contratação
+  const canConclude = request.status === LABOR_REQUEST_STATUS_ID.EM_CONTRATACAO
+    && canAccess(user.department, ACCESS.concludeContract);
 
   const handleApprovalSuccess = () => {
     setApprovalDone(true);
     reloadRequest();
     reloadApprovals();
+  };
+
+  const handleConclude = async () => {
+    setIsConcluding(true);
+    const result = await concludeLaborRequest(request.id);
+    setIsConcluding(false);
+    setConcludeOpen(false);
+    setFeedback(result.success
+      ? { tone: 'success', message: result.body?.message ?? 'Contrato concluído.' }
+      : { tone: 'danger', message: result.body?.message ?? 'Erro ao concluir o contrato.' });
+    if (result.success) reloadRequest();
   };
 
   // IDs sugeridos de document_types pela atividade (empresa e outros do colaborador)
@@ -102,8 +124,23 @@ export default function RequestDetailPage() {
         eyebrow={`Solicitação #${request.request_number}`}
         title={request.title}
         description={request.location}
-        actions={<StatusBadge enumMap={LABOR_REQUEST_STATUS} value={request.status} />}
+        actions={
+          <>
+            <StatusBadge enumMap={LABOR_REQUEST_STATUS} value={request.status} />
+            {canConclude && (
+              <Button size="sm" variant="secondary" icon={LuCircleCheckBig} onClick={() => setConcludeOpen(true)}>
+                Concluir contrato
+              </Button>
+            )}
+          </>
+        }
       />
+
+      {feedback && (
+        <div className={styles.bannerWrapper}>
+          <Banner tone={feedback.tone} description={feedback.message} />
+        </div>
+      )}
 
       {approvalDone && (
         <div className={styles.bannerWrapper}>
@@ -123,6 +160,16 @@ export default function RequestDetailPage() {
               <dl className={styles.infoGrid}>
                 <dt>Nº do contrato</dt>
                 <dd>{request.contract_number ?? (isPending ? 'Definido na aprovação da Segurança do Trabalho' : '—')}</dd>
+
+                {request.concluded_at && (
+                  <>
+                    <dt>Contrato concluído</dt>
+                    <dd>
+                      {formatDateTime(request.concluded_at)}
+                      {request.concluded_by_name ? ` · ${request.concluded_by_name}` : ''}
+                    </dd>
+                  </>
+                )}
 
                 <dt>Atividade</dt>
                 <dd>{request.activity_type_name ?? '—'}</dd>
@@ -240,6 +287,16 @@ export default function RequestDetailPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={concludeOpen}
+        onClose={() => setConcludeOpen(false)}
+        onConfirm={handleConclude}
+        title="Concluir contrato"
+        description="O contrato termina neste mês: os documentos mensais deixam de ser cobrados a partir do próximo mês. O fornecedor ainda vê o contrato e pode enviar o que ficou pendente. Não dá para desfazer pela tela."
+        confirmLabel="Concluir contrato"
+        isLoading={isConcluding}
+      />
     </div>
   );
 }

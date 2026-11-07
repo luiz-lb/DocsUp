@@ -1,5 +1,6 @@
 import multer from 'multer';
 import * as phase2Service from '../services/phase2Service.js';
+import * as monthlyService from '../services/monthlyService.js';
 import { sendPrivateFile } from '../utils/fileResponse.js';
 
 // ── Configuração do multer (memória — salva em disco no service) ──────────────
@@ -205,6 +206,52 @@ export async function listEmployees(req, res) {
         return res.status(200).json({ success: true, body: result.body });
     } catch (error) {
         console.error('listEmployees controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+// ─────────────────────────────────────────────
+// Documentos trabalhistas mensais (portal do fornecedor)
+// ─────────────────────────────────────────────
+
+/** GET /phase2/:token/monthly?month=YYYY-MM — competências do contrato e os itens do mês. */
+export async function getMonthly(req, res) {
+    try {
+        const result = await monthlyService.getSupplierMonthly(
+            req.params.token,
+            req.fornecedor.supplierId,
+            typeof req.query.month === 'string' ? req.query.month : null,
+        );
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('getMonthly controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
+/**
+ * POST /phase2/:token/monthly-documents (multipart)
+ *   fields: documentTypeId, referenceMonth ('YYYY-MM'), employeeId? (tipos por colaborador), expiresAt?
+ *   files:  files[] (exatamente 1)
+ */
+export async function uploadMonthly(req, res) {
+    try {
+        const { documentTypeId, referenceMonth, employeeId, expiresAt } = req.body ?? {};
+        const result = await monthlyService.uploadMonthlyDocument(
+            req.params.token,
+            req.fornecedor.supplierId,
+            { documentTypeId, referenceMonth, employeeId, expiresAt },
+            req.files ?? [],
+        );
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(201).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('uploadMonthly controller error:', error);
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }

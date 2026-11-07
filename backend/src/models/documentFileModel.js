@@ -30,7 +30,8 @@ export async function getDocumentFilesByIds(ids) {
             d.employee_id,
             e.full_name      AS employee_name,
             dt.[name]        AS document_type_name,
-            dt.category
+            dt.category,
+            d.reference_month
         FROM documents AS d
         INNER JOIN suppliers      AS s  ON s.id  = d.supplier_id
         INNER JOIN document_types AS dt ON dt.id = d.document_type_id

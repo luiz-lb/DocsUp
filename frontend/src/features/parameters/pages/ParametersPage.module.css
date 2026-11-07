@@ -43,3 +43,8 @@
 .tabPanel {
     margin-top: 1.25em;
 }
+
+/* Dia limite dos mensais (acima da lista de tipos) */
+.settingsCard {
+  margin-bottom: 1.25rem;
+}

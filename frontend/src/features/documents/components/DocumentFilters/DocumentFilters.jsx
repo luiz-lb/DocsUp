@@ -3,7 +3,8 @@ import { LuSearch, LuSlidersHorizontal, LuX } from 'react-icons/lu';
 import { Button, FormField, SearchSelect } from '../../../../components/ui/index.js';
 import { DOCUMENT_STATUS } from '../../../../constants/enums.js';
 import { cn } from '../../../../utils/cn.js';
-import { EMPTY_DOCUMENT_FILTERS, hasActiveFilters } from './documentFilters.js';
+import { EMPTY_DOCUMENT_FILTERS, INITIAL_DOCUMENTS, hasActiveFilters } from './documentFilters.js';
+import { formatMonth } from '../../../../utils/formatters.js';
 import styles from './DocumentFilters.module.css';
 
 /**
@@ -122,6 +123,16 @@ export default function DocumentFilters({ filters, onFiltersChange, options, res
             <option value="">Empresa e colaboradores</option>
             <option value="empresa">Só da empresa</option>
             <option value="colaborador">Só de colaboradores</option>
+          </select>
+        </FormField>
+
+        <FormField label="Competência" className={styles.field}>
+          <select value={filters.month} onChange={setFromEvent('month')}>
+            <option value="">Iniciais e mensais</option>
+            <option value={INITIAL_DOCUMENTS}>Só os documentos iniciais</option>
+            {options.months.map((month) => (
+              <option key={month} value={month}>Mensal · {formatMonth(month)}</option>
+            ))}
           </select>
         </FormField>
 

@@ -15,7 +15,14 @@ const EMPTY_FORM = {
   validationMethod: '2',
   apiIntegration: '',
   aiInstructions: '',
+  scope: '',
 };
+
+// Escopo do documento mensal (document_types.scope)
+const MONTHLY_SCOPES = [
+  { value: '0', label: 'Da empresa', hint: 'Um documento por mês para o contrato (ex.: guia do FGTS).' },
+  { value: '1', label: 'De cada colaborador', hint: 'Um documento por mês para cada colaborador (ex.: espelho de ponto).' },
+];
 
 // Método de validação (document_types.validation_method): 2 Manual, 0 API, 1 IA (N8N)
 const VALIDATION = { API: '0', AI: '1', MANUAL: '2' };
@@ -42,6 +49,7 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
   const isEdit = Boolean(documentType);
   const currentCategory = isEdit ? documentType.category : category;
   const isNr = currentCategory === DOCUMENT_CATEGORY_ID.NR;
+  const isMonthly = currentCategory === DOCUMENT_CATEGORY_ID.MENSAL;
   const canMove = isEdit && MOVABLE_CATEGORIES.includes(documentType.category);
 
   const [form, setForm] = useState(EMPTY_FORM);
@@ -81,6 +89,7 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
             validationMethod: String(documentType.validation_method ?? VALIDATION.MANUAL),
             apiIntegration: documentType.api_endpoint ?? '',
             aiInstructions: documentType.ai_instructions ?? '',
+            scope: documentType.scope !== undefined && documentType.scope !== null ? String(documentType.scope) : '',
           }
         : EMPTY_FORM,
     );
@@ -94,6 +103,7 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
     if (!name) return isNr ? 'Informe o título da NR.' : 'Informe o nome.';
     if (name.length > 200) return 'O nome pode ter no máximo 200 caracteres.';
     if (isNr && !NR_CODE_PATTERN.test(form.code.trim())) return 'Informe o código no formato NR-00 (ex.: NR-35).';
+    if (isMonthly && !isEdit && form.scope === '') return 'Escolha se o documento mensal é da empresa ou de cada colaborador.';
     if (form.validationMethod === VALIDATION.API && !form.apiIntegration) {
       return 'Selecione a integração de API.';
     }
@@ -130,6 +140,7 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
     if (isNr) payload.code = form.code.trim();
     if (!isEdit) payload.category = category;
     if (canMove) payload.category = Number(form.category);
+    if (isMonthly && !isEdit) payload.scope = Number(form.scope);
 
     setError('');
     setIsSubmitting(true);
@@ -192,6 +203,28 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
         <FormField label="Descrição">
           <textarea value={form.description} onChange={updateField('description')} rows={3} maxLength={2000} />
         </FormField>
+
+        {/* Mensal: da empresa ou de cada colaborador (escolhido na criação, fixo depois) */}
+        {isMonthly && (
+          <fieldset className={styles.scopeGroup} disabled={isEdit}>
+            <legend>Quem envia todo mês {isEdit && <span className={styles.scopeLocked}>(não muda depois de criado)</span>}</legend>
+            {MONTHLY_SCOPES.map((option) => (
+              <label key={option.value} className={styles.scopeOption}>
+                <input
+                  type="radio"
+                  name="monthly-scope"
+                  value={option.value}
+                  checked={form.scope === option.value}
+                  onChange={updateField('scope')}
+                />
+                <span>
+                  <strong>{option.label}</strong>
+                  <span className={styles.scopeHint}>{option.hint}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        )}
 
         {canMove && (
           <FormField label="Categoria" required hint="Os básicos são exigidos de todo colaborador, em todas as solicitações.">

@@ -7,6 +7,7 @@ import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
 import { collaboratorAuditEntry } from '../utils/audit.js';
 import { toInteger } from '../utils/parse.js';
 import { resolveUploadPath } from '../utils/uploadPaths.js';
+import { toMonthKey } from '../utils/dates.js';
 
 // Máximo de documentos num ZIP (acima disso, o download fica pesado demais para uma requisição)
 export const MAX_ZIP_DOCUMENTS = 500;
@@ -59,6 +60,9 @@ function zipFileName(document) {
  * Pasta do documento no ZIP (o contrato entra no nome da pasta da solicitação, quando existe):
  *   <Fornecedor>/<Contrato X - Solicitação N - Título>/Empresa/
  *   <Fornecedor>/<Contrato X - Solicitação N - Título>/Colaboradores/<Nome do colaborador>/
+ * Documentos mensais ficam numa pasta por competência:
+ *   <Fornecedor>/<Contrato X - Solicitação N - Título>/Mensais/<AAAA-MM>/Empresa/
+ *   <Fornecedor>/<Contrato X - Solicitação N - Título>/Mensais/<AAAA-MM>/Colaboradores/<Nome>/
  */
 function zipFolder(document) {
     const supplier = safeName(document.supplier_name, `Fornecedor ${document.supplier_id}`);
@@ -70,9 +74,12 @@ function zipFolder(document) {
             120,
         )
         : 'Sem solicitação';
-    if (!document.employee_id) return `${supplier}/${request}/Empresa`;
+    const base = document.reference_month
+        ? `${supplier}/${request}/Mensais/${toMonthKey(document.reference_month)}`
+        : `${supplier}/${request}`;
+    if (!document.employee_id) return `${base}/Empresa`;
     const employee = safeName(document.employee_name, `Colaborador ${document.employee_id}`);
-    return `${supplier}/${request}/Colaboradores/${employee}`;
+    return `${base}/Colaboradores/${employee}`;
 }
 
 /** Caminho único no ZIP: repetido ganha ' (2)', ' (3)'... antes da extensão. */

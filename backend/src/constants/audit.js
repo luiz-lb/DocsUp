@@ -37,6 +37,7 @@ export const AUDIT_ACTIONS = Object.freeze({
     SUPPLIER_ASSIGNMENT_REPLACE: 'supplier_assignment.replace',
     SUPPLIER_ASSIGNMENT_DECLARE: 'supplier_assignment.declare',
     LABOR_REQUEST_CONCLUDE: 'labor_request.conclude',
+    SETTINGS_UPDATE: 'settings.update',
 });
 
 // audit_log.entity_type
@@ -48,4 +49,5 @@ export const AUDIT_ENTITIES = Object.freeze({
     EMPLOYEE: 'employee',
     SUPPLIER_USER: 'supplier_user',
     LABOR_REQUEST: 'labor_request',
+    SETTINGS: 'settings',
 });

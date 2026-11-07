@@ -111,3 +111,19 @@ export async function setDocumentStatus(documentId, status, comments) {
     return toErrorResult(error, 'Erro ao atualizar status.');
   }
 }
+
+/**
+ * Documentos trabalhistas mensais de um mês em todos os contratos com fornecedor ativo.
+ * GET /documents/monthly?month=YYYY-MM (sem mês: o mês anterior)
+ * → { month, dueDay, dueDate, hasTypes, summary, rows: [{ contractNumber, laborRequestId, laborRequestTitle,
+ *     supplierId, supplierName, documentTypeId, documentTypeName, employeeId, employeeName, situation, document }] }
+ */
+export async function getMonthlyOverview(month) {
+  try {
+    const result = await api.get('/documents/monthly', { params: month ? { month } : {} });
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    console.error('getMonthlyOverview error:', error);
+    return { success: false, message: getApiErrorMessage(error, 'Erro ao buscar os documentos mensais.') };
+  }
+}

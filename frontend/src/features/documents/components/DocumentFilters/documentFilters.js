@@ -9,9 +9,19 @@ export const EMPTY_DOCUMENT_FILTERS = {
   documentTypeId: '',
   status: '',
   scope: '',
+  month: '',
   from: '',
   to: '',
 };
+
+// Valor da opção "Documentos iniciais" no filtro de competência (sem mês de referência)
+export const INITIAL_DOCUMENTS = '__iniciais__';
+
+/** Mês de referência do documento mensal em 'AAAA-MM' ('' nos documentos iniciais). */
+export function monthOf(doc) {
+  const match = /^(\d{4})-(\d{2})/.exec(String(doc.reference_month ?? ''));
+  return match ? `${match[1]}-${match[2]}` : '';
+}
 
 // Valor da opção "Sem local" (documentos sem solicitação ou solicitação sem local)
 export const NO_LOCATION = '__sem_local__';
@@ -60,6 +70,8 @@ export function filterDocuments(documents, filters) {
     if (filters.status && String(doc.status) !== filters.status) return false;
     if (filters.scope === 'empresa' && doc.employee_id) return false;
     if (filters.scope === 'colaborador' && !doc.employee_id) return false;
+    if (filters.month === INITIAL_DOCUMENTS && monthOf(doc)) return false;
+    if (filters.month && filters.month !== INITIAL_DOCUMENTS && monthOf(doc) !== filters.month) return false;
     if (filters.from || filters.to) {
       const day = localDay(doc.uploaded_at);
       if (filters.from && day < filters.from) return false;
@@ -76,8 +88,10 @@ export function buildFilterOptions(documents) {
   const locations = new Set();
   const requests = new Map();
   const documentTypes = new Map();
+  const months = new Set();
 
   for (const doc of documents) {
+    if (monthOf(doc)) months.add(monthOf(doc));
     contracts.add(doc.contract_number?.trim() || NO_CONTRACT);
     if (doc.supplier_id) suppliers.set(String(doc.supplier_id), doc.supplier_name ?? `Fornecedor ${doc.supplier_id}`);
     locations.add(doc.labor_request_location?.trim() || NO_LOCATION);
@@ -98,5 +112,7 @@ export function buildFilterOptions(documents) {
       .sort(byLabel),
     requests: toOptions(requests),
     documentTypes: toOptions(documentTypes),
+    // Competências dos documentos mensais, da mais nova para a mais antiga
+    months: [...months].sort().reverse(),
   };
 }

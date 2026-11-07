@@ -54,7 +54,11 @@ export async function listDocumentsWithValidation({ supplierId, laborRequestId, 
                   AND h.document_type_id = d.document_type_id
                   AND ((h.labor_request_id IS NULL AND d.labor_request_id IS NULL) OR h.labor_request_id = d.labor_request_id)
                   AND ((h.employee_id IS NULL AND d.employee_id IS NULL) OR h.employee_id = d.employee_id)
+                  AND ((h.reference_month IS NULL AND d.reference_month IS NULL) OR h.reference_month = d.reference_month)
             ) AS deliveries_count,
+            /* Mês de referência (competência) dos documentos mensais; NULL nos iniciais */
+            d.reference_month,
+            dt.category,
             /* Observação da última análise do RH (o fornecedor vê) */
             review.manual_comments AS observation,
             d.labor_request_id,

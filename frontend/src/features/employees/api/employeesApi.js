@@ -161,3 +161,44 @@ export async function submitDeclaration(token, payload) {
     return toErrorResult(error, 'Erro ao enviar a declaração.');
   }
 }
+
+// ─────────────────────────────────────────────
+// Documentos trabalhistas mensais (contrato do fornecedor)
+// ─────────────────────────────────────────────
+
+/**
+ * Competências do contrato e os itens de um mês (sem mês: o mais antigo com pendência).
+ * GET /phase2/:token/monthly?month=YYYY-MM
+ * → { dueDay, concluded, hasTypes, months: [{ month, dueDate, total, pending, late, sent, approved, returned }],
+ *     selectedMonth, selectedDueDate, items: [{ documentTypeId, documentTypeName, employeeId, employeeName,
+ *     situation, document }] }
+ */
+export async function getMonthlyDocuments(token, month) {
+  try {
+    const result = await api.get(`/phase2/${token}/monthly`, { params: month ? { month } : {} });
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    console.error('getMonthlyDocuments error:', error);
+    return { success: false, message: getApiErrorMessage(error, 'Erro ao buscar os documentos mensais.') };
+  }
+}
+
+/**
+ * Envia um documento mensal (um arquivo).
+ * POST /phase2/:token/monthly-documents (multipart)
+ * @param {{ documentTypeId, referenceMonth: 'YYYY-MM', employeeId? }} data
+ */
+export async function uploadMonthlyDocument(token, data, file) {
+  try {
+    const formData = new FormData();
+    formData.append('documentTypeId', String(data.documentTypeId));
+    formData.append('referenceMonth', data.referenceMonth);
+    if (data.employeeId) formData.append('employeeId', String(data.employeeId));
+    formData.append('files', file);
+    const result = await api.post(`/phase2/${token}/monthly-documents`, formData);
+    return result.data;
+  } catch (error) {
+    console.error('uploadMonthlyDocument error:', error);
+    return toErrorResult(error, 'Erro ao enviar o documento mensal.');
+  }
+}

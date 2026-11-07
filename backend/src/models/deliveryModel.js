@@ -6,12 +6,13 @@ import { sql, poolPromise } from '../config/dbConfig.js';
 // is_current = 1. A observação é a da análise manual mais recente do RH (document_validations,
 // validation_type = 2).
 
-// Mesma "vaga" de documento entre a entrega h e a entrega d
+// Mesma "vaga" de documento entre a entrega h e a entrega d (nos mensais, o mesmo mês de referência)
 const SAME_SLOT = `
     h.supplier_id = d.supplier_id
     AND h.document_type_id = d.document_type_id
     AND ((h.labor_request_id IS NULL AND d.labor_request_id IS NULL) OR h.labor_request_id = d.labor_request_id)
     AND ((h.employee_id IS NULL AND d.employee_id IS NULL) OR h.employee_id = d.employee_id)
+    AND ((h.reference_month IS NULL AND d.reference_month IS NULL) OR h.reference_month = d.reference_month)
 `;
 
 // Última análise manual de uma entrega (alias da entrega: h)
@@ -68,7 +69,7 @@ export async function listSupplierDeliveries(supplierId, laborRequestId) {
         .input('supplier_id', sql.Int, supplierId)
         .input('labor_request_id', sql.Int, laborRequestId)
         .query(`
-            SELECT ${DELIVERY_FIELDS}, h.document_type_id, h.employee_id
+            SELECT ${DELIVERY_FIELDS}, h.document_type_id, h.employee_id, h.reference_month
             FROM documents AS h
             ${LATEST_REVIEW}
             WHERE h.supplier_id = @supplier_id
@@ -80,16 +81,18 @@ export async function listSupplierDeliveries(supplierId, laborRequestId) {
 
 /**
  * Status da entrega atual de um documento (ou null se nunca foi enviado). Usado para
- * liberar o reenvio depois do prazo da Fase 2 (só reprovado ou reenvio necessário).
- * employeeId nulo = documento da empresa.
+ * liberar o reenvio depois do prazo dos documentos iniciais (só reprovado ou reenvio
+ * necessário) e para não substituir um documento mensal já aprovado.
+ * employeeId nulo = documento da empresa; referenceMonth nulo = documento inicial.
  */
-export async function getCurrentDeliveryStatus({ supplierId, laborRequestId, documentTypeId, employeeId = null }) {
+export async function getCurrentDeliveryStatus({ supplierId, laborRequestId, documentTypeId, employeeId = null, referenceMonth = null }) {
     const pool = await poolPromise;
     const result = await pool.request()
         .input('supplier_id', sql.Int, supplierId)
         .input('labor_request_id', sql.Int, laborRequestId)
         .input('document_type_id', sql.Int, documentTypeId)
         .input('employee_id', sql.Int, employeeId)
+        .input('reference_month', sql.Date, referenceMonth)
         .query(`
             SELECT TOP (1) [status]
             FROM documents
@@ -97,6 +100,7 @@ export async function getCurrentDeliveryStatus({ supplierId, laborRequestId, doc
               AND labor_request_id = @labor_request_id
               AND document_type_id = @document_type_id
               AND ((@employee_id IS NULL AND employee_id IS NULL) OR employee_id = @employee_id)
+              AND ((@reference_month IS NULL AND reference_month IS NULL) OR reference_month = @reference_month)
               AND is_current = 1
             ORDER BY id DESC
         `);

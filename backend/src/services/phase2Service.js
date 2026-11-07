@@ -54,7 +54,7 @@ async function canResendAfterDeadline({ supplierId, laborRequestId, documentType
  * obrigatória, tem de ser válida e não pode ser passada. Sem validade: é ignorada (NULL).
  * Retorna { value } (Date local ou null) ou { error }.
  */
-function resolveExpiration(documentType, expiresAt) {
+export function resolveExpiration(documentType, expiresAt) {
     if (!documentType.has_expiration) return { value: null };
     if (isBlank(expiresAt)) return { error: 'Informe a validade do documento.' };
 

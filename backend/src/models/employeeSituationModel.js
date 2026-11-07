@@ -59,6 +59,7 @@ export async function listEmployeeSituations({ search = '', status } = {}) {
                 MIN(CASE WHEN d.[status] <> 5 THEN d.expires_at END)  AS next_expiry
             FROM documents AS d
             WHERE d.employee_id = e.id AND d.is_current = 1
+              AND d.reference_month IS NULL  -- só os documentos iniciais (os mensais têm aba própria)
         ) AS docs
         OUTER APPLY (
             SELECT STRING_AGG(dt.[name], ', ') AS retained_by

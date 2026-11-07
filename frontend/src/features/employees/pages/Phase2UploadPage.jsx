@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { LuBuilding2, LuUsers, LuUpload } from 'react-icons/lu';
+import { LuBuilding2, LuCalendarDays, LuUsers, LuUpload } from 'react-icons/lu';
 import { Button, FormField, FileDropzone, StatusBadge, Banner, SearchSelect } from '../../../components/ui/index.js';
 import { EMPLOYEE_STATUS, DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID, ASSIGNMENT_STATUS_ID } from '../../../constants/enums.js';
 import ContractDeclaration from '../../contracts/components/ContractDeclaration/index.js';
 import DeclarationSummary from '../../contracts/components/DeclarationSummary/index.js';
+import MonthlyDocumentsTab from '../../contracts/components/MonthlyDocumentsTab/index.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { getPhase2ByToken, addEmployee, uploadCompanyDocuments, downloadPhase2Document } from '../api/employeesApi.js';
 import Phase2CountdownBanner from '../components/Phase2CountdownBanner/index.js';
@@ -22,6 +23,7 @@ const EMPTY_EMPLOYEE = { fullName: '', cpf: '', rg: '', roleFunction: '', docume
 const TABS = {
   COMPANY: 'company',
   EMPLOYEES: 'employees',
+  MONTHLY: 'monthly',
 };
 
 // Status em que o RH devolveu o documento (dá para reenviar mesmo depois do prazo)
@@ -411,7 +413,25 @@ export default function Phase2UploadPage() {
             <span className={styles.tabLabelLong}>Documentos dos colaboradores</span>
             <span className={styles.tabLabelShort}>Colaboradores</span>
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === TABS.MONTHLY}
+            className={cn(styles.tab, tab === TABS.MONTHLY && styles.tabActive)}
+            onClick={() => setTab(TABS.MONTHLY)}
+          >
+            <LuCalendarDays aria-hidden="true" />
+            <span className={styles.tabLabelLong}>Documentos mensais</span>
+            <span className={styles.tabLabelShort}>Mensais</span>
+          </button>
         </div>
+
+        {/* ── Aba: Documentos trabalhistas mensais ───────────────────── */}
+        {tab === TABS.MONTHLY && (
+          <div className={styles.tabPanel}>
+            <MonthlyDocumentsTab token={token} />
+          </div>
+        )}
 
         {/* ── Aba: Documentos da empresa ─────────────────────────────── */}
         {tab === TABS.COMPANY && (

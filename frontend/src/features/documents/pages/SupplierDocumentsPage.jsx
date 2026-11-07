@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LuArrowLeft, LuChevronRight, LuDownload, LuFileText, LuHistory, LuPencil, LuUsers } from 'react-icons/lu';
+import { LuArrowLeft, LuCalendarDays, LuChevronRight, LuDownload, LuFileText, LuHistory, LuPencil, LuUsers } from 'react-icons/lu';
 import {
   PageHeader,
   DataTable,
@@ -9,12 +9,13 @@ import {
   FormField,
 } from '../../../components/ui/index.js';
 import { DOCUMENT_STATUS } from '../../../constants/enums.js';
-import { formatDate } from '../../../utils/formatters.js';
+import { formatDate, formatMonth } from '../../../utils/formatters.js';
 import { useAsyncData } from '../../../hooks/useAsyncData.js';
 import { downloadDocumentFiles, listDeliveredDocuments } from '../api/documentsRealApi.js';
 import DocumentStatusModal from '../components/DocumentStatusModal/index.js';
 import DeliveryHistoryModal from '../components/DeliveryHistoryModal/index.js';
 import EmployeeSituationTab, { EMPTY_EMPLOYEE_FILTERS } from '../components/EmployeeSituationTab/index.js';
+import MonthlyOverviewTab from '../components/MonthlyOverviewTab/index.js';
 import DocumentFilters, {
   EMPTY_DOCUMENT_FILTERS,
   buildFilterOptions,
@@ -47,10 +48,11 @@ const GROUP_BY = {
   },
 };
 
-// Visões da tela: documentos entregues ou situação dos colaboradores
+// Visões da tela: documentos entregues, situação dos colaboradores e mensais por competência
 const VIEWS = [
   { key: 'documents', label: 'Documentos', icon: LuFileText },
   { key: 'employees', label: 'Colaboradores', icon: LuUsers },
+  { key: 'monthly', label: 'Mensais', icon: LuCalendarDays },
 ];
 
 // Ordem/campos do resumo de contagem por status
@@ -276,6 +278,7 @@ export default function SupplierDocumentsPage() {
           <strong>{row.document_type_name}</strong>
           <span className={styles.fileName} title={row.file_name}>{row.file_name}</span>
           <span className={styles.meta}>{row.employee_name ? `Colaborador: ${row.employee_name}` : 'Empresa'}</span>
+          {row.reference_month && <span className={styles.meta}>Mensal · {formatMonth(row.reference_month)}</span>}
         </div>
       ),
     },
@@ -346,7 +349,7 @@ export default function SupplierDocumentsPage() {
       <PageHeader
         eyebrow="RH & Segurança"
         title="Documentos dos fornecedores"
-        description="Documentos entregues pelos fornecedores e a situação de cada colaborador. Baixe os arquivos, atualize o status dos documentos e a situação dos colaboradores."
+        description="Documentos entregues pelos fornecedores, a situação de cada colaborador e os documentos mensais de cada contrato. Baixe os arquivos, atualize o status dos documentos e a situação dos colaboradores."
         actions={
           view === 'documents' && !openGroup && (
             <FormField label="Organizar por" className={styles.filterField}>
@@ -378,6 +381,8 @@ export default function SupplierDocumentsPage() {
       {view === 'employees' && (
         <EmployeeSituationTab filters={employeeFilters} onFiltersChange={setEmployeeFilters} />
       )}
+
+      {view === 'monthly' && <MonthlyOverviewTab />}
 
       {view === 'documents' && (
         <DocumentFilters

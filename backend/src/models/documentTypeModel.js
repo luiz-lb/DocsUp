@@ -8,6 +8,7 @@ const DOCUMENT_TYPE_FIELDS = `
     dt.[name],
     dt.[description],
     dt.category,
+    dt.scope,
     dt.has_expiration,
     dt.validity_days,
     dt.validation_method,

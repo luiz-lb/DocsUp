@@ -33,7 +33,8 @@ const ASSIGNMENT_FIELDS = `
     lr.contract_number,
     lr.[location]        AS labor_request_location,
     lr.start_date        AS labor_request_start_date,
-    lr.[status]          AS labor_request_status
+    lr.[status]          AS labor_request_status,
+    lr.concluded_at      AS labor_request_concluded_at
 `;
 
 const ASSIGNMENT_JOINS = `

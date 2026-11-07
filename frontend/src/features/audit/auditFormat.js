@@ -1,4 +1,15 @@
-import { AUDIT_ACTOR_TYPE, DEPARTMENT, DOCUMENT_CATEGORY, DOCUMENT_STATUS, EMPLOYEE_STATUS, RISK_LEVEL, SUPPLIER_USER_ROLE, VALIDATION_METHOD } from '../../constants/enums.js';
+import {
+  ASSIGNMENT_STATUS,
+  AUDIT_ACTOR_TYPE,
+  DEPARTMENT,
+  DOCUMENT_CATEGORY,
+  DOCUMENT_STATUS,
+  EMPLOYEE_STATUS,
+  LABOR_REQUEST_STATUS,
+  RISK_LEVEL,
+  SUPPLIER_USER_ROLE,
+  VALIDATION_METHOD,
+} from '../../constants/enums.js';
 
 // Nome dos campos gravados em old_values / new_values
 const FIELD_LABELS = {
@@ -29,6 +40,14 @@ const FIELD_LABELS = {
   ai_instructions: 'Instrução para a IA',
   role: 'Papel',
   by_owner: 'Definida pelo Responsável',
+  scope: 'Quem envia',
+  assignment_id: 'Vínculo',
+  invite_email: 'E-mail do convite',
+  deadline_at: 'Prazo dos documentos',
+  reason: 'Motivo',
+  signed_by: 'Assinado por',
+  missing_documents: 'Documentos que a empresa não tem',
+  monthly_due_day: 'Dia limite dos mensais',
 };
 
 // Campos com lista de ids, mostrados como '#1, #2'
@@ -53,6 +72,15 @@ export function describeTarget(row) {
   }
   if (row.entity_type === 'supplier_user') {
     return { title: row.target_name ?? `Usuário do fornecedor #${row.entity_id}`, subtitle: row.target_email ?? 'Usuário do fornecedor' };
+  }
+  if (row.entity_type === 'labor_request') {
+    return {
+      title: row.target_name ?? `Solicitação #${row.entity_id}`,
+      subtitle: row.target_contract_number ? `Contrato ${row.target_contract_number}` : 'Solicitação',
+    };
+  }
+  if (row.entity_type === 'settings') {
+    return { title: 'Parâmetros do sistema', subtitle: null };
   }
   if (row.entity_type === 'document_type') {
     return { title: row.target_name ?? `Tipo de documento #${row.entity_id}`, subtitle: 'Tipo de documento' };
@@ -87,6 +115,13 @@ function formatValue(field, value, entityType) {
   if (value === undefined || value === null) return '—';
   // status: situação do colaborador ou status do documento, conforme a entidade
   if (field === 'status' && entityType === 'employee') return EMPLOYEE_STATUS[value]?.label ?? String(value);
+  // status de solicitação (conclusão) ou do vínculo com o fornecedor (indicação / declaração)
+  if (field === 'status' && entityType === 'labor_request') {
+    return LABOR_REQUEST_STATUS[value]?.label ?? ASSIGNMENT_STATUS[value]?.label ?? String(value);
+  }
+  if (field === 'deadline_at') return String(value).replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}).*$/, '$3/$2/$1 $4');
+  if (field === 'missing_documents' && Array.isArray(value)) return value.length > 0 ? value.join(', ') : 'Nenhum';
+  if (field === 'scope') return value === 1 ? 'Cada colaborador' : 'A empresa';
   // 'AAAA-MM-DDTHH:mm' (gravado sem fuso) → 'DD/MM/AAAA HH:mm'
   if (field === 'integration_at') return String(value).replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}).*$/, '$3/$2/$1 $4');
   if (field === 'department') return DEPARTMENT[value]?.label ?? String(value);

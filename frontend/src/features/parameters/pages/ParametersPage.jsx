@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { LuBuilding2, LuFileText, LuHardHat, LuIdCard, LuWrench } from 'react-icons/lu';
+import { LuBuilding2, LuCalendarDays, LuFileText, LuHardHat, LuIdCard, LuWrench } from 'react-icons/lu';
 import { PageHeader } from '../../../components/ui/index.js';
 import { DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import { cn } from '../../../utils/cn.js';
 import DocumentTypesTab from '../components/DocumentTypesTab/index.js';
 import ActivitiesTab from '../components/ActivitiesTab/index.js';
+import MonthlySettingsCard from '../components/MonthlySettingsCard/index.js';
 import styles from './ParametersPage.module.css';
 
 // Uma aba por categoria de documento, mais a de atividades
@@ -13,6 +14,7 @@ const TABS = [
   { key: 'basicos', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.BASICO].label, icon: LuIdCard, category: DOCUMENT_CATEGORY_ID.BASICO },
   { key: 'nrs', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.NR].label, icon: LuHardHat, category: DOCUMENT_CATEGORY_ID.NR },
   { key: 'outros', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.OUTRO].label, icon: LuFileText, category: DOCUMENT_CATEGORY_ID.OUTRO },
+  { key: 'mensais', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.MENSAL].label, icon: LuCalendarDays, category: DOCUMENT_CATEGORY_ID.MENSAL },
   { key: 'atividades', label: 'Atividades', icon: LuWrench, category: null },
 ];
 
@@ -25,7 +27,7 @@ export default function ParametersPage() {
       <PageHeader
         eyebrow="Administração"
         title="Parâmetros"
-        description="Catálogo dos documentos exigidos (da empresa e dos colaboradores) e das atividades, com os documentos sugeridos para cada uma."
+        description="Catálogo dos documentos exigidos (da empresa, dos colaboradores e os trabalhistas mensais) e das atividades, com os documentos sugeridos para cada uma."
       />
 
       <div className={styles.tabs} role="tablist">
@@ -48,7 +50,14 @@ export default function ParametersPage() {
         {activeTab.category === null ? (
           <ActivitiesTab key={activeTab.key} />
         ) : (
-          <DocumentTypesTab key={activeTab.key} category={activeTab.category} />
+          <>
+            {activeTab.category === DOCUMENT_CATEGORY_ID.MENSAL && (
+              <div className={styles.settingsCard}>
+                <MonthlySettingsCard />
+              </div>
+            )}
+            <DocumentTypesTab key={activeTab.key} category={activeTab.category} />
+          </>
         )}
       </div>
     </div>

@@ -4,6 +4,10 @@ import * as docRequiredModel from '../models/docRequiredModel.js'
 import * as trasaction from '../models/trasaction.js'
 import { DOCUMENT_CATEGORIES } from '../constants/documentCategories.js'
 import { toInteger } from '../utils/parse.js'
+import * as auditModel from '../models/auditModel.js'
+import { collaboratorAuditEntry } from '../utils/audit.js'
+import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js'
+import { LABOR_REQUEST_STATUSES } from '../constants/laborRequest.js'
 
 // Categorias que a Segurança escolhe na aprovação: empresa e outros do colaborador.
 // Os básicos entram sempre (todos os ativos); as NRs vêm em nrTypeIds.
@@ -278,5 +282,38 @@ export async function approveRequest(laborRequestId, approverId, department, dec
         }
         console.error('Erro no approveRequest service:', error);
         return {success: false, body: { message: "Erro ao processar aprovação." }}
+    }
+}
+
+/**
+ * Conclui o contrato (RH ou Compras): a solicitação precisa estar em contratação. Depois disso
+ * não há novas competências de documentos mensais a cobrar; o fornecedor ainda vê o contrato
+ * e pode enviar o que ficou pendente até o mês da conclusão. Grava na auditoria.
+ */
+export async function concludeRequest(laborRequestId, actor, context = {}) {
+    try {
+        const request = await laborRequestModel.getLaborRequestById(laborRequestId);
+        if (!request) return { success: false, status: 404, message: 'Solicitação não encontrada.' };
+        if (request.status !== LABOR_REQUEST_STATUSES.IN_CONTRACTING) {
+            return {
+                success: false,
+                status: 400,
+                message: 'Só dá para concluir o contrato de uma solicitação em contratação.',
+            };
+        }
+
+        await trasaction.executarEmTransacao(async (transaction) => {
+            const concluded = await laborRequestModel.concludeRequest(transaction, laborRequestId, actor.id);
+            if (!concluded) throw Object.assign(new Error('A solicitação mudou.'), { conflict: true });
+            await auditModel.insertAuditLog(transaction, collaboratorAuditEntry(
+                context, AUDIT_ACTIONS.LABOR_REQUEST_CONCLUDE, AUDIT_ENTITIES.LABOR_REQUEST, laborRequestId,
+                { status: request.status }, { status: LABOR_REQUEST_STATUSES.CONCLUDED },
+            ));
+        });
+        return { success: true, body: { message: 'Contrato concluído. Os documentos mensais deixam de ser cobrados a partir do próximo mês.' } };
+    } catch (error) {
+        if (error.conflict) return { success: false, status: 409, message: 'A solicitação mudou. Atualize a tela.' };
+        console.error('Erro no concludeRequest service:', error);
+        return { success: false, status: 500, message: 'Erro ao concluir o contrato.' };
     }
 }

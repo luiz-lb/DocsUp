@@ -1,8 +1,9 @@
 import * as documentTypeService from '../services/documentTypeService.js';
 import * as activityService from '../services/activityService.js';
+import * as monthlyService from '../services/monthlyService.js';
 import { AVAILABLE_API_INTEGRATIONS } from '../constants/validationMethods.js';
 
-const CATEGORY_FILTERS = ['0', '1', '2', '3'];
+const CATEGORY_FILTERS = ['0', '1', '2', '3', '4'];
 
 function parseId(value) {
     const id = Number(value);
@@ -63,7 +64,7 @@ export async function listDocumentTypes(req, res) {
         let category;
         if (categoryParam !== undefined && categoryParam !== '') {
             if (!CATEGORY_FILTERS.includes(categoryParam)) {
-                return badRequest(res, 'category deve ser 0 (Empresa), 1 (Básico), 2 (NR) ou 3 (Outros).');
+                return badRequest(res, 'category deve ser 0 (Empresa), 1 (Básico), 2 (NR), 3 (Outros) ou 4 (Trabalhista mensal).');
             }
             category = Number(categoryParam);
         }
@@ -82,14 +83,14 @@ export async function listDocumentTypes(req, res) {
     }
 }
 
-/** POST /parameters/document-types  Body: { name, description?, category, hasExpiration, validityDays, code? } */
+/** POST /parameters/document-types  Body: { name, description?, category, hasExpiration, validityDays, code?, scope? (mensal) } */
 export async function createDocumentType(req, res) {
     try {
         const {
-            name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions,
+            name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions, scope,
         } = req.body ?? {};
         const result = await documentTypeService.createDocumentType(
-            { name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions },
+            { name, description, category, hasExpiration, validityDays, code, validationMethod, apiIntegration, aiInstructions, scope },
             auditContext(req),
         );
         return sendResult(res, result, 201);
@@ -200,5 +201,27 @@ export async function setActivityStatus(req, res) {
         return sendResult(res, result);
     } catch (error) {
         return internalError(res, 'setActivityStatus', error);
+    }
+}
+
+// ─────────────────────────────────────────────
+// Parâmetros do sistema (dia limite dos documentos mensais)
+// ─────────────────────────────────────────────
+
+/** GET /parameters/settings → { monthlyDueDay, maxDueDay } */
+export async function getSettings(req, res) {
+    try {
+        return sendResult(res, await monthlyService.getSettings());
+    } catch (error) {
+        return internalError(res, 'getSettings', error);
+    }
+}
+
+/** PUT /parameters/settings  Body: { monthlyDueDay } (1 a 28) */
+export async function updateSettings(req, res) {
+    try {
+        return sendResult(res, await monthlyService.updateSettings(req.body ?? {}, auditContext(req)));
+    } catch (error) {
+        return internalError(res, 'updateSettings', error);
     }
 }

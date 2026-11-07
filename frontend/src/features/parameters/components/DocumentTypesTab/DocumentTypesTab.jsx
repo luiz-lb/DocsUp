@@ -98,6 +98,18 @@ export default function DocumentTypesTab({ category }) {
           <span className={styles.muted}>—</span>
         ),
     },
+    ...(category === DOCUMENT_CATEGORY_ID.MENSAL
+      ? [{
+          key: 'scope',
+          header: 'Quem envia',
+          render: (row) => (
+            <StatusBadge
+              label={row.scope === 1 ? 'Cada colaborador' : 'A empresa'}
+              tone={row.scope === 1 ? 'info' : 'indigo'}
+            />
+          ),
+        }]
+      : []),
     { key: 'validity', header: 'Validade', render: (row) => describeValidity(row) },
     {
       key: 'validation',
@@ -133,6 +145,12 @@ export default function DocumentTypesTab({ category }) {
     <div>
       {category === DOCUMENT_CATEGORY_ID.BASICO && (
         <Banner tone="info" description="Os documentos básicos são exigidos de todo colaborador, em todas as solicitações." />
+      )}
+      {category === DOCUMENT_CATEGORY_ID.MENSAL && (
+        <Banner
+          tone="info"
+          description="Os documentos mensais ativos valem para todos os contratos. Os sugeridos já vêm cadastrados como inativos: ative os que a empresa cobra."
+        />
       )}
 
       <ParametersToolbar

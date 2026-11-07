@@ -36,6 +36,15 @@ router.post(
     phase2Controller.addCompanyDocuments,
 );
 
+// Portal do fornecedor — documentos trabalhistas mensais: competências e itens do mês, e o envio
+router.get('/:token/monthly', verificarTokenFornecedor, phase2Controller.getMonthly);
+router.post(
+    '/:token/monthly-documents',
+    verificarTokenFornecedor,
+    phase2Controller.uploadMiddleware,
+    phase2Controller.uploadMonthly,
+);
+
 // Painel interno — lista todos os funcionários enviados (RH, Segurança do Trabalho e Obra)
 router.get('/employees/list', verificarToken, requireRole(...ACCESS.EMPLOYEES), phase2Controller.listEmployees);
 

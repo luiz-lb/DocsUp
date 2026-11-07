@@ -1,0 +1,63 @@
+.toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-white, #fff);
+}
+
+.field {
+  gap: 0.3em !important;
+}
+
+.field > span:first-child {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-textMuted, #6b7280);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  text-transform: none;
+}
+
+.header::first-letter {
+  text-transform: uppercase;
+}
+
+.summaryItem {
+  display: inline-flex;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.meta {
+  font-size: 0.8rem;
+  color: var(--color-textMuted, #6b7280);
+  overflow-wrap: anywhere;
+}
+
+.observation {
+  font-size: 0.8rem;
+  color: var(--color-danger, #e5484d);
+}
+
+.actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}

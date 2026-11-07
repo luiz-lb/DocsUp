@@ -132,6 +132,7 @@ export async function getEmployeesBySupplierAndRequest(supplierId, laborRequestI
             WHERE e.supplier_id      = @supplier_id
               AND e.labor_request_id = @labor_request_id
               AND d.is_current       = 1
+              AND d.reference_month IS NULL  -- os mensais ficam na aba própria
             ORDER BY dt.category ASC, dt.[name] ASC, d.uploaded_at DESC
         `);
 
@@ -197,8 +198,10 @@ export async function updateEmployeeStatus(transaction, employeeId, status) {
  */
 export async function insertDocument(transaction, {
     supplierId, documentTypeId, laborRequestId, employeeId,
-    fileName, filePath, fileSizeBytes, mimeType, fileHash, expiresAt
+    fileName, filePath, fileSizeBytes, mimeType, fileHash, expiresAt, referenceMonth = null,
 }) {
+    // A vaga do documento: fornecedor + solicitação + tipo + colaborador (ou empresa) e, nos
+    // documentos mensais, o mês de referência (cada competência tem o seu histórico)
     const request = new sql.Request(transaction);
     const result = await request
         .input('supplier_id', sql.Int, supplierId)
@@ -211,6 +214,7 @@ export async function insertDocument(transaction, {
         .input('mime_type', sql.VarChar(100), mimeType ?? null)
         .input('file_hash', sql.VarChar(128), fileHash ?? null)
         .input('expires_at', sql.Date, expiresAt ?? null)
+        .input('reference_month', sql.Date, referenceMonth ?? null)
         .query(`
             DECLARE @next_version INT = (
                 SELECT ISNULL(MAX([version]), 0) + 1
@@ -219,6 +223,7 @@ export async function insertDocument(transaction, {
                   AND document_type_id = @document_type_id
                   AND ((@labor_request_id IS NULL AND labor_request_id IS NULL) OR labor_request_id = @labor_request_id)
                   AND ((@employee_id IS NULL AND employee_id IS NULL) OR employee_id = @employee_id)
+                  AND ((@reference_month IS NULL AND reference_month IS NULL) OR reference_month = @reference_month)
             );
 
             UPDATE documents
@@ -227,17 +232,18 @@ export async function insertDocument(transaction, {
               AND document_type_id = @document_type_id
               AND ((@labor_request_id IS NULL AND labor_request_id IS NULL) OR labor_request_id = @labor_request_id)
               AND ((@employee_id IS NULL AND employee_id IS NULL) OR employee_id = @employee_id)
+              AND ((@reference_month IS NULL AND reference_month IS NULL) OR reference_month = @reference_month)
               AND is_current = 1;
 
             INSERT INTO documents
                 (supplier_id, document_type_id, labor_request_id, employee_id,
                  file_name, file_path, file_size_bytes, mime_type, file_hash,
-                 [version], is_current, [status], expires_at)
+                 [version], is_current, [status], expires_at, reference_month)
             OUTPUT INSERTED.id
             VALUES
                 (@supplier_id, @document_type_id, @labor_request_id, @employee_id,
                  @file_name, @file_path, @file_size_bytes, @mime_type, @file_hash,
-                 @next_version, 1, 0, @expires_at);
+                 @next_version, 1, 0, @expires_at, @reference_month);
         `);
     return result.recordset[0]?.id ?? null;
 }
@@ -273,6 +279,7 @@ export async function getDocumentsBySupplierAndRequest(supplierId, laborRequestI
             WHERE d.supplier_id      = @supplier_id
               AND d.labor_request_id = @labor_request_id
               AND d.is_current       = 1
+              AND d.reference_month IS NULL  -- os mensais ficam na aba própria
             ORDER BY d.uploaded_at DESC
         `);
     return result.recordset;

@@ -151,10 +151,13 @@ export async function getLaborRequestById(id) {
                 r.urgency,
                 r.[status],
                 r.created_at,
-                r.updated_at
+                r.updated_at,
+                r.concluded_at,
+                concluder.[name] as concluded_by_name
             from labor_requests as r
             Inner join users as u on u.id = r.requester_id
             Left join activity_types as at on at.id = r.activity_type_id
+            Left join users as concluder on concluder.id = r.concluded_by
             Where r.id = @id
         `);
 
@@ -245,6 +248,26 @@ export async function updateLaborRequestStatus(transaction, laborRequestId, stat
             WHERE id = @id
         `);
 
+    return result.rowsAffected[0] > 0;
+}
+
+/**
+ * Conclui o contrato: status 6, data e quem concluiu. Só muda se ainda estiver em
+ * contratação (5). Retorna true se concluiu.
+ */
+export async function concludeRequest(transaction, laborRequestId, userId) {
+    const result = await new sql.Request(transaction)
+        .input('id', sql.Int, laborRequestId)
+        .input('user_id', sql.Int, userId)
+        .query(`
+            UPDATE labor_requests
+            SET [status] = 6,
+                concluded_at = GETDATE(),
+                concluded_by = @user_id,
+                updated_at = GETDATE(),
+                update_by_id = @user_id
+            WHERE id = @id AND [status] = 5
+        `);
     return result.rowsAffected[0] > 0;
 }
 

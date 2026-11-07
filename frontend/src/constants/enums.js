@@ -60,6 +60,7 @@ export const DOCUMENT_CATEGORY = {
   1: { label: 'Básicos do colaborador', tone: 'info' },
   2: { label: 'NRs do colaborador', tone: 'warning' },
   3: { label: 'Outros do colaborador', tone: 'neutral' },
+  4: { label: 'Trabalhistas mensais', tone: 'teal' },
 };
 
 // Ids do DOCUMENT_CATEGORY por nome (mesmos valores do backend)
@@ -68,6 +69,16 @@ export const DOCUMENT_CATEGORY_ID = {
   BASICO: 1,
   NR: 2,
   OUTRO: 3,
+  MENSAL: 4,
+};
+
+// Situação de um documento mensal esperado (calculada no backend)
+export const MONTHLY_SITUATION = {
+  pending: { label: 'A enviar', tone: 'info' },
+  late: { label: 'Atrasado', tone: 'danger' },
+  sent: { label: 'Enviado (em análise)', tone: 'warning' },
+  approved: { label: 'Aprovado', tone: 'success' },
+  returned: { label: 'Devolvido pelo RH', tone: 'danger' },
 };
 
 export const VALIDATION_METHOD = {

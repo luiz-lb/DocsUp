@@ -1,3 +1,4 @@
+import { requestAuditContext } from '../utils/audit.js'
 import * as laborRequestService from '../services/laborRequestService.js'
 
 const ALLOWED_PAGE_SIZES = [10, 25, 50, 100];
@@ -176,6 +177,24 @@ export async function approveRequest(req, res) {
         }
     } catch (error) {
         console.error('Erro no approveRequest controller:', error);
+        return res.status(500).json({ success: false, body: { message: "Erro interno do servidor." } });
+    }
+}
+
+/** POST /laborRequest/:id/conclude — conclui o contrato (RH ou Compras). */
+export async function concludeRequest(req, res) {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+            return res.status(400).json({ success: false, body: { message: "Solicitação inválida." } });
+        }
+        const result = await laborRequestService.concludeRequest(id, req.usuario, requestAuditContext(req));
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        return res.status(200).json({ success: true, body: result.body });
+    } catch (error) {
+        console.error('Erro no concludeRequest controller:', error);
         return res.status(500).json({ success: false, body: { message: "Erro interno do servidor." } });
     }
 }

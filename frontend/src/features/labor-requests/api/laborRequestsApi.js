@@ -235,3 +235,13 @@ export async function replaceSupplier(laborRequestId, payload) {
     return toErrorResult(error, 'Erro ao trocar o fornecedor.');
   }
 }
+
+/** Conclui o contrato (RH ou Compras). POST /laborRequest/:id/conclude */
+export async function concludeLaborRequest(laborRequestId) {
+  try {
+    const result = await api.post(`/laborRequest/${laborRequestId}/conclude`);
+    return result.data;
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao concluir o contrato.');
+  }
+}

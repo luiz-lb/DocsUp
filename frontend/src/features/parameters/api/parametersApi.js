@@ -114,3 +114,28 @@ export async function setActivityStatus(id, isActive) {
     return toErrorResult(error, 'Erro ao alterar o status da atividade.');
   }
 }
+
+// ---------------------------------------------------------------------------
+// Parâmetros do sistema (só Admin)
+// ---------------------------------------------------------------------------
+
+/** GET /parameters/settings → { monthlyDueDay, maxDueDay } */
+export async function getSettings() {
+  try {
+    const result = await api.get('/parameters/settings');
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    console.error('Erro ao buscar os parâmetros:', error);
+    return toErrorResult(error, 'Erro ao buscar os parâmetros.');
+  }
+}
+
+/** PUT /parameters/settings — { monthlyDueDay } (1 a 28) */
+export async function updateSettings(payload) {
+  try {
+    const result = await api.put('/parameters/settings', payload);
+    return result.data;
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao salvar os parâmetros.');
+  }
+}

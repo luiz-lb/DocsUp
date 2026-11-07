@@ -64,3 +64,20 @@ export function formatDuration(ms) {
   const seconds = totalSeconds % 60;
   return [hours, minutes, seconds].map((unit) => String(unit).padStart(2, '0')).join(':');
 }
+
+/** 'AAAA-MM' → 'outubro de 2026' (competência dos documentos mensais). */
+export function formatMonth(value) {
+  const match = /^(\d{4})-(\d{2})/.exec(String(value ?? ''));
+  if (!match) return '—';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
+  return date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+}
+
+/** 'AAAA-MM' → 'out/2026' (rótulo curto). */
+export function formatMonthShort(value) {
+  const match = /^(\d{4})-(\d{2})/.exec(String(value ?? ''));
+  if (!match) return '—';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
+  const month = date.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
+  return `${month}/${match[1]}`;
+}
