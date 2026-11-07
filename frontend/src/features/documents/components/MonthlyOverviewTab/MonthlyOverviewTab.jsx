@@ -3,7 +3,7 @@ import { LuDownload, LuPencil } from 'react-icons/lu';
 import { Banner, Button, DataTable, FormField, SearchSelect, StatusBadge } from '../../../../components/ui/index.js';
 import { MONTHLY_SITUATION } from '../../../../constants/enums.js';
 import { useAsyncData } from '../../../../hooks/useAsyncData.js';
-import { formatDateOnly, formatMonth } from '../../../../utils/formatters.js';
+import { formatDate, formatDateOnly, formatMonth } from '../../../../utils/formatters.js';
 import { downloadDocumentFiles, getMonthlyOverview } from '../../api/documentsRealApi.js';
 import DocumentStatusModal from '../DocumentStatusModal/index.js';
 import styles from './MonthlyOverviewTab.module.css';
@@ -102,7 +102,7 @@ export default function MonthlyOverviewTab() {
       render: (row) => (
         <div className={styles.cell}>
           <StatusBadge enumMap={MONTHLY_SITUATION} value={row.situation} />
-          {row.document && <span className={styles.meta}>Enviado em {formatDateOnly(row.document.uploadedAt)}</span>}
+          {row.document && <span className={styles.meta}>Enviado em {formatDate(row.document.uploadedAt)}</span>}
           {row.document?.observation && <span className={styles.observation}>{row.document.observation}</span>}
         </div>
       ),

@@ -114,8 +114,10 @@ function publicAssignment(assignment, { withLink }) {
 }
 
 /**
- * Fornecedor dono do e-mail (usuário ativo), para vincular o convite na hora.
- * Retorna { supplierId, supplierName } (supplierId null se o e-mail não tem cadastro) ou { error }.
+ * Fornecedor dono do e-mail (usuário ativo), para vincular o convite na hora. Só vincula se
+ * o e-mail já foi confirmado (o usuário entrou com o código enviado a ele): e-mail digitado
+ * num cadastro e nunca confirmado fica esperando quem entrar com ele.
+ * Retorna { supplierId, supplierName } (supplierId null se não vincula agora) ou { error }.
  */
 async function supplierForEmail(email) {
     const user = await supplierUserModel.findActiveUserByEmail(email);
@@ -126,7 +128,11 @@ async function supplierForEmail(email) {
     if (user.supplier_status === SUPPLIER_STATUSES.INACTIVE) {
         return { error: 'Este fornecedor está inativo no portal. Escolha outro fornecedor.' };
     }
-    return { supplierId: user.supplier_id, supplierName: user.razao_social };
+    // ownerSupplierId: a empresa do e-mail, mesmo sem confirmação (para não "trocar" pela mesma)
+    if (!user.email_verified_at) {
+        return { supplierId: null, supplierName: null, pendingVerification: true, ownerSupplierId: user.supplier_id };
+    }
+    return { supplierId: user.supplier_id, supplierName: user.razao_social, ownerSupplierId: user.supplier_id };
 }
 
 /** Avisa o fornecedor do convite por e-mail (com o envio desligado, só registra no log). */
@@ -271,6 +277,8 @@ export async function lookupSupplierEmail(rawEmail) {
                     status: user.supplier_status,
                 },
                 user: { name: user.name, role: user.role },
+                // E-mail confirmado no login: a solicitação vai direto para a empresa
+                emailVerified: Boolean(user.email_verified_at),
             },
         };
     } catch (error) {
@@ -347,14 +355,26 @@ export async function assignSupplier(laborRequestId, payload = {}, actor, contex
     return {
         success: true,
         body: {
-            message: supplier.supplierId
-                ? `Fornecedor indicado: ${supplier.supplierName}. A solicitação já aparece no portal dele.`
-                : 'Convite criado. O e-mail ainda não tem cadastro: o link leva ao cadastro do fornecedor.',
+            message: inviteMessage(supplier),
             registered: Boolean(supplier.supplierId),
             inviteLink: inviteLink(token),
             mailEnabled: isMailEnabled(),
         },
     };
+}
+
+/** Mensagem do convite criado, conforme o e-mail (empresa vinculada, aguardando login ou sem cadastro). */
+function inviteMessage(supplier, { replaced = false } = {}) {
+    if (supplier.supplierId) {
+        return replaced
+            ? `Fornecedor trocado para ${supplier.supplierName}. O anterior perdeu o acesso a esta solicitação.`
+            : `Fornecedor indicado: ${supplier.supplierName}. A solicitação já aparece no portal dele.`;
+    }
+    const prefix = replaced ? 'Fornecedor trocado. ' : 'Convite criado. ';
+    if (supplier.pendingVerification) {
+        return `${prefix}O e-mail tem cadastro, mas ainda não foi confirmado: a solicitação aparece para a empresa quando esse usuário entrar no portal ou abrir o link.`;
+    }
+    return `${prefix}O e-mail ainda não tem cadastro: o link leva ao cadastro do fornecedor.`;
 }
 
 /**
@@ -488,7 +508,7 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
 
     const supplier = await supplierForEmail(email);
     if (supplier.error) return { success: false, status: 400, message: supplier.error };
-    if (supplier.supplierId && supplier.supplierId === current.supplier_id) {
+    if (supplier.ownerSupplierId && supplier.ownerSupplierId === current.supplier_id) {
         return {
             success: false,
             status: 400,
@@ -537,9 +557,7 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
     return {
         success: true,
         body: {
-            message: supplier.supplierId
-                ? `Fornecedor trocado para ${supplier.supplierName}. O anterior perdeu o acesso a esta solicitação.`
-                : 'Fornecedor trocado. O novo e-mail ainda não tem cadastro: o link leva ao cadastro do fornecedor.',
+            message: inviteMessage(supplier, { replaced: true }),
             registered: Boolean(supplier.supplierId),
             inviteLink: inviteLink(token),
             mailEnabled: isMailEnabled(),

@@ -223,7 +223,11 @@ export default function SupplierInviteModal({ open, mode = 'assign', laborReques
               <div className={styles.lookupFound}>
                 <strong>{lookup.supplier.razaoSocial}</strong>
                 <span>CNPJ {formatCnpj(lookup.supplier.cnpj)} · {lookup.user.name}</span>
-                <span className={styles.lookupNote}>Já tem cadastro: a solicitação aparece direto no portal dele.</span>
+                <span className={styles.lookupNote}>
+                  {lookup.emailVerified
+                    ? 'Já tem cadastro: a solicitação aparece direto no portal dele.'
+                    : 'Tem cadastro, mas o e-mail ainda não foi confirmado: a solicitação aparece quando esse usuário entrar no portal ou abrir o link.'}
+                </span>
               </div>
             ) : (
               <div className={styles.lookupNew}>

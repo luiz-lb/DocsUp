@@ -173,6 +173,22 @@
     }
 }
 
+/* Celular pequeno: três abas (Empresa, Colaboradores, Mensais) cabem sem o ícone */
+@media (max-width: 420px) {
+    .tabs {
+        gap: 0.25em;
+    }
+
+    .tab {
+        padding: 0.7em 0.25em;
+        font-size: 0.85rem;
+    }
+
+    .tab svg {
+        display: none;
+    }
+}
+
 .tab:hover {
     opacity: 0.9;
 }

@@ -548,5 +548,8 @@ export async function loginPhase2(otp, session) {
         return { success: false, message: 'Acesso não permitido. Entre em contato com Suprimentos.' };
     }
 
+    // O código chegou no e-mail: ele está confirmado (passa a receber convites direto)
+    if (!user.email_verified_at) await supplierUserModel.markEmailVerified(user.id);
+
     return { success: true, token: signSupplierToken(user), supplier: sessionPayload(user) };
 }

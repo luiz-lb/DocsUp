@@ -7,6 +7,14 @@
     scrollbar-width: thin;
 }
 
+/* Tela larga: as abas quebram linha em vez de esconder a última atrás da rolagem */
+@media (min-width: 900px) {
+    .tabs {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+}
+
 .tab {
     display: inline-flex;
     align-items: center;

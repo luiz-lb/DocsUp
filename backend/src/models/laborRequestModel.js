@@ -10,7 +10,7 @@ export async function laborRequestNew(transaction, id_user, activity_type_id, ti
         .input('description', sql.VarChar, description)
         .input('location', sql.VarChar, location)
         .input('urgency', sql.TinyInt, urgency)
-        .input('startDate', sql.DateTime2, startDate)
+        .input('startDate', sql.Date, startDate)
         .query('insert into labor_requests (requester_id, activity_type_id, title, [description], [location], start_date, urgency, [status], update_by_id) Output inserted.id VALUES (@id_user,@activity_type_id, @title, @description, @location, @startDate, @urgency, 0, @id_user)');
 
     return result.recordset[0];

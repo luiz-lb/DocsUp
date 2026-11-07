@@ -8,6 +8,7 @@ import * as auditModel from '../models/auditModel.js'
 import { collaboratorAuditEntry } from '../utils/audit.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js'
 import { LABOR_REQUEST_STATUSES } from '../constants/laborRequest.js'
+import { parseLocalDate } from '../utils/dates.js'
 
 // Categorias que a Segurança escolhe na aprovação: empresa e outros do colaborador.
 // Os básicos entram sempre (todos os ativos); as NRs vêm em nrTypeIds.
@@ -87,14 +88,32 @@ async function resolveApprovalRequirements(documentTypeIds, nrTypeIds) {
     }
 }
 
+/**
+ * Data de início da solicitação como Date local (meia-noite): aceita 'YYYY-MM-DD' (sem fuso)
+ * ou um ISO com hora (o DatePicker antigo mandava a meia-noite local em UTC). Null se inválida.
+ */
+function resolveStartDate(value) {
+    if (typeof value !== 'string' || !value.trim()) return null;
+    // Só a data: tem que existir no calendário (o Date "corrigiria" 30/02 para 02/03)
+    if (!value.includes('T')) return parseLocalDate(value);
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
 export async function createLaborRequest(idUser, idActivityType, title, description, location, urgency, startDate) {
     let trasactionNumber;
     let transacaoConcluida = false;
 
+    const start = resolveStartDate(startDate);
+    if (!start) {
+        return {success: false, body: { message: "Data de início inválida." }}
+    }
+
     try {
         trasactionNumber = await trasaction.iniciarTransacao();
 
-        const result = await laborRequestModel.laborRequestNew(trasactionNumber, idUser, idActivityType, title, description, location, urgency, startDate);
+        const result = await laborRequestModel.laborRequestNew(trasactionNumber, idUser, idActivityType, title, description, location, urgency, start);
 
         if(!result){
             await trasaction.finalizarTransacao(trasactionNumber, false);

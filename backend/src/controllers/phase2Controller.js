@@ -88,7 +88,7 @@ export async function submitDeclaration(req, res) {
 // ─────────────────────────────────────────────
 export async function listMyRequests(req, res) {
     try {
-        const result = await phase2Service.listSupplierPhase2Requests(req.fornecedor.supplierId);
+        const result = await phase2Service.listSupplierPhase2Requests(req.fornecedor.supplierId, req.fornecedor.email);
         if (!result.success) {
             return res.status(result.status ?? 500).json({ success: false, body: { message: result.message } });
         }

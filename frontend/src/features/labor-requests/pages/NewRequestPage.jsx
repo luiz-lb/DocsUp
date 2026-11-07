@@ -7,6 +7,7 @@ import { ErrorDialog, Card, PageHeader, Button, FormField, WizardStepper, Banner
 import { createLaborRequest, getActivityTypes } from '../api/laborRequestsApi.js';
 import { ROUTES } from '../../../constants/routes.js';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
+import { toDateInputValue } from '../../../utils/formatters.js';
 import styles from './NewRequestPage.module.css';
 
 const STEPS = ['Dados da solicitação', 'Revisão e envio'];
@@ -47,6 +48,8 @@ export default function NewRequestPage() {
     setIsSubmitting(true);
     const created = await createLaborRequest({
       ...form,
+      // 'AAAA-MM-DD' no horário local: sem fuso, a data não muda de dia no caminho
+      startDate: form.startDate ? toDateInputValue(form.startDate) : null,
       activityTypeId: Number(form.activityTypeId),
       urgency: Number(form.urgency),
       idUser: user.id

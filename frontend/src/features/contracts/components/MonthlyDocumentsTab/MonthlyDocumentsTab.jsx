@@ -4,7 +4,7 @@ import { Banner, Button, FileDropzone, Modal, StatusBadge } from '../../../../co
 import { MONTHLY_SITUATION } from '../../../../constants/enums.js';
 import { useAsyncData } from '../../../../hooks/useAsyncData.js';
 import { cn } from '../../../../utils/cn.js';
-import { formatDateOnly, formatMonth, formatMonthShort } from '../../../../utils/formatters.js';
+import { formatDate, formatDateOnly, formatMonth, formatMonthShort } from '../../../../utils/formatters.js';
 import { downloadPhase2Document, getMonthlyDocuments, uploadMonthlyDocument } from '../../../employees/api/employeesApi.js';
 import styles from './MonthlyDocumentsTab.module.css';
 
@@ -68,7 +68,7 @@ export default function MonthlyDocumentsTab({ token }) {
           {item.employeeName && <span className={styles.itemMeta}>{item.documentTypeName}</span>}
           {item.document && (
             <span className={styles.itemMeta}>
-              {item.document.fileName} · enviado em {formatDateOnly(item.document.uploadedAt)}
+              {item.document.fileName} · enviado em {formatDate(item.document.uploadedAt)}
               {item.document.version > 1 ? ` · ${item.document.version}ª entrega` : ''}
             </span>
           )}

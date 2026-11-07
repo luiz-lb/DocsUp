@@ -52,6 +52,7 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
     }
   };
 
+  const isClosed = [LABOR_REQUEST_STATUS_ID.CONCLUIDA, LABOR_REQUEST_STATUS_ID.CANCELADA].includes(requestStatus);
   const companyDeclaration = declaration.filter((row) => row.category === DOCUMENT_CATEGORY_ID.EMPRESA);
   const employeeDeclaration = declaration.filter((row) => row.category !== DOCUMENT_CATEGORY_ID.EMPRESA);
   const missingCompany = companyDeclaration.filter((row) => row.has_document === false);
@@ -187,7 +188,8 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
               </div>
             )}
 
-            {canManage && (
+            {/* Contrato concluído ou cancelado: sem troca de fornecedor nem de prazo */}
+            {canManage && !isClosed && (
               <div className={styles.actions}>
                 {[ASSIGNMENT_STATUS_ID.AGUARDANDO, ASSIGNMENT_STATUS_ID.BLOQUEADO].includes(current.status) && (
                   <Button size="sm" variant="secondary" icon={LuRefreshCw} onClick={() => setModalMode('resend')}>

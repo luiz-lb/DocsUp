@@ -33,6 +33,18 @@ export async function setSetting(transaction, key, value, userId) {
 // Catálogo e documentos mensais
 // ─────────────────────────────────────────────
 
+// Contratos por consulta: 2 parâmetros cada, abaixo do limite de 2100 do SQL Server
+const PAIRS_PER_QUERY = 500;
+
+/** Roda a consulta em lotes de contratos e junta os resultados. */
+async function inBatches(pairs, query) {
+    const rows = [];
+    for (let start = 0; start < pairs.length; start += PAIRS_PER_QUERY) {
+        rows.push(...await query(pairs.slice(start, start + PAIRS_PER_QUERY)));
+    }
+    return rows;
+}
+
 /** Tipos mensais ativos (valem para todos os contratos). scope 0 = empresa, 1 = colaborador. */
 export async function getActiveMonthlyTypes() {
     const pool = await poolPromise;
@@ -51,6 +63,10 @@ export async function getActiveMonthlyTypes() {
  * Opcionalmente só de um mês (referenceMonth: Date no dia 1).
  */
 export async function listCurrentMonthlyDocuments(pairs, referenceMonth = null) {
+    return inBatches(pairs, (batch) => currentMonthlyDocuments(batch, referenceMonth));
+}
+
+async function currentMonthlyDocuments(pairs, referenceMonth) {
     if (pairs.length === 0) return [];
     const pool = await poolPromise;
     const request = pool.request().input('reference_month', sql.Date, referenceMonth);
@@ -92,6 +108,10 @@ export async function listCurrentMonthlyDocuments(pairs, referenceMonth = null) 
  * cadastrado depois do mês não deve aquele mês. pairs: [{ supplierId, laborRequestId }].
  */
 export async function listEmployeesForMonthly(pairs) {
+    return inBatches(pairs, employeesForMonthly);
+}
+
+async function employeesForMonthly(pairs) {
     if (pairs.length === 0) return [];
     const pool = await poolPromise;
     const request = pool.request();

@@ -47,6 +47,15 @@ export function dueDateFor(month, dueDay) {
 }
 
 /**
+ * Vencimento para a tela: 'YYYY-MM-DD' no horário local. Como Date, o fim do dia 10 (23:59
+ * aqui) sairia no JSON como dia 11 em UTC e a tela mostraria o dia seguinte.
+ */
+function dueDateText(date) {
+    const pad = (number) => String(number).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
  * Competências cobradas de um contrato, da mais antiga para a mais nova: do mês de início
  * da solicitação (mas não antes do mês em que este fornecedor foi indicado) até o mês da
  * conclusão do contrato, ou até o mês atual enquanto ele não for concluído.
@@ -240,11 +249,11 @@ export async function getSupplierMonthly(token, supplierId, monthParam) {
                 ...base,
                 months: [...perMonth].reverse().map((entry) => ({
                     month: toMonthKey(entry.month),
-                    dueDate: entry.dueDate,
+                    dueDate: dueDateText(entry.dueDate),
                     ...entry.summary,
                 })),
                 selectedMonth: toMonthKey(selected.month),
-                selectedDueDate: selected.dueDate,
+                selectedDueDate: dueDateText(selected.dueDate),
                 items: selected.items,
             },
         };
@@ -362,7 +371,7 @@ export async function getMonthlyOverview(monthParam) {
                 now,
             }).some((item) => item.getTime() === month.getTime()));
 
-        const body = { month: toMonthKey(month), dueDay, dueDate, hasTypes: types.length > 0 };
+        const body = { month: toMonthKey(month), dueDay, dueDate: dueDateText(dueDate), hasTypes: types.length > 0 };
         if (types.length === 0 || contracts.length === 0) {
             return { success: true, body: { ...body, rows: [], summary: summarize([]) } };
         }

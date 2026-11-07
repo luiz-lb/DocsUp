@@ -10,6 +10,7 @@ const USER_WITH_SUPPLIER = `
     su.email,
     su.is_active,
     su.sessions_valid_after,
+    su.email_verified_at,
     s.cnpj,
     s.razao_social,
     s.nome_fantasia,
@@ -135,7 +136,7 @@ export async function insertUser(transaction, { supplierId, role, name, email, p
     return result.recordset[0]?.id ?? null;
 }
 
-/** Nome e e-mail do usuário. */
+/** Nome e e-mail do usuário. E-mail trocado volta a ficar sem confirmação (até o próximo login). */
 export async function updateUser(transaction, id, { name, email }) {
     const result = await new sql.Request(transaction)
         .input('id', sql.Int, id)
@@ -143,10 +144,21 @@ export async function updateUser(transaction, id, { name, email }) {
         .input('email', sql.NVarChar(200), email)
         .query(`
             UPDATE supplier_users
-            SET [name] = @name, email = @email, updated_at = GETDATE()
+            SET [name] = @name,
+                email_verified_at = CASE WHEN email = @email THEN email_verified_at ELSE NULL END,
+                email = @email,
+                updated_at = GETDATE()
             WHERE id = @id
         `);
     return result.rowsAffected[0] > 0;
+}
+
+/** Marca o e-mail como confirmado (login com o código enviado para ele). */
+export async function markEmailVerified(id) {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('id', sql.Int, id)
+        .query('UPDATE supplier_users SET email_verified_at = GETDATE() WHERE id = @id AND email_verified_at IS NULL');
 }
 
 /**

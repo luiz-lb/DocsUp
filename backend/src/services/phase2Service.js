@@ -5,7 +5,6 @@ import * as assignmentModel from '../models/assignmentModel.js';
 import * as employeeModel from '../models/employeeModel.js';
 import * as laborRequestModel from '../models/laborRequestModel.js';
 import * as documentTypeModel from '../models/documentTypeModel.js';
-import * as supplierUserModel from '../models/supplierUserModel.js';
 import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
 import * as deliveryModel from '../models/deliveryModel.js';
@@ -765,13 +764,17 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
 
 /**
  * Contratos (vínculos abertos) do fornecedor, com o prazo e o resumo dos documentos. Antes,
- * vincula a ele os convites feitos para os e-mails dos usuários dele que ainda estavam sem
- * fornecedor (ex.: se cadastrou sem abrir o link).
+ * vincula a ele os convites ainda sem fornecedor feitos para o e-mail de QUEM ESTÁ LOGADO
+ * (ex.: se cadastrou sem abrir o link). Só esse e-mail conta: ele foi confirmado pelo código
+ * enviado no login. O e-mail do outro usuário pode ter sido digitado pelo Responsável e ainda
+ * não foi confirmado por ninguém, então não puxa convites.
+ *
+ * @param {number} supplierId
+ * @param {string} userEmail — e-mail do usuário logado (req.fornecedor.email)
  */
-export async function listSupplierPhase2Requests(supplierId) {
+export async function listSupplierPhase2Requests(supplierId, userEmail) {
     try {
-        const emails = (await supplierUserModel.getActiveEmailsBySupplier(supplierId)).map((row) => row.email);
-        await assignmentModel.claimByEmails(supplierId, emails);
+        if (userEmail) await assignmentModel.claimByEmails(supplierId, [userEmail]);
 
         const rows = await assignmentModel.listOpenBySupplier(supplierId);
         const result = rows.map((row) => ({
