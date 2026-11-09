@@ -450,6 +450,7 @@ export async function changeDeadline(laborRequestId, payload = {}, actor, contex
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_DEADLINE, laborRequestId,
                 { deadline_at: toLocalDateTimeText(current.deadline_at) },
                 { deadline_at: toLocalDateTimeText(deadline.value) });
+            await producers.supplierDeadlineChanged(transaction, { assignment: current, request: loaded.request, deadlineAt: deadline.value });
         });
         return { success: true, body: { message: 'Prazo dos documentos atualizado.' } };
     } catch (error) {
@@ -529,6 +530,7 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
             await producers.supplierInvited(transaction, {
                 email, request: loaded.request, inviteUrl: inviteLink(token), deadlineAt: deadline.value, kind: 'replaced',
             });
+            await producers.supplierAccessRemoved(transaction, { previous: current, request: loaded.request });
         });
     } catch (error) {
         if (error.conflict || SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {

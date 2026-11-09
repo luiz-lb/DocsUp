@@ -1,3 +1,4 @@
+import * as producers from '../events/producers.js';
 import * as contractProgressService from './contractProgressService.js';
 import axios from 'axios';
 import { sql, poolPromise } from '../config/dbConfig.js';
@@ -307,6 +308,9 @@ export async function reviewDocument(validationId, documentId, reviewerId, decis
         const docStatus = decision === 1 ? 2 : 4;
         await documentValidationModel.updateDocumentStatus(transaction, documentId, docStatus);
         await contractProgressService.onDocumentStatusChanged(transaction, documentId, docStatus, { actorId: reviewerId });
+        if (docStatus === 4) {
+            await producers.supplierDocumentReturned(transaction, { documentId, status: docStatus, observation: comments ?? null });
+        }
 
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
@@ -390,6 +394,10 @@ export async function setDocumentStatus(documentId, status, reviewer, comments, 
         await trasaction.executarEmTransacao(async (transaction) => {
             await documentValidationModel.updateDocumentStatus(transaction, documentId, status);
             await contractProgressService.onDocumentStatusChanged(transaction, documentId, status, context);
+            // Reprovado / reenvio necessário: o fornecedor fica sabendo na hora (com o motivo)
+            if (STATUS_NEEDS_OBSERVATION.includes(status)) {
+                await producers.supplierDocumentReturned(transaction, { documentId, status, observation });
+            }
             await documentValidationModel.insertManualReview(transaction, {
                 documentId,
                 reviewerId: reviewer.id,

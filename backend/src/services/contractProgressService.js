@@ -1,3 +1,4 @@
+import * as producers from '../events/producers.js';
 import * as contractProgressModel from '../models/contractProgressModel.js';
 import * as laborRequestModel from '../models/laborRequestModel.js';
 import * as auditModel from '../models/auditModel.js';
@@ -63,6 +64,7 @@ export async function advanceIfInitialDocumentationApproved(transaction, { labor
     if (!moved) return { advanced: false };
 
     await auditModel.insertAuditLog(transaction, progressAuditEntry(context, laborRequestId));
+    await producers.supplierDocumentationApproved(transaction, { assignment });
     return { advanced: true, assignmentId: assignment.id };
 }
 

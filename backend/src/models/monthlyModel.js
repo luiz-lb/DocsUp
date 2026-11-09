@@ -130,6 +130,8 @@ export async function listActiveContracts() {
             s.razao_social      AS supplier_name,
             l.labor_request_id,
             l.created_at        AS assignment_created_at,
+            l.invite_email,
+            l.invite_token,
             lr.title            AS labor_request_title,
             lr.contract_number,
             lr.[location]       AS labor_request_location,

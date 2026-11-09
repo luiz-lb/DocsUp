@@ -1,3 +1,4 @@
+import * as producers from '../events/producers.js'
 import * as laborRequestModel from '../models/laborRequestModel.js'
 import * as documentTypeModel from '../models/documentTypeModel.js'
 import * as docRequiredModel from '../models/docRequiredModel.js'
@@ -329,6 +330,7 @@ export async function concludeRequest(laborRequestId, actor, context = {}) {
                 context, AUDIT_ACTIONS.LABOR_REQUEST_CONCLUDE, AUDIT_ENTITIES.LABOR_REQUEST, laborRequestId,
                 { status: request.status }, { status: LABOR_REQUEST_STATUSES.CONCLUDED },
             ));
+            await producers.supplierContractConcluded(transaction, { laborRequestId });
         });
         return { success: true, body: { message: 'Contrato concluído. Os documentos mensais deixam de ser cobrados a partir do próximo mês.' } };
     } catch (error) {

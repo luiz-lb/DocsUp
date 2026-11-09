@@ -46,21 +46,37 @@ export function dueDateFor(month, dueDay) {
  * Vencimento para a tela: 'YYYY-MM-DD' no horário local. Como Date, o fim do dia 10 (23:59
  * aqui) sairia no JSON como dia 11 em UTC e a tela mostraria o dia seguinte.
  */
-function dueDateText(date) {
+export function dueDateText(date) {
     const pad = (number) => String(number).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /**
+ * Competência mais nova já aberta: os documentos de um mês são enviados no mês seguinte, a
+ * partir do dia de abertura (Parâmetros). Ex.: abertura dia 1 → em 9/11 a mais nova é outubro.
+ */
+export function latestOpenMonth(now = new Date(), openDay = 1) {
+    const monthsBack = now.getDate() >= openDay ? 1 : 2;
+    return new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+}
+
+/** Dia em que a competência abre (no mês seguinte a ela). */
+export function openDateFor(month, openDay = 1) {
+    return new Date(month.getFullYear(), month.getMonth() + 1, openDay);
+}
+
+/**
  * Competências cobradas de um contrato, da mais antiga para a mais nova: do mês de início
  * da solicitação (mas não antes do mês em que este fornecedor foi indicado) até o mês da
- * conclusão do contrato, ou até o mês atual enquanto ele não for concluído.
+ * conclusão do contrato, só as que já abriram (dia de abertura do mês seguinte).
  */
-export function competenceMonths({ startDate, assignmentCreatedAt, concludedAt, now = new Date() }) {
+export function competenceMonths({ startDate, assignmentCreatedAt, concludedAt, now = new Date(), openDay = 1 }) {
     const indicated = monthStart(assignmentCreatedAt ?? now);
     const started = startDate ? monthStart(startDate) : indicated;
     const first = started > indicated ? started : indicated;
-    const last = monthStart(concludedAt ?? now);
+    const opened = latestOpenMonth(now, openDay);
+    const concluded = concludedAt ? monthStart(concludedAt) : null;
+    const last = concluded && concluded < opened ? concluded : opened;
 
     const months = [];
     for (let month = first; month <= last; month = new Date(month.getFullYear(), month.getMonth() + 1, 1)) {
@@ -153,6 +169,18 @@ export async function getDueDay() {
     return (await settingsService.getMonthlyCalendar()).dueDay;
 }
 
+/** Calendário dos mensais: { openDay, reminderDay, dueDay }. */
+export function getCalendar() {
+    return settingsService.getMonthlyCalendar();
+}
+
+/** Primeira competência que o contrato deve (início da solicitação, não antes da indicação). */
+function firstCompetence(startDate, assignmentCreatedAt, now = new Date()) {
+    const indicated = monthStart(assignmentCreatedAt ?? now);
+    const started = startDate ? monthStart(startDate) : indicated;
+    return started > indicated ? started : indicated;
+}
+
 // ─────────────────────────────────────────────
 // Portal do fornecedor
 // ─────────────────────────────────────────────
@@ -168,18 +196,29 @@ export async function getSupplierMonthly(token, supplierId, monthParam) {
         const { assignment } = loaded;
 
         const now = new Date();
-        const dueDay = await getDueDay();
+        const { openDay, dueDay } = await getCalendar();
         const types = await monthlyModel.getActiveMonthlyTypes();
         const months = competenceMonths({
             startDate: assignment.labor_request_start_date,
             assignmentCreatedAt: assignment.created_at,
             concludedAt: assignment.labor_request_concluded_at,
             now,
+            openDay,
         });
+        // Próxima competência a abrir (a tela diz quando começa o envio)
+        const lastListed = months[months.length - 1];
+        const nextMonth = lastListed
+            ? new Date(lastListed.getFullYear(), lastListed.getMonth() + 1, 1)
+            : firstCompetence(assignment.labor_request_start_date, assignment.created_at, now);
+        const concludedMonth = assignment.labor_request_concluded_at ? monthStart(assignment.labor_request_concluded_at) : null;
+        const hasNext = !concludedMonth || nextMonth <= concludedMonth;
         const base = {
             dueDay,
+            openDay,
             concluded: Boolean(assignment.labor_request_concluded_at),
             hasTypes: types.length > 0,
+            nextMonth: hasNext ? toMonthKey(nextMonth) : null,
+            nextOpenDate: hasNext ? dueDateText(openDateFor(nextMonth, openDay)) : null,
         };
         if (types.length === 0 || months.length === 0) {
             return { success: true, body: { ...base, months: [], selectedMonth: null, items: [] } };
@@ -249,13 +288,15 @@ export async function uploadMonthlyDocument(token, supplierId, data = {}, files 
     }
 
     const month = parseMonth(data.referenceMonth ?? '');
+    const { openDay } = await getCalendar();
     const months = competenceMonths({
         startDate: assignment.labor_request_start_date,
         assignmentCreatedAt: assignment.created_at,
         concludedAt: assignment.labor_request_concluded_at,
+        openDay,
     });
     if (!month || !months.some((item) => item.getTime() === month.getTime())) {
-        return { success: false, message: 'Mês de referência fora do período do contrato.' };
+        return { success: false, message: 'Mês de referência fora do período do contrato (ou ainda não aberto para envio).' };
     }
 
     let employeeId = null;
@@ -317,55 +358,70 @@ export async function uploadMonthlyDocument(token, supplierId, data = {}, files 
  * o que já foi enviado (e a análise) e o que falta (no prazo ou atrasado). Sem mês, mostra
  * o mês anterior (a competência que vence neste mês).
  */
-export async function getMonthlyOverview(monthParam) {
-    try {
-        const now = new Date();
-        const month = parseMonth(monthParam ?? '') ?? new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const dueDay = await getDueDay();
-        const dueDate = dueDateFor(month, dueDay);
-        const types = await monthlyModel.getActiveMonthlyTypes();
+/**
+ * Contratos ativos que devem a competência `month`, cada um com os itens do mês e a situação
+ * de cada item (usado no acompanhamento do RH e nos avisos do calendário dos mensais).
+ */
+export async function contractsForMonth(month, { now = new Date(), calendar = null } = {}) {
+    const { openDay, dueDay } = calendar ?? await getCalendar();
+    const dueDate = dueDateFor(month, dueDay);
+    const types = await monthlyModel.getActiveMonthlyTypes();
+    const contracts = (await monthlyModel.listActiveContracts()).filter((contract) =>
+        competenceMonths({
+            startDate: contract.start_date,
+            assignmentCreatedAt: contract.assignment_created_at,
+            concludedAt: contract.concluded_at,
+            now,
+            openDay,
+        }).some((item) => item.getTime() === month.getTime()));
 
-        const contracts = (await monthlyModel.listActiveContracts()).filter((contract) =>
-            competenceMonths({
-                startDate: contract.start_date,
-                assignmentCreatedAt: contract.assignment_created_at,
-                concludedAt: contract.concluded_at,
-                now,
-            }).some((item) => item.getTime() === month.getTime()));
+    if (types.length === 0 || contracts.length === 0) return { types, dueDay, dueDate, contracts: [] };
 
-        const body = { month: toMonthKey(month), dueDay, dueDate: dueDateText(dueDate), hasTypes: types.length > 0 };
-        if (types.length === 0 || contracts.length === 0) {
-            return { success: true, body: { ...body, rows: [], summary: summarize([]) } };
-        }
+    const pairs = contracts.map((contract) => ({ supplierId: contract.supplier_id, laborRequestId: contract.labor_request_id }));
+    const [employees, documents] = await Promise.all([
+        monthlyModel.listEmployeesForMonthly(pairs),
+        monthlyModel.listCurrentMonthlyDocuments(pairs, month),
+    ]);
 
-        const pairs = contracts.map((contract) => ({ supplierId: contract.supplier_id, laborRequestId: contract.labor_request_id }));
-        const [employees, documents] = await Promise.all([
-            monthlyModel.listEmployeesForMonthly(pairs),
-            monthlyModel.listCurrentMonthlyDocuments(pairs, month),
-        ]);
-
-        const rows = contracts.flatMap((contract) => {
+    return {
+        types,
+        dueDay,
+        dueDate,
+        contracts: contracts.map((contract) => {
             const contractEmployees = employees.filter((employee) =>
                 employee.supplier_id === contract.supplier_id && employee.labor_request_id === contract.labor_request_id);
             const contractDocuments = documents.filter((document) =>
                 document.supplier_id === contract.supplier_id && document.labor_request_id === contract.labor_request_id);
-            return itemsWithStatus({
+            const items = itemsWithStatus({
                 types,
                 employees: contractEmployees,
                 month,
                 documentsByKey: indexDocuments(contractDocuments),
                 dueDate,
                 now,
-            }).map((item) => ({
-                ...item,
-                laborRequestId: contract.labor_request_id,
-                laborRequestTitle: contract.labor_request_title,
-                contractNumber: contract.contract_number,
-                location: contract.labor_request_location,
-                supplierId: contract.supplier_id,
-                supplierName: contract.supplier_name,
-            }));
-        });
+            });
+            return { contract, items, summary: summarize(items) };
+        }),
+    };
+}
+
+export async function getMonthlyOverview(monthParam) {
+    try {
+        const now = new Date();
+        const calendar = await getCalendar();
+        const month = parseMonth(monthParam ?? '') ?? latestOpenMonth(now, calendar.openDay);
+        const { types, dueDay, dueDate, contracts } = await contractsForMonth(month, { now, calendar });
+
+        const body = { month: toMonthKey(month), dueDay, dueDate: dueDateText(dueDate), hasTypes: types.length > 0 };
+        const rows = contracts.flatMap(({ contract, items }) => items.map((item) => ({
+            ...item,
+            laborRequestId: contract.labor_request_id,
+            laborRequestTitle: contract.labor_request_title,
+            contractNumber: contract.contract_number,
+            location: contract.labor_request_location,
+            supplierId: contract.supplier_id,
+            supplierName: contract.supplier_name,
+        })));
 
         return { success: true, body: { ...body, rows, summary: summarize(rows) } };
     } catch (error) {

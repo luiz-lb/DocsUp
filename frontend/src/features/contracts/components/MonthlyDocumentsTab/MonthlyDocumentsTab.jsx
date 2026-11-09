@@ -40,7 +40,14 @@ export default function MonthlyDocumentsTab({ token }) {
     return <Banner tone="info" description="Nenhum documento mensal é cobrado por enquanto." />;
   }
   if (data.months.length === 0) {
-    return <Banner tone="info" description="Os documentos mensais começam a ser cobrados no mês de início do contrato." />;
+    return (
+      <Banner
+        tone="info"
+        description={data.nextMonth && data.nextOpenDate
+          ? `Os documentos de cada mês são enviados no mês seguinte. Os de ${formatMonth(data.nextMonth)} abrem para envio em ${formatDateOnly(data.nextOpenDate)} e vencem no dia ${data.dueDay}.`
+          : 'Nenhum mês a enviar neste contrato.'}
+      />
+    );
   }
 
   const companyItems = data.items.filter((item) => !item.employeeId);

@@ -25,7 +25,7 @@ const NUMERIC_SETTINGS = Object.freeze({
 });
 
 const TOGGLE_PREFIX = 'notification_enabled.';
-const CACHE_MS = 15000;
+const CACHE_MS = Number(process.env.SETTINGS_CACHE_MS || 15000);
 
 let cache = null;
 let cacheAt = 0;
