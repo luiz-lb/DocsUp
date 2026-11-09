@@ -1,33 +1,5 @@
-// Documentos trabalhistas mensais (document_types.category = 4) e parâmetros do sistema
+// Documentos trabalhistas mensais (document_types.category = 4)
 import { sql, poolPromise } from '../config/dbConfig.js';
-
-// ─────────────────────────────────────────────
-// Parâmetros (app_settings)
-// ─────────────────────────────────────────────
-
-export async function getSetting(key) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input('key', sql.VarChar(100), key)
-        .query('SELECT setting_value, updated_at, updated_by FROM app_settings WHERE setting_key = @key');
-    return result.recordset[0] ?? null;
-}
-
-export async function setSetting(transaction, key, value, userId) {
-    await new sql.Request(transaction)
-        .input('key', sql.VarChar(100), key)
-        .input('value', sql.NVarChar(500), value)
-        .input('user_id', sql.Int, userId ?? null)
-        .query(`
-            IF EXISTS (SELECT 1 FROM app_settings WHERE setting_key = @key)
-                UPDATE app_settings
-                SET setting_value = @value, updated_at = GETDATE(), updated_by = @user_id
-                WHERE setting_key = @key
-            ELSE
-                INSERT INTO app_settings (setting_key, setting_value, updated_by)
-                VALUES (@key, @value, @user_id)
-        `);
-}
 
 // ─────────────────────────────────────────────
 // Catálogo e documentos mensais

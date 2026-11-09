@@ -4,13 +4,21 @@ import { Banner, Button, Card, FormField } from '../../../../components/ui/index
 import { getSettings, updateSettings } from '../../api/parametersApi.js';
 import styles from './MonthlySettingsCard.module.css';
 
+const FIELDS = [
+  { key: 'openDay', payload: 'monthlyOpenDay', label: 'Abre no dia', hint: 'aviso a todos os fornecedores' },
+  { key: 'reminderDay', payload: 'monthlyReminderDay', label: 'Lembrete no dia', hint: 'para quem ainda tem pendência' },
+  { key: 'dueDay', payload: 'monthlyDueDay', label: 'Último dia do prazo', hint: 'depois disso fica atrasado' },
+];
+
 /**
- * Dia limite dos documentos trabalhistas mensais (Admin): os documentos de um mês vencem
- * nesse dia do mês seguinte. Ex.: dia 10 → os de outubro vencem em 10 de novembro.
+ * Calendário dos documentos trabalhistas mensais (Admin). Os documentos de um mês são
+ * enviados no mês seguinte: abrem no dia de abertura, recebem lembrete e vencem no fim do
+ * último dia. Ex.: 1, 19 e 21 → os de outubro abrem em 1º/11, lembrete em 19/11 e vencem em 21/11.
  */
 export default function MonthlySettingsCard() {
-  const [dueDay, setDueDay] = useState('');
-  const [maxDueDay, setMaxDueDay] = useState(28);
+  const [form, setForm] = useState({ openDay: '', reminderDay: '', dueDay: '' });
+  const [saved, setSaved] = useState(null);
+  const [maxDay, setMaxDay] = useState(28);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -20,8 +28,11 @@ export default function MonthlySettingsCard() {
     getSettings().then((result) => {
       if (!active) return;
       if (result.success) {
-        setDueDay(String(result.body.monthlyDueDay));
-        setMaxDueDay(result.body.maxDueDay ?? 28);
+        const monthly = result.body.monthly;
+        const values = { openDay: String(monthly.openDay), reminderDay: String(monthly.reminderDay), dueDay: String(monthly.dueDay) };
+        setForm(values);
+        setSaved(values);
+        setMaxDay(monthly.maxDay ?? 28);
       } else {
         setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao buscar os parâmetros.' });
       }
@@ -30,18 +41,23 @@ export default function MonthlySettingsCard() {
     return () => { active = false; };
   }, []);
 
+  const days = FIELDS.map((field) => Number(form[field.key]));
+  const valid = days.every((day) => Number.isInteger(day) && day >= 1 && day <= maxDay) && days[0] < days[1] && days[1] < days[2];
+  const changed = saved && FIELDS.some((field) => form[field.key] !== saved[field.key]);
+
   const handleSave = async () => {
     setFeedback(null);
-    const day = Number(dueDay);
-    if (!Number.isInteger(day) || day < 1 || day > maxDueDay) {
-      setFeedback({ tone: 'danger', message: `Informe um dia de 1 a ${maxDueDay}.` });
+    if (!valid) {
+      setFeedback({ tone: 'danger', message: `Use dias de 1 a ${maxDay}, com a abertura antes do lembrete e o lembrete antes do último dia.` });
       return;
     }
     setIsSaving(true);
-    const result = await updateSettings({ monthlyDueDay: day });
+    const payload = Object.fromEntries(FIELDS.map((field, index) => [field.payload, days[index]]));
+    const result = await updateSettings(payload);
     setIsSaving(false);
+    if (result.success) setSaved({ ...form });
     setFeedback(result.success
-      ? { tone: 'success', message: result.body?.message ?? 'Dia limite atualizado.' }
+      ? { tone: 'success', message: result.body?.message ?? 'Calendário atualizado.' }
       : { tone: 'danger', message: result.body?.message ?? 'Erro ao salvar.' });
   };
 
@@ -50,31 +66,36 @@ export default function MonthlySettingsCard() {
       <Card.Body>
         <div className={styles.row}>
           <div className={styles.text}>
-            <h3 className={styles.title}><LuCalendarClock aria-hidden="true" /> Dia limite dos documentos mensais</h3>
+            <h3 className={styles.title}><LuCalendarClock aria-hidden="true" /> Calendário dos documentos mensais</h3>
             <p className={styles.note}>
               Os tipos ativos desta aba são cobrados todo mês, de todos os fornecedores com contrato em andamento, desde o mês
-              de início da solicitação até o contrato ser concluído. Os documentos de um mês vencem neste dia do mês seguinte.
+              de início da solicitação até o contrato ser concluído. Os documentos de um mês são enviados no mês seguinte.
             </p>
           </div>
-          <div className={styles.form}>
-            <FormField label="Dia do mês seguinte" className={styles.field}>
+        </div>
+        <div className={styles.form}>
+          {FIELDS.map((field) => (
+            <FormField key={field.key} label={field.label} hint={field.hint} className={styles.field}>
               <input
                 type="number"
                 min="1"
-                max={maxDueDay}
+                max={maxDay}
                 step="1"
-                value={dueDay}
-                onChange={(event) => setDueDay(event.target.value)}
+                value={form[field.key]}
+                onChange={(event) => setForm((prev) => ({ ...prev, [field.key]: event.target.value }))}
                 disabled={isLoading || isSaving}
               />
             </FormField>
-            <Button icon={LuSave} size="sm" onClick={handleSave} isLoading={isSaving} disabled={isLoading}>
-              Salvar
-            </Button>
-          </div>
+          ))}
+          <Button icon={LuSave} size="sm" onClick={handleSave} isLoading={isSaving} disabled={isLoading || !changed}>
+            Salvar
+          </Button>
         </div>
-        {dueDay && Number(dueDay) >= 1 && (
-          <p className={styles.example}>Ex.: os documentos de outubro vencem em {dueDay} de novembro.</p>
+        {valid && (
+          <p className={styles.example}>
+            Ex.: os documentos de outubro abrem em {days[0]}/11, recebem lembrete em {days[1]}/11 e vencem no fim do dia {days[2]}/11.
+            Enviados depois, ficam como atrasados.
+          </p>
         )}
         {feedback && <Banner tone={feedback.tone} description={feedback.message} />}
       </Card.Body>

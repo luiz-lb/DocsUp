@@ -119,7 +119,10 @@ export async function setActivityStatus(id, isActive) {
 // Parâmetros do sistema (só Admin)
 // ---------------------------------------------------------------------------
 
-/** GET /parameters/settings → { monthlyDueDay, maxDueDay } */
+/**
+ * GET /parameters/settings → { monthly: { openDay, reminderDay, dueDay, maxDay },
+ *   notifications: { rhDigestIntervalHours, initialDeadlineReminderHours, scheduledHour, types: [...] } }
+ */
 export async function getSettings() {
   try {
     const result = await api.get('/parameters/settings');
@@ -130,12 +133,37 @@ export async function getSettings() {
   }
 }
 
-/** PUT /parameters/settings — { monthlyDueDay } (1 a 28) */
+/** PUT /parameters/settings — só os campos que mudaram (ver settingsService no backend) */
 export async function updateSettings(payload) {
   try {
     const result = await api.put('/parameters/settings', payload);
     return result.data;
   } catch (error) {
     return toErrorResult(error, 'Erro ao salvar os parâmetros.');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Notificações (só Admin): últimos envios e reenviar
+// ---------------------------------------------------------------------------
+
+/** GET /parameters/notifications/deliveries?status=3,4&page=1&pageSize=25 */
+export async function listNotificationDeliveries({ status = '', page = 1, pageSize = 25 } = {}) {
+  try {
+    const result = await api.get('/parameters/notifications/deliveries', { params: { status: status || undefined, page, pageSize } });
+    return { success: true, body: result.data.body };
+  } catch (error) {
+    console.error('Erro ao buscar os envios:', error);
+    return toErrorResult(error, 'Erro ao buscar os envios.');
+  }
+}
+
+/** POST /parameters/notifications/deliveries/:id/retry */
+export async function retryNotificationDelivery(id) {
+  try {
+    const result = await api.post(`/parameters/notifications/deliveries/${id}/retry`);
+    return result.data;
+  } catch (error) {
+    return toErrorResult(error, 'Erro ao pedir o reenvio.');
   }
 }

@@ -65,5 +65,6 @@ desligado, o código de acesso do fornecedor só funciona fora de produção (vo
 | 0012 | E-mail do usuário do fornecedor confirmado (no login) |
 | 0013 | Desfaz a confirmação em massa da 0012: só fica confirmado quem veio dos contatos antigos ou já entrou com o código |
 | 0014 | Status "Serviço em andamento" (8): solicitações em "Pendente de documentação" (5) com todos os documentos iniciais aprovados passam para 8 |
+| 0015 | Notificações por eventos: outbox (event_outbox), registro dos envios (notification_deliveries) e parâmetros (calendário dos mensais 1 / 19 / 21, resumo do RH, lembretes) |
 
 As tabelas da cotação continuam no banco, sem uso.

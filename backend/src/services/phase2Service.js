@@ -12,7 +12,7 @@ import * as trasaction from '../models/trasaction.js';
 import * as deliveryModel from '../models/deliveryModel.js';
 import * as documentDownloadService from './documentDownloadService.js';
 import { getDeclarationItems, isDeadlineClosed } from './assignmentService.js';
-import { sendMail, escapeHtml } from './mailService.js';
+import * as producers from '../events/producers.js';
 import { groupDeliveriesBySlot, slotKey, toSupplierDelivery } from './deliveryService.js';
 import { AUDIT_ACTIONS, AUDIT_ACTOR_TYPES, AUDIT_ENTITIES } from '../constants/audit.js';
 import { DOCUMENT_CATEGORIES, EMPLOYEE_DOCUMENT_CATEGORIES } from '../constants/documentCategories.js';
@@ -437,6 +437,9 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
                     [LABOR_REQUEST_STATUSES.PENDING_DOCUMENTATION],
                 );
                 if (!changed) throw Object.assign(new Error('A solicitação mudou.'), { conflict: true });
+                await producers.purchasingContractBlocked(transaction, {
+                    assignment, missingDocuments, declaredBy: supplier.name ?? null,
+                });
             }
             await auditModel.insertAuditLog(transaction, {
                 actorType: AUDIT_ACTOR_TYPES.SUPPLIER,
@@ -471,10 +474,6 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
         return { success: false, status: 500, message: 'Erro ao enviar a declaração.' };
     }
 
-    if (blocked) {
-        await notifyPurchasingOfBlock(assignment, missingDocuments);
-    }
-
     return {
         success: true,
         body: {
@@ -486,33 +485,6 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
                 : 'Declaração e termo assinados. Agora envie os documentos.',
         },
     };
-}
-
-/** Avisa Compras (e quem indicou o fornecedor) que o convite ficou bloqueado. */
-async function notifyPurchasingOfBlock(assignment, missingDocuments) {
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
-    const recipients = [...new Set([process.env.SUPRIMENTOS_EMAIL, assignment.created_by_email].filter(Boolean))];
-    const contract = assignment.contract_number ? ` · Contrato ${escapeHtml(assignment.contract_number)}` : '';
-    await sendMail({
-        to: recipients,
-        subject: `Fornecedor sem documento da empresa: ${assignment.labor_request_title}`,
-        html: `
-            <div style="font-family:sans-serif; max-width:560px; margin:auto;">
-                <h2 style="color:#b45309;">Convite pausado</h2>
-                <p><strong>${escapeHtml(assignment.supplier_name ?? assignment.invite_email)}</strong> declarou que não tem
-                   documento da empresa exigido na solicitação
-                   <strong>${escapeHtml(assignment.labor_request_title)}</strong>${contract}:</p>
-                <ul>${missingDocuments.map((item) => `<li>${escapeHtml(item.name)}</li>`).join('')}</ul>
-                <p>Reenvie o convite para o mesmo e-mail (recomeça do zero) ou troque o fornecedor.</p>
-                <p style="margin-top:1rem;">
-                    <a href="${frontendUrl}/solicitacoes/${assignment.labor_request_id}"
-                       style="background:#004643;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">
-                        Abrir a solicitação
-                    </a>
-                </p>
-            </div>
-        `,
-    });
 }
 
 // ─────────────────────────────────────────────

@@ -1,4 +1,5 @@
-# DocsUp: banco (SQL Server 2022), inicialização do banco, backend e frontend.
+# DocsUp: banco (SQL Server 2022), inicialização do banco, backend, frontend, Kafka e o
+# serviço de notificações (notifier).
 # Antes de subir: copie .env.example para .env (nesta pasta) e preencha.
 
 name: docsup
@@ -80,12 +81,87 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
+      MAIL_COMPANY_NAME: ${MAIL_COMPANY_NAME:-}
       SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-${SMTP_USER:-}}
       HUBDEV_TOKEN: ${HUBDEV_TOKEN:-}
     ports:
       - "${BACKEND_PORT:-3003}:3003"
     volumes:
       - uploads:/app/uploads
+    restart: unless-stopped
+
+  # Kafka (modo KRaft, sem Zookeeper), só na rede interna do Docker. Os eventos de notificação
+  # passam por aqui: a API grava na outbox, o notifier publica e consome.
+  kafka:
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      # Mensagens ficam 7 dias no Kafka (o histórico dos envios fica no banco)
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms256m
+      # ID do cluster (UUID em base64, 22 caracteres). Fixo: o volume guarda os dados com ele.
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-kC_h7j81nInRVP_M2Kt0Uw}
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # Serviço de notificações: mesmo código do backend, outro processo (node notifier.js).
+  # Publica no Kafka os eventos da outbox, consome e envia os e-mails (novas tentativas e fila
+  # de erro), e roda o agendador (prazos, calendário dos mensais e resumo do RH).
+  notifier:
+    build:
+      context: ./backend
+    command: ["node", "--disable-warning=TimeoutNegativeWarning", "notifier.js"]
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+    init: true
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      TZ: ${TZ:-America/Sao_Paulo}
+      DB_SERVER: db
+      DB_PORT: "1433"
+      DB_DATABASE: ${DB_DATABASE:?Defina DB_DATABASE no .env}
+      DB_USERENV: ${DB_USERENV:?Defina DB_USERENV no .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env}
+      DB_ENCRYPT: ${DB_ENCRYPT:-true}
+      DB_TRUST_CERT: ${DB_TRUST_CERT:-true}
+      KAFKA_BROKERS: kafka:9092
+      FRONTEND_URL: ${FRONTEND_URL:?Defina FRONTEND_URL no .env}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
+      MAIL_COMPANY_NAME: ${MAIL_COMPANY_NAME:-}
+      SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-${SMTP_USER:-}}
     restart: unless-stopped
 
   frontend:
@@ -102,3 +178,4 @@ services:
 volumes:
   db-data:
   uploads:
+  kafka-data:

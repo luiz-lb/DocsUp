@@ -63,3 +63,27 @@ export function toLocalDateTimeText(value) {
 export function startOfToday(now = new Date()) {
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
+
+const pad2 = (number) => String(number).padStart(2, '0');
+
+/** Date → 'DD/MM/AAAA' no horário local (textos de e-mail). */
+export function toBrDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return `${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
+}
+
+/** Date → 'DD/MM/AAAA às HH:mm' no horário local (textos de e-mail). */
+export function toBrDateTime(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return `${toBrDate(date)} às ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+const MONTH_NAMES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+/** Date (qualquer dia do mês) → 'outubro/2026'. */
+export function toMonthName(value) {
+    const date = new Date(value);
+    return `${MONTH_NAMES[date.getMonth()]}/${date.getFullYear()}`;
+}

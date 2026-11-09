@@ -5,7 +5,8 @@ import * as supplierUserModel from '../models/supplierUserModel.js';
 import * as documentTypeModel from '../models/documentTypeModel.js';
 import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
-import { sendMail, escapeHtml, isMailEnabled } from './mailService.js';
+import { isMailEnabled } from './mailService.js';
+import * as producers from '../events/producers.js';
 import { collaboratorAuditEntry } from '../utils/audit.js';
 import { normalizeEmail } from '../utils/email.js';
 import { parseLocalDateTime, toLocalDateTimeText } from '../utils/dates.js';
@@ -134,36 +135,6 @@ async function supplierForEmail(email) {
         return { supplierId: null, supplierName: null, pendingVerification: true, ownerSupplierId: user.supplier_id };
     }
     return { supplierId: user.supplier_id, supplierName: user.razao_social, ownerSupplierId: user.supplier_id };
-}
-
-/** Avisa o fornecedor do convite por e-mail (com o envio desligado, só registra no log). */
-async function notifySupplierInvite({ email, request, token, deadlineAt, isNew }) {
-    const link = inviteLink(token);
-    const contract = request.contract_number ? ` · Contrato ${escapeHtml(request.contract_number)}` : '';
-    await sendMail({
-        to: email,
-        subject: `${isNew ? 'Novo contrato' : 'Convite reenviado'}: ${request.title}`,
-        html: `
-            <div style="font-family: sans-serif; max-width: 560px; margin: auto;">
-                <h2 style="color: #004643;">Documentação do contrato</h2>
-                <p>Sua empresa foi indicada para o serviço:</p>
-                <p style="font-size: 1.1rem; font-weight: bold;">${escapeHtml(request.title)}${contract}</p>
-                <p><strong>Local:</strong> ${escapeHtml(request.location ?? '—')}</p>
-                <p>Entre no portal, confira os documentos exigidos, declare o que a empresa tem e envie a
-                   documentação até <strong>${new Date(deadlineAt).toLocaleString('pt-BR')}</strong>.</p>
-                <p style="margin-top: 1.5rem;">
-                    <a href="${link}"
-                       style="background:#004643; color:#fff; padding:12px 24px;
-                              border-radius:6px; text-decoration:none; font-weight:bold;">
-                        Abrir no portal
-                    </a>
-                </p>
-                <p style="color:#6b7280; font-size:0.8rem; margin-top:1rem;">
-                    Ainda não tem cadastro? O link leva ao cadastro do fornecedor.
-                </p>
-            </div>
-        `,
-    });
 }
 
 /**
@@ -352,6 +323,9 @@ export async function assignSupplier(laborRequestId, payload = {}, actor, contex
                 supplier: supplier.supplierName,
                 deadline_at: toLocalDateTimeText(deadline.value),
             });
+            await producers.supplierInvited(transaction, {
+                email, request, inviteUrl: inviteLink(token), deadlineAt: deadline.value, kind: 'new',
+            });
         });
     } catch (error) {
         if (SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
@@ -363,8 +337,6 @@ export async function assignSupplier(laborRequestId, payload = {}, actor, contex
         console.error('assignSupplier error:', error);
         return { success: false, status: 500, message: 'Erro ao indicar o fornecedor.' };
     }
-
-    await notifySupplierInvite({ email, request, token, deadlineAt: deadline.value, isNew: true });
 
     return {
         success: true,
@@ -436,6 +408,9 @@ export async function resendInvite(laborRequestId, payload = {}, actor, context 
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_RESEND, laborRequestId,
                 auditSnapshot(current),
                 { invite_email: current.invite_email, deadline_at: toLocalDateTimeText(deadline.value) });
+            await producers.supplierInvited(transaction, {
+                email: current.invite_email, request: loaded.request, inviteUrl: inviteLink(token), deadlineAt: deadline.value, kind: 'resent',
+            });
         });
     } catch (error) {
         if (error.conflict || SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
@@ -444,8 +419,6 @@ export async function resendInvite(laborRequestId, payload = {}, actor, context 
         console.error('resendInvite error:', error);
         return { success: false, status: 500, message: 'Erro ao reenviar o convite.' };
     }
-
-    await notifySupplierInvite({ email: current.invite_email, request: loaded.request, token, deadlineAt: deadline.value, isNew: false });
 
     return {
         success: true,
@@ -553,6 +526,9 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
                     deadline_at: toLocalDateTimeText(deadline.value),
                     reason,
                 });
+            await producers.supplierInvited(transaction, {
+                email, request: loaded.request, inviteUrl: inviteLink(token), deadlineAt: deadline.value, kind: 'replaced',
+            });
         });
     } catch (error) {
         if (error.conflict || SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
@@ -561,8 +537,6 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
         console.error('replaceSupplier error:', error);
         return { success: false, status: 500, message: 'Erro ao trocar o fornecedor.' };
     }
-
-    await notifySupplierInvite({ email, request: loaded.request, token, deadlineAt: deadline.value, isNew: true });
 
     return {
         success: true,

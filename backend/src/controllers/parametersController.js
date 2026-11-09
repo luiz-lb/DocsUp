@@ -1,6 +1,7 @@
 import * as documentTypeService from '../services/documentTypeService.js';
 import * as activityService from '../services/activityService.js';
-import * as monthlyService from '../services/monthlyService.js';
+import * as settingsService from '../services/settingsService.js';
+import * as notificationAdminService from '../services/notificationAdminService.js';
 import { AVAILABLE_API_INTEGRATIONS } from '../constants/validationMethods.js';
 
 const CATEGORY_FILTERS = ['0', '1', '2', '3', '4'];
@@ -208,20 +209,40 @@ export async function setActivityStatus(req, res) {
 // Parâmetros do sistema (dia limite dos documentos mensais)
 // ─────────────────────────────────────────────
 
-/** GET /parameters/settings → { monthlyDueDay, maxDueDay } */
+/** GET /parameters/settings → { monthly: { openDay, reminderDay, dueDay, maxDay }, notifications: {...} } */
 export async function getSettings(req, res) {
     try {
-        return sendResult(res, await monthlyService.getSettings());
+        return sendResult(res, await settingsService.getSettings());
     } catch (error) {
         return internalError(res, 'getSettings', error);
     }
 }
 
-/** PUT /parameters/settings  Body: { monthlyDueDay } (1 a 28) */
+/** PUT /parameters/settings  Body: só o que mudou (calendário dos mensais, notificações) */
 export async function updateSettings(req, res) {
     try {
-        return sendResult(res, await monthlyService.updateSettings(req.body ?? {}, auditContext(req)));
+        return sendResult(res, await settingsService.updateSettings(req.body ?? {}, auditContext(req)));
     } catch (error) {
         return internalError(res, 'updateSettings', error);
+    }
+}
+
+/** GET /parameters/notifications/deliveries?status=3,4&page=1&pageSize=25 → últimos envios */
+export async function listNotificationDeliveries(req, res) {
+    try {
+        return sendResult(res, await notificationAdminService.listDeliveries(req.query ?? {}));
+    } catch (error) {
+        return internalError(res, 'listNotificationDeliveries', error);
+    }
+}
+
+/** POST /parameters/notifications/deliveries/:id/retry → pede o reenvio */
+export async function retryNotificationDelivery(req, res) {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ success: false, body: { message: 'Envio inválido.' } });
+    try {
+        return sendResult(res, await notificationAdminService.retryDelivery(id, auditContext(req)));
+    } catch (error) {
+        return internalError(res, 'retryNotificationDelivery', error);
     }
 }

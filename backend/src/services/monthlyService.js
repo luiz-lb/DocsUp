@@ -1,19 +1,15 @@
 import * as monthlyModel from '../models/monthlyModel.js';
+import * as settingsService from './settingsService.js';
 import * as documentTypeModel from '../models/documentTypeModel.js';
 import * as deliveryModel from '../models/deliveryModel.js';
-import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
 import { loadActiveAssignment, persistFile, removeSavedFiles, resolveExpiration } from './phase2Service.js';
-import { collaboratorAuditEntry } from '../utils/audit.js';
 import { parseMonth, toMonthKey } from '../utils/dates.js';
 import { toInteger, isBlank } from '../utils/parse.js';
-import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
 import { DOCUMENT_CATEGORIES } from '../constants/documentCategories.js';
 
-// Dia limite (do mês seguinte) para enviar os documentos de uma competência
-export const DUE_DAY_KEY = 'monthly_documents_due_day';
-export const DEFAULT_DUE_DAY = 10;
-export const MAX_DUE_DAY = 28; // dia que existe em todos os meses
+// Dia limite (do mês seguinte) para enviar os documentos de uma competência: em Parâmetros
+// (calendário dos mensais, settingsService)
 
 const APPROVED = 2;
 const RETURNED_STATUSES = [3, 4]; // Reprovado, Reenvio necessário
@@ -152,43 +148,9 @@ function indexDocuments(documents) {
 // Parâmetro: dia limite
 // ─────────────────────────────────────────────
 
+/** Último dia do prazo dos mensais (do mês seguinte à competência). */
 export async function getDueDay() {
-    const row = await monthlyModel.getSetting(DUE_DAY_KEY);
-    const day = toInteger(row?.setting_value ?? '');
-    return Number.isInteger(day) && day >= 1 && day <= MAX_DUE_DAY ? day : DEFAULT_DUE_DAY;
-}
-
-/** Parâmetros do sistema (Admin). */
-export async function getSettings() {
-    try {
-        return { success: true, body: { monthlyDueDay: await getDueDay(), maxDueDay: MAX_DUE_DAY } };
-    } catch (error) {
-        console.error('getSettings error:', error);
-        return { success: false, status: 500, message: 'Erro ao buscar os parâmetros.' };
-    }
-}
-
-/** Muda o dia limite dos documentos mensais (1 a 28). Admin; grava na auditoria. */
-export async function updateSettings(payload = {}, context = {}) {
-    const day = toInteger(payload.monthlyDueDay);
-    if (!Number.isInteger(day) || day < 1 || day > MAX_DUE_DAY) {
-        return { success: false, status: 400, message: `O dia limite tem que ser de 1 a ${MAX_DUE_DAY}.` };
-    }
-    try {
-        const before = await getDueDay();
-        if (before === day) return { success: true, body: { message: 'Nenhuma alteração para salvar.' } };
-        await trasaction.executarEmTransacao(async (transaction) => {
-            await monthlyModel.setSetting(transaction, DUE_DAY_KEY, String(day), context.actorId);
-            await auditModel.insertAuditLog(transaction, collaboratorAuditEntry(
-                context, AUDIT_ACTIONS.SETTINGS_UPDATE, AUDIT_ENTITIES.SETTINGS, null,
-                { monthly_due_day: before }, { monthly_due_day: day },
-            ));
-        });
-        return { success: true, body: { message: 'Dia limite dos documentos mensais atualizado.' } };
-    } catch (error) {
-        console.error('updateSettings error:', error);
-        return { success: false, status: 500, message: 'Erro ao salvar os parâmetros.' };
-    }
+    return (await settingsService.getMonthlyCalendar()).dueDay;
 }
 
 // ─────────────────────────────────────────────

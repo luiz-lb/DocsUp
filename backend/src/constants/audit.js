@@ -40,6 +40,7 @@ export const AUDIT_ACTIONS = Object.freeze({
     // Todos os documentos iniciais aprovados: Serviço em andamento (automático)
     LABOR_REQUEST_IN_PROGRESS: 'labor_request.in_progress',
     SETTINGS_UPDATE: 'settings.update',
+    NOTIFICATION_RETRY: 'notification.retry',
 });
 
 // audit_log.entity_type
@@ -52,4 +53,5 @@ export const AUDIT_ENTITIES = Object.freeze({
     SUPPLIER_USER: 'supplier_user',
     LABOR_REQUEST: 'labor_request',
     SETTINGS: 'settings',
+    NOTIFICATION: 'notification',
 });

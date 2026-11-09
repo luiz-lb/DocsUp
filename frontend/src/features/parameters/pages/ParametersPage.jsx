@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { LuBuilding2, LuCalendarDays, LuFileText, LuHardHat, LuIdCard, LuWrench } from 'react-icons/lu';
+import { LuBellRing, LuBuilding2, LuCalendarDays, LuFileText, LuHardHat, LuIdCard, LuWrench } from 'react-icons/lu';
 import { PageHeader } from '../../../components/ui/index.js';
 import { DOCUMENT_CATEGORY, DOCUMENT_CATEGORY_ID } from '../../../constants/enums.js';
 import { cn } from '../../../utils/cn.js';
 import DocumentTypesTab from '../components/DocumentTypesTab/index.js';
 import ActivitiesTab from '../components/ActivitiesTab/index.js';
 import MonthlySettingsCard from '../components/MonthlySettingsCard/index.js';
+import NotificationsTab from '../components/NotificationsTab/index.js';
 import styles from './ParametersPage.module.css';
 
-// Uma aba por categoria de documento, mais a de atividades
+// Uma aba por categoria de documento, mais a de atividades e a de notificações
 const TABS = [
   { key: 'empresa', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.EMPRESA].label, icon: LuBuilding2, category: DOCUMENT_CATEGORY_ID.EMPRESA },
   { key: 'basicos', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.BASICO].label, icon: LuIdCard, category: DOCUMENT_CATEGORY_ID.BASICO },
@@ -16,6 +17,7 @@ const TABS = [
   { key: 'outros', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.OUTRO].label, icon: LuFileText, category: DOCUMENT_CATEGORY_ID.OUTRO },
   { key: 'mensais', label: DOCUMENT_CATEGORY[DOCUMENT_CATEGORY_ID.MENSAL].label, icon: LuCalendarDays, category: DOCUMENT_CATEGORY_ID.MENSAL },
   { key: 'atividades', label: 'Atividades', icon: LuWrench, category: null },
+  { key: 'notificacoes', label: 'Notificações', icon: LuBellRing, category: null },
 ];
 
 export default function ParametersPage() {
@@ -27,7 +29,7 @@ export default function ParametersPage() {
       <PageHeader
         eyebrow="Administração"
         title="Parâmetros"
-        description="Catálogo dos documentos exigidos (da empresa, dos colaboradores e os trabalhistas mensais) e das atividades, com os documentos sugeridos para cada uma."
+        description="Catálogo dos documentos exigidos (da empresa, dos colaboradores e os trabalhistas mensais), as atividades com os documentos sugeridos e as notificações por e-mail."
       />
 
       <div className={styles.tabs} role="tablist">
@@ -47,9 +49,9 @@ export default function ParametersPage() {
 
       {/* key: cada aba começa com a busca e os filtros limpos */}
       <div role="tabpanel" className={styles.tabPanel}>
-        {activeTab.category === null ? (
-          <ActivitiesTab key={activeTab.key} />
-        ) : (
+        {activeTab.key === 'notificacoes' && <NotificationsTab />}
+        {activeTab.key === 'atividades' && <ActivitiesTab key={activeTab.key} />}
+        {activeTab.category !== null && (
           <>
             {activeTab.category === DOCUMENT_CATEGORY_ID.MENSAL && (
               <div className={styles.settingsCard}>

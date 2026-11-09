@@ -17,9 +17,12 @@ router.put('/document-types/:id/status', parametersController.setDocumentTypeSta
 // Integrações de API disponíveis para o método de validação "API"
 router.get('/api-integrations', parametersController.listApiIntegrations);
 
-// Parâmetros do sistema: dia limite (do mês seguinte) para os documentos mensais
+// Parâmetros do sistema: calendário dos documentos mensais e notificações
 router.get('/settings', parametersController.getSettings);
 router.put('/settings', parametersController.updateSettings);
+// Notificações: últimos envios e reenviar o que falhou
+router.get('/notifications/deliveries', parametersController.listNotificationDeliveries);
+router.post('/notifications/deliveries/:id/retry', parametersController.retryNotificationDelivery);
 
 // Atividades e seus documentos sugeridos: lista (filtros status e search), cria, edita e ativa / inativa
 router.get('/activities', parametersController.listActivities);

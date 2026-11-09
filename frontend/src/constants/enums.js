@@ -270,9 +270,36 @@ export const AUDIT_ACTION = {
   'supplier_assignment.declare': { label: 'Declaração do fornecedor assinada', tone: 'info' },
   'labor_request.conclude': { label: 'Contrato concluído', tone: 'success' },
   'labor_request.in_progress': { label: 'Serviço em andamento (documentos iniciais aprovados)', tone: 'teal' },
+  'notification.retry': { label: 'Reenvio de notificação pedido', tone: 'info' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */
 export function resolveEnum(enumMap, value) {
   return enumMap[value] ?? { label: 'Desconhecido', tone: 'neutral' };
 }
+
+// notification_deliveries.status: envio de uma notificação (um por evento e destinatário)
+export const DELIVERY_STATUS = {
+  0: { label: 'Na fila', tone: 'neutral' },
+  1: { label: 'Enviando', tone: 'info' },
+  2: { label: 'Enviado', tone: 'success' },
+  3: { label: 'Falhou (vai tentar de novo)', tone: 'warning' },
+  4: { label: 'Fila de erro', tone: 'danger' },
+  5: { label: 'Não enviado (e-mail desligado)', tone: 'neutral' },
+};
+
+export const DELIVERY_STATUS_ID = {
+  NA_FILA: 0,
+  ENVIANDO: 1,
+  ENVIADO: 2,
+  FALHOU: 3,
+  FILA_DE_ERRO: 4,
+  NAO_ENVIADO: 5,
+};
+
+// Público de cada aviso (Parâmetros → Notificações)
+export const NOTIFICATION_AUDIENCE = {
+  supplier: { label: 'Para o fornecedor', description: 'Saem na hora, para o Responsável e o Operador da empresa (ou para o e-mail indicado).' },
+  purchasing: { label: 'Para Compras', description: 'Para a caixa de Suprimentos e para quem indicou o fornecedor.' },
+  rh: { label: 'Para o RH', description: 'Resumo para todos os usuários ativos do RH.' },
+};

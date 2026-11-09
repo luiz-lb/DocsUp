@@ -7,7 +7,8 @@ import * as supplierUserModel from '../models/supplierUserModel.js';
 import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
 import { getSupplierJwtSecret } from '../config/jwtSecrets.js';
-import { sendMail, escapeHtml } from './mailService.js';
+import { sendMail } from './mailService.js';
+import { esc, layout } from '../notifications/templates/layout.js';
 import { cnpjDigits, formatCnpj, isValidCnpj } from '../utils/cnpj.js';
 import { normalizeEmail } from '../utils/email.js';
 import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
@@ -480,24 +481,22 @@ export async function loginPhase1(email, password, session) {
         attempts: 0,
     };
 
+    // Código de segurança: vai direto (não passa pela fila de eventos nem fica em log)
     const sent = await sendMail({
         to: user.email,
         subject: 'Seu código de acesso ao Portal do Fornecedor',
-        html: `
-            <div style="font-family: sans-serif; max-width: 480px; margin: auto;">
-                <h2 style="color: #004643;">Portal do Fornecedor</h2>
-                <p>Olá, ${escapeHtml(user.name)}. Um acesso foi solicitado para ${escapeHtml(user.razao_social)}.</p>
-                <p>Seu código de verificação é:</p>
-                <div style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;
-                            background: #f3f4f6; padding: 1rem 2rem;
-                            border-radius: 8px; text-align: center; margin: 1rem 0;">
-                    ${otp}
-                </div>
-                <p style="color: #6b7280; font-size: 0.875rem;">
-                    Este código expira em 10 minutos. Se não foi você, ignore este e-mail.
-                </p>
-            </div>
-        `,
+        html: layout({
+            preheader: 'Use este código para entrar no Portal do Fornecedor.',
+            eyebrow: 'Código de acesso',
+            title: 'Portal do Fornecedor',
+            intro: `Olá, ${esc(user.name)}. Um acesso foi pedido para <strong>${esc(user.razao_social)}</strong>. Seu código é:`,
+            body: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;"><tr>
+                <td align="center" style="background:#f6f7f6;border:1px dashed #b9d3d0;border-radius:12px;padding:18px;font-family:Consolas,'Courier New',monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#004643;">${otp}</td>
+            </tr></table>`,
+            note: 'O código vale por 10 minutos. Se não foi você, ignore este e-mail: ninguém entra sem a senha.',
+        }),
+        text: `Seu código de acesso ao Portal do Fornecedor: ${otp}
+Vale por 10 minutos. Se não foi você, ignore este e-mail.`,
     });
 
     if (!sent && process.env.NODE_ENV !== 'production') {
