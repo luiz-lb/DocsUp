@@ -90,6 +90,15 @@ done
 log "1/4 Database [$DB_DATABASE]"
 sql -d master -v DB_NAME="$DB_DATABASE" -i "$SCRIPTS_DIR/init/00_create_database.sql"
 
+# Logo depois de o SQL Server subir, o master já responde mas o database da aplicação
+# ainda pode estar em recuperação (login falha com 18456 state 38). Espera ficar ONLINE.
+for i in $(seq 1 60); do
+  status="$(sql -d master -h -1 -W -Q "SET NOCOUNT ON; SELECT CONVERT(varchar(20), DATABASEPROPERTYEX(N'$DB_DATABASE', 'Status'))" 2>/dev/null | tr -d '[:space:]')"
+  if [ "$status" = "ONLINE" ] && sql -d "$DB_DATABASE" -Q "SET NOCOUNT ON; SELECT 1" -o /dev/null 2>/dev/null; then break; fi
+  [ "$i" -lt 60 ] || fail "O database [$DB_DATABASE] não ficou ONLINE em 2 minutos (status: ${status:-desconhecido})."
+  sleep 2
+done
+
 log "2/4 Controle de migrações"
 sql -d "$DB_DATABASE" -i "$SCRIPTS_DIR/init/01_schema_migrations.sql"
 
