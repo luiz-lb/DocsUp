@@ -113,15 +113,25 @@ async function notifyMilestone({ kind, month }, now, calendar) {
     return count;
 }
 
+// Passadas já feitas nesta hora ({aviso}:{competência} → hora): o agendador roda a cada minuto,
+// mas o cálculo (todos os contratos) só se repete de hora em hora no dia do aviso, para pegar
+// contratos que ficaram ativos depois da primeira passada.
+const lastPass = new Map();
+
 registerJob({
     name: 'calendário dos mensais',
     async run(now) {
         const settings = await getSnapshot();
         if (now.getHours() < settings.scheduledHour) return 0;
         const calendar = { openDay: settings.monthlyOpenDay, reminderDay: settings.monthlyReminderDay, dueDay: settings.monthlyDueDay };
+        const hourStamp = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
         let count = 0;
         for (const milestone of milestonesFor(now, calendar)) {
+            if (settings.enabled[MILESTONES[milestone.kind]] === false) continue;
+            const passKey = `${milestone.kind}:${toMonthKey(milestone.month)}`;
+            if (lastPass.get(passKey) === hourStamp) continue;
             count += await notifyMilestone(milestone, now, calendar);
+            lastPass.set(passKey, hourStamp);
         }
         return count;
     },

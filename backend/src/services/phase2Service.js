@@ -1,3 +1,4 @@
+import * as contractProgressModel from '../models/contractProgressModel.js';
 import { ACCEPTANCE_TERM, acceptanceTermText } from '../constants/acceptanceTerm.js';
 import { buildDeclarationPdf, declarationFileName } from './declarationPdfService.js';
 import * as contractProgressService from './contractProgressService.js';
@@ -445,6 +446,7 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
 
     try {
         await trasaction.executarEmTransacao(async (transaction) => {
+            await contractProgressModel.lockContract(transaction, assignment.labor_request_id, supplier.supplierId);
             await assignmentModel.saveDeclaration(transaction, assignment.id, [
                 ...[...companyAnswers].map(([documentTypeId, hasDocument]) => ({ documentTypeId, hasDocument })),
                 ...[...employeeAnswers].map(([documentTypeId, employeeCount]) => ({ documentTypeId, employeeCount })),

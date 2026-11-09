@@ -20,7 +20,7 @@ const EXPIRED_WINDOW_HOURS = 24;
 /** O que falta enviar (declaração ainda não assinada conta como tudo). */
 async function missingFor(row) {
     if (row.status === 0 || !row.supplier_id) {
-        return { declared: false, company: [], employee: [], basics: [] };
+        return { declared: false, company: [], employee: [], basics: [], noEmployees: false };
     }
     const missing = await contractProgressModel.getInitialDocumentationMissing(null, {
         assignmentId: row.id, laborRequestId: row.labor_request_id, supplierId: row.supplier_id,
@@ -29,7 +29,7 @@ async function missingFor(row) {
 }
 
 function hasMissing(missing) {
-    return !missing.declared || missing.company.length > 0 || missing.employee.length > 0 || missing.basics.length > 0;
+    return !missing.declared || missing.company.length > 0 || missing.employee.length > 0 || missing.basics.length > 0 || missing.noEmployees;
 }
 
 function baseData(row, missing) {

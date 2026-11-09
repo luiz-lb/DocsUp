@@ -82,7 +82,7 @@ export async function getEmployeeSituation(id) {
     const pool = await poolPromise;
     const result = await pool.request()
         .input('id', sql.Int, id)
-        .query('SELECT id, full_name, [status], integration_at FROM employees WHERE id = @id');
+        .query('SELECT id, full_name, [status], integration_at, supplier_id, labor_request_id FROM employees WHERE id = @id');
     return result.recordset[0] ?? null;
 }
 

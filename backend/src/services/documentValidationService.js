@@ -1,3 +1,4 @@
+import * as contractProgressModel from '../models/contractProgressModel.js';
 import * as producers from '../events/producers.js';
 import * as contractProgressService from './contractProgressService.js';
 import axios from 'axios';
@@ -296,30 +297,23 @@ export async function reviewDocument(validationId, documentId, reviewerId, decis
         return { success: false, message: 'decision deve ser 1 (Aprovado) ou 2 (Reprovado).' };
     }
 
-    let transaction;
-    let transactionDone = false;
-
     try {
-        transaction = await trasaction.iniciarTransacao();
+        const slot = await contractProgressModel.getDocumentSlot(null, documentId);
+        await trasaction.executarEmTransacaoComRetentativa(async (transaction) => {
+            await contractProgressModel.lockContract(transaction, slot?.labor_request_id, slot?.supplier_id);
+            await documentValidationModel.applyManualDecision(transaction, validationId, reviewerId, decision, comments);
 
-        await documentValidationModel.applyManualDecision(transaction, validationId, reviewerId, decision, comments);
-
-        // status do documento: 2=Aprovado, 3=Reprovado / 4=Reenvio Necessário
-        const docStatus = decision === 1 ? 2 : 4;
-        await documentValidationModel.updateDocumentStatus(transaction, documentId, docStatus);
-        await contractProgressService.onDocumentStatusChanged(transaction, documentId, docStatus, { actorId: reviewerId });
-        if (docStatus === 4) {
-            await producers.supplierDocumentReturned(transaction, { documentId, status: docStatus, observation: comments ?? null });
-        }
-
-        await trasaction.finalizarTransacao(transaction, true);
-        transactionDone = true;
+            // status do documento: 2=Aprovado, 3=Reprovado / 4=Reenvio Necessário
+            const docStatus = decision === 1 ? 2 : 4;
+            await documentValidationModel.updateDocumentStatus(transaction, documentId, docStatus);
+            await contractProgressService.onDocumentStatusChanged(transaction, documentId, docStatus, { actorId: reviewerId });
+            if (docStatus === 4) {
+                await producers.supplierDocumentReturned(transaction, { documentId, status: docStatus, observation: comments ?? null });
+            }
+        });
 
         return { success: true, body: { message: 'Revisão registrada com sucesso.' } };
     } catch (error) {
-        if (transaction && !transactionDone) {
-            await trasaction.finalizarTransacao(transaction, false);
-        }
         console.error('reviewDocument error:', error);
         return { success: false, message: 'Erro ao registrar revisão.' };
     }
@@ -391,7 +385,10 @@ export async function setDocumentStatus(documentId, status, reviewer, comments, 
         }
 
         const { manualDecision, finalStatus } = reviewDecision(status);
-        await trasaction.executarEmTransacao(async (transaction) => {
+        const slot = await contractProgressModel.getDocumentSlot(null, documentId);
+        // Uma alteração por vez em cada contrato (ver lockContract); deadlock que sobrar: tenta de novo
+        await trasaction.executarEmTransacaoComRetentativa(async (transaction) => {
+            await contractProgressModel.lockContract(transaction, slot?.labor_request_id, slot?.supplier_id);
             await documentValidationModel.updateDocumentStatus(transaction, documentId, status);
             await contractProgressService.onDocumentStatusChanged(transaction, documentId, status, context);
             // Reprovado / reenvio necessário: o fornecedor fica sabendo na hora (com o motivo)
@@ -418,6 +415,7 @@ export async function setDocumentStatus(documentId, status, reviewer, comments, 
 
         return { success: true, body: { message: 'Status atualizado com sucesso.' } };
     } catch (error) {
+        if (error.lockTimeout) return { success: false, status: 409, message: error.message };
         console.error('setDocumentStatus error:', error);
         return { success: false, status: 500, message: 'Erro ao atualizar status do documento.' };
     }

@@ -1,3 +1,5 @@
+import * as contractProgressModel from '../models/contractProgressModel.js';
+import * as contractProgressService from './contractProgressService.js';
 import * as employeeSituationModel from '../models/employeeSituationModel.js';
 import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
@@ -56,11 +58,22 @@ export async function setEmployeeSituation(employeeId, payload = {}, context = {
             return { success: true, body: { message: 'Nenhuma alteração para salvar.' } };
         }
 
-        await trasaction.executarEmTransacao(async (transaction) => {
+        await trasaction.executarEmTransacaoComRetentativa(async (transaction) => {
+            // Desligar pode completar o contrato: uma alteração por vez no contrato (lockContract)
+            if (status === EMPLOYEE_STATUSES.DISMISSED) {
+                await contractProgressModel.lockContract(transaction, before.labor_request_id, before.supplier_id);
+            }
             await employeeSituationModel.updateEmployeeSituation(transaction, employeeId, { status, integrationAt });
             await auditModel.insertAuditLog(transaction, collaboratorAuditEntry(
                 context, AUDIT_ACTIONS.EMPLOYEE_STATUS_CHANGE, AUDIT_ENTITIES.EMPLOYEE, employeeId, oldValues, newValues,
             ));
+            // Colaborador desligado sai da conta dos documentos iniciais: o contrato pode ter
+            // ficado com tudo aprovado (Serviço em andamento)
+            if (status === EMPLOYEE_STATUSES.DISMISSED && before.labor_request_id) {
+                await contractProgressService.advanceIfInitialDocumentationApproved(transaction, {
+                    laborRequestId: before.labor_request_id, supplierId: before.supplier_id,
+                }, context);
+            }
         });
 
         return { success: true, body: { message: 'Situação do colaborador atualizada.' } };

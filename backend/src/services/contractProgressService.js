@@ -32,7 +32,8 @@ function progressAuditEntry(context, laborRequestId) {
 
 /**
  * Se o RH já aprovou todos os documentos iniciais do contrato (os da empresa declarados, os
- * de colaborador na quantidade declarada e os básicos de cada colaborador cadastrado), a
+ * de colaborador na quantidade declarada e os básicos de cada colaborador cadastrado, com pelo
+ * menos um colaborador quando há básicos exigidos), a
  * solicitação passa de Pendente de documentação para Serviço em andamento. Roda na transação
  * de quem aprovou: a aprovação e a mudança de status entram juntas.
  *
@@ -54,7 +55,7 @@ export async function advanceIfInitialDocumentationApproved(transaction, { labor
         laborRequestId,
         supplierId,
     });
-    if (gaps.missingCompany > 0 || gaps.missingEmployeeTypes > 0 || gaps.missingBasics > 0) {
+    if (gaps.missingCompany > 0 || gaps.missingEmployeeTypes > 0 || gaps.missingBasics > 0 || gaps.missingEmployees > 0) {
         return { advanced: false };
     }
 

@@ -29,6 +29,7 @@ function missingBlock(missing) {
         return callout('A declaração e o termo de aceite ainda não foram assinados: abra o contrato no portal para começar.', 'warning', 'Falta começar');
     }
     const lines = [
+        ...(missing.noEmployees ? ['Cadastre os colaboradores que vão atuar na obra, com os documentos básicos'] : []),
         ...missing.company.map((name) => `Empresa: ${name}`),
         ...missing.employee.map((item) => `${item.name}: ${item.sent} de ${item.declared} colaborador${item.declared === 1 ? '' : 'es'}`),
         ...missing.basics.map((item) => `Documentos básicos de ${item.employee} (${item.missing} faltando)`),
@@ -43,6 +44,7 @@ function missingText(missing) {
     if (!missing) return [];
     if (!missing.declared) return ['Falta assinar a declaração e o termo de aceite.'];
     return [
+        ...(missing.noEmployees ? ['- Cadastre os colaboradores da obra'] : []),
         ...missing.company.map((name) => `- Empresa: ${name}`),
         ...missing.employee.map((item) => `- ${item.name}: ${item.sent} de ${item.declared}`),
         ...missing.basics.map((item) => `- Básicos de ${item.employee} (${item.missing})`),

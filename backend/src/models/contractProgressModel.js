@@ -21,6 +21,28 @@ function statusList(request, statuses) {
     }).join(', ');
 }
 
+/**
+ * Trava do contrato (fornecedor + solicitação) até o fim da transação: quem aprova documentos,
+ * desliga colaborador ou assina a declaração do mesmo contrato espera a vez. Sem ela, duas
+ * aprovações ao mesmo tempo travavam uma à outra (cada uma bloqueia o seu documento e depois
+ * lê os outros para conferir se o contrato ficou completo) e o banco derrubava uma delas.
+ * Tem que ser pega ANTES de mexer nas linhas do contrato.
+ */
+export async function lockContract(transaction, laborRequestId, supplierId) {
+    if (!transaction || !laborRequestId || !supplierId) return;
+    const result = await new sql.Request(transaction)
+        .input('resource', sql.NVarChar(255), `docsup:contract:${laborRequestId}:${supplierId}`)
+        .query(`
+            DECLARE @result INT;
+            EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive',
+                                         @LockOwner = 'Transaction', @LockTimeout = 20000;
+            SELECT @result AS result;
+        `);
+    if ((result.recordset[0]?.result ?? -999) < 0) {
+        throw Object.assign(new Error('O contrato está ocupado por outra alteração. Tente de novo.'), { lockTimeout: true });
+    }
+}
+
 /** Vínculo ATIVO (declaração assinada) do fornecedor na solicitação, com o status da solicitação. */
 export async function getActiveAssignment(transaction, laborRequestId, supplierId) {
     const request = await requestFor(transaction);
@@ -79,7 +101,9 @@ const COUNTED_DOCUMENTS = (statuses) => `
  * - missingEmployeeTypes: documentos de colaborador (NRs / outros) com menos colaboradores do
  *   que o fornecedor declarou;
  * - missingBasics: documentos básicos exigidos (de todo colaborador) que faltam, somando os
- *   colaboradores cadastrados no contrato (menos os desligados).
+ *   colaboradores cadastrados no contrato (menos os desligados);
+ * - missingEmployees: 1 se há básicos exigidos e nenhum colaborador cadastrado (contrato de mão
+ *   de obra sem colaborador não está com a documentação completa).
  */
 export async function getInitialDocumentationGaps(transaction, { assignmentId, laborRequestId, supplierId }, statuses = APPROVED_ONLY) {
     const request = await requestFor(transaction);
@@ -114,13 +138,22 @@ export async function getInitialDocumentationGaps(transaction, { assignmentId, l
                    AND NOT EXISTS (
                        SELECT 1 FROM counted AS a
                        WHERE a.document_type_id = b.id AND a.employee_id = e.id
-                   )) AS missing_basics
+                   )) AS missing_basics,
+                CASE WHEN EXISTS (SELECT 1 FROM basics)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM employees AS e
+                      WHERE e.supplier_id = @supplier_id
+                        AND e.labor_request_id = @labor_request_id
+                        AND ISNULL(e.[status], 0) <> 5
+                  )
+                     THEN 1 ELSE 0 END AS missing_employees
         `);
     const row = result.recordset[0];
     return {
         missingCompany: row.missing_company,
         missingEmployeeTypes: row.missing_employee_types,
         missingBasics: row.missing_basics,
+        missingEmployees: row.missing_employees,
     };
 }
 
@@ -163,11 +196,21 @@ export async function getInitialDocumentationMissing(transaction, { assignmentId
               AND ISNULL(e.[status], 0) <> 5
               AND NOT EXISTS (SELECT 1 FROM counted AS a WHERE a.document_type_id = b.id AND a.employee_id = e.id)
             GROUP BY e.full_name
+            UNION ALL
+            SELECT 'no_employees', NULL, NULL, NULL
+            WHERE EXISTS (SELECT 1 FROM basics)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM employees AS e
+                      WHERE e.supplier_id = @supplier_id
+                        AND e.labor_request_id = @labor_request_id
+                        AND ISNULL(e.[status], 0) <> 5
+                  )
         `);
     const rows = result.recordset;
     return {
         company: rows.filter((row) => row.kind === 'company').map((row) => row.name),
         employee: rows.filter((row) => row.kind === 'employee').map((row) => ({ name: row.name, sent: row.sent, declared: row.declared })),
         basics: rows.filter((row) => row.kind === 'basics').map((row) => ({ employee: row.name, missing: row.sent })),
+        noEmployees: rows.some((row) => row.kind === 'no_employees'),
     };
 }

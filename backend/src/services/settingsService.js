@@ -36,9 +36,26 @@ function readNumber(map, name) {
     return Number.isInteger(value) && value >= def.min && value <= def.max ? value : def.fallback;
 }
 
+/**
+ * Calendário dos mensais coerente (abertura < lembrete < último dia). Valores antigos fora de
+ * ordem (ex.: prazo 15 com o lembrete padrão 19) viram: lembrete 2 dias antes do prazo.
+ */
+export function normalizeCalendar({ monthlyOpenDay, monthlyReminderDay, monthlyDueDay }) {
+    let open = monthlyOpenDay;
+    let reminder = monthlyReminderDay;
+    let due = monthlyDueDay;
+    if (due < 3) due = 21;
+    if (open >= due - 1) open = 1;
+    if (!(reminder > open && reminder < due)) reminder = due - 2 > open ? due - 2 : open + 1;
+    return { monthlyOpenDay: open, monthlyReminderDay: reminder, monthlyDueDay: due };
+}
+
+const CALENDAR_FIELDS = ['monthlyOpenDay', 'monthlyReminderDay', 'monthlyDueDay'];
+
 function buildSnapshot(map) {
     const values = {};
     for (const name of Object.keys(NUMERIC_SETTINGS)) values[name] = readNumber(map, name);
+    Object.assign(values, normalizeCalendar(values));
     const enabled = {};
     for (const type of EVENT_TYPE_LIST) enabled[type] = map.get(`${TOGGLE_PREFIX}${type}`) !== '0';
     return { ...values, enabled };
@@ -136,7 +153,8 @@ export async function updateSettings(payload = {}, context = {}) {
         }
     }
 
-    if (!(next.monthlyOpenDay < next.monthlyReminderDay && next.monthlyReminderDay < next.monthlyDueDay)) {
+    const calendarChanged = CALENDAR_FIELDS.some((name) => payload[name] !== undefined);
+    if (calendarChanged && !(next.monthlyOpenDay < next.monthlyReminderDay && next.monthlyReminderDay < next.monthlyDueDay)) {
         return {
             success: false,
             status: 400,

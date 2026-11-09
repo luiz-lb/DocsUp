@@ -71,7 +71,8 @@ const RETURNED_LABELS = { 3: 'Reprovado', 4: 'Reenvio necessário' };
 /** RH reprovou ou pediu o reenvio de um documento (inicial ou mensal). */
 export async function supplierDocumentReturned(transaction, { documentId, status, observation }) {
     const notice = await recipientModel.documentNotice(transaction, documentId);
-    if (!notice || !notice.labor_request_id) return null;
+    // Sem vínculo em aberto (fornecedor trocado): ele não tem mais acesso, não há o que reenviar
+    if (!notice || !notice.labor_request_id || !notice.invite_token) return null;
     const recipients = await recipientModel.assignmentRecipients(transaction, {
         supplierId: notice.supplier_id, inviteEmail: notice.invite_email,
     });
