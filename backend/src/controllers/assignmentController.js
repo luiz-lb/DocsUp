@@ -93,3 +93,30 @@ export async function replaceSupplier(req, res) {
         return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
     }
 }
+
+/**
+ * GET /laborRequest/:id/supplier/declaration.pdf?assignment=<id> — PDF da declaração do
+ * fornecedor (o atual, ou um vínculo do histórico). Fica na auditoria.
+ */
+export async function downloadDeclarationPdf(req, res) {
+    try {
+        const id = laborRequestIdFrom(req, res);
+        if (id === null) return undefined;
+        const assignmentParam = req.query.assignment;
+        const assignmentId = assignmentParam === undefined || assignmentParam === '' ? null : Number(assignmentParam);
+        if (assignmentId !== null && (!Number.isInteger(assignmentId) || assignmentId <= 0)) {
+            return res.status(400).json({ success: false, body: { message: 'Fornecedor inválido.' } });
+        }
+        const result = await assignmentService.getDeclarationPdf(id, assignmentId, requestAuditContext(req));
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        res.attachment(result.body.fileName);
+        res.type('application/pdf');
+        res.setHeader('Cache-Control', 'no-store');
+        return res.send(result.body.buffer);
+    } catch (error) {
+        console.error('downloadDeclarationPdf controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}

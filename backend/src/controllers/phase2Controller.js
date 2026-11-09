@@ -130,6 +130,23 @@ export async function downloadDocument(req, res) {
     }
 }
 
+// GET /phase2/:token/declaration.pdf → PDF da declaração assinada (fornecedor dono do contrato)
+export async function downloadDeclarationPdf(req, res) {
+    try {
+        const result = await phase2Service.getDeclarationPdf(req.params.token, req.fornecedor.supplierId);
+        if (!result.success) {
+            return res.status(result.status ?? 400).json({ success: false, body: { message: result.message } });
+        }
+        res.attachment(result.body.fileName);
+        res.type('application/pdf');
+        res.setHeader('Cache-Control', 'no-store');
+        return res.send(result.body.buffer);
+    } catch (error) {
+        console.error('phase2 downloadDeclarationPdf controller error:', error);
+        return res.status(500).json({ success: false, body: { message: 'Erro interno do servidor.' } });
+    }
+}
+
 // ─────────────────────────────────────────────
 // POST /phase2/:token/employee  (requer JWT de fornecedor)
 // Body: multipart/form-data

@@ -16,6 +16,8 @@ router.get('/:token', verificarTokenFornecedor, phase2Controller.getPhase2);
 
 // Portal do fornecedor — declaração (o que a empresa tem) e termo de aceite assinado
 router.post('/:token/declaration', verificarTokenFornecedor, phase2Controller.submitDeclaration);
+// PDF da declaração assinada (fornecedor dono do contrato)
+router.get('/:token/declaration.pdf', verificarTokenFornecedor, phase2Controller.downloadDeclarationPdf);
 
 // Portal do fornecedor — baixa um arquivo que ele mesmo enviou nesta solicitação (exige JWT fornecedor)
 router.get('/:token/documents/:documentId/download', verificarTokenFornecedor, phase2Controller.downloadDocument);

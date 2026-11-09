@@ -18,7 +18,7 @@ const MAX_EMPLOYEES = 100000;
  *
  * Props: token, items ({ company: [{ id, name }], employee: [{ id, name, code }] }), onDone(result)
  */
-export default function ContractDeclaration({ token, items, onDone }) {
+export default function ContractDeclaration({ token, items, term, onDone }) {
   const company = items?.company ?? [];
   const employee = items?.employee ?? [];
 
@@ -161,6 +161,7 @@ export default function ContractDeclaration({ token, items, onDone }) {
         onAccept={handleAccept}
         isSubmitting={isSubmitting}
         hasMissingDocuments={missing.length > 0}
+        term={term}
       />
     </div>
   );

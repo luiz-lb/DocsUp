@@ -1,3 +1,5 @@
+import { ACCEPTANCE_TERM, acceptanceTermText } from '../constants/acceptanceTerm.js';
+import { buildDeclarationPdf, declarationFileName } from './declarationPdfService.js';
 import * as contractProgressService from './contractProgressService.js';
 import path from 'path';
 import crypto from 'crypto';
@@ -205,6 +207,31 @@ export async function loadActiveAssignment(token, supplierId) {
     return loaded;
 }
 
+/** Código de verificação da declaração (impresso no PDF): XXXX-XXXX-XXXX. */
+function newDeclarationCode() {
+    const hex = crypto.randomBytes(6).toString('hex').toUpperCase();
+    return `${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`;
+}
+
+/**
+ * PDF da declaração para o fornecedor dono do contrato (só depois de assinada).
+ * Retorna { success, body: { buffer, fileName } } ou { success: false, status, message }.
+ */
+export async function getDeclarationPdf(token, supplierId) {
+    const loaded = await loadOwnAssignment(token, supplierId);
+    if (loaded.error) return { success: false, ...loaded.error };
+    if (!loaded.assignment.declared_at) {
+        return { success: false, status: 400, message: 'A declaração deste contrato ainda não foi assinada.' };
+    }
+    try {
+        const buffer = await buildDeclarationPdf(loaded.assignment);
+        return { success: true, body: { buffer, fileName: declarationFileName(loaded.assignment) } };
+    } catch (error) {
+        console.error('getDeclarationPdf error:', error);
+        return { success: false, status: 500, message: 'Erro ao gerar o PDF da declaração.' };
+    }
+}
+
 /** Vínculo como o fornecedor vê (sem token, sem dados internos de Compras). */
 function supplierAssignmentView(assignment) {
     return {
@@ -213,6 +240,7 @@ function supplierAssignmentView(assignment) {
         isExpired: isDeadlineClosed(assignment),
         declaredAt: assignment.declared_at,
         declaredByName: assignment.declared_by_name ?? null,
+        declarationCode: assignment.declaration_code ?? null,
         blockedAt: assignment.blocked_at,
         laborRequestId: assignment.labor_request_id,
         laborRequestTitle: assignment.labor_request_title,
@@ -269,7 +297,7 @@ export async function getPhase2ByToken(token, supplierId) {
             contract_number: assignment.contract_number,
             supplier_name: assignment.supplier_name,
         };
-        const base = { assignment: view, deadline, declaration, declarationItems };
+        const base = { assignment: view, deadline, declaration, declarationItems, term: ACCEPTANCE_TERM };
 
         if (assignment.status !== ASSIGNMENT_STATUSES.ACTIVE) {
             return { success: true, body: base };
@@ -426,6 +454,9 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
                 declaredBy: supplier.supplierUserId,
                 ipAddress: context.ipAddress,
                 userAgent: context.userAgent,
+                code: newDeclarationCode(),
+                termVersion: ACCEPTANCE_TERM.version,
+                termText: acceptanceTermText(),
             });
             if (!declared) throw Object.assign(new Error('Declaração já enviada.'), { conflict: true });
 

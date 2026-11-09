@@ -21,6 +21,12 @@ const ASSIGNMENT_FIELDS = `
     l.declared_by,
     declarer.[name]      AS declared_by_name,
     l.acceptance_ip,
+    l.acceptance_user_agent,
+    l.declaration_code,
+    l.term_version,
+    l.term_text,
+    declarer.email       AS declared_by_email,
+    declarer.[role]      AS declared_by_role,
     l.blocked_at,
     l.ended_at,
     l.ended_by,
@@ -252,13 +258,16 @@ export async function saveDeclaration(transaction, assignmentId, rows) {
  * Declaração assinada: status 1 (ativo) ou 2 (bloqueado), com quem assinou, IP e navegador.
  * Só muda vínculo que ainda aguardava a declaração. Retorna true se mudou.
  */
-export async function markDeclared(transaction, assignmentId, { status, declaredBy, ipAddress, userAgent }) {
+export async function markDeclared(transaction, assignmentId, { status, declaredBy, ipAddress, userAgent, code, termVersion, termText }) {
     const result = await new sql.Request(transaction)
         .input('id', sql.Int, assignmentId)
         .input('status', sql.TinyInt, status)
         .input('declared_by', sql.Int, declaredBy)
         .input('ip', sql.VarChar(45), ipAddress ?? null)
         .input('ua', sql.NVarChar(500), userAgent ? String(userAgent).slice(0, 500) : null)
+        .input('code', sql.VarChar(20), code ?? null)
+        .input('term_version', sql.VarChar(20), termVersion ?? null)
+        .input('term_text', sql.NVarChar(sql.MAX), termText ?? null)
         .query(`
             UPDATE labor_request_suppliers
             SET [status] = @status,
@@ -266,6 +275,9 @@ export async function markDeclared(transaction, assignmentId, { status, declared
                 declared_by = @declared_by,
                 acceptance_ip = @ip,
                 acceptance_user_agent = @ua,
+                declaration_code = @code,
+                term_version = @term_version,
+                term_text = @term_text,
                 blocked_at = CASE WHEN @status = 2 THEN GETDATE() ELSE NULL END
             WHERE id = @id AND [status] = 0
         `);

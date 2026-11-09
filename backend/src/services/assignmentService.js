@@ -1,3 +1,4 @@
+import { buildDeclarationPdf, declarationFileName } from './declarationPdfService.js';
 import crypto from 'crypto';
 import * as assignmentModel from '../models/assignmentModel.js';
 import * as laborRequestModel from '../models/laborRequestModel.js';
@@ -103,6 +104,7 @@ function publicAssignment(assignment, { withLink }) {
         linkedAt: assignment.linked_at,
         declaredAt: assignment.declared_at,
         declaredByName: assignment.declared_by_name ?? null,
+        declarationCode: assignment.declaration_code ?? null,
         acceptanceIp: assignment.acceptance_ip ?? null,
         blockedAt: assignment.blocked_at,
         endedAt: assignment.ended_at,
@@ -549,4 +551,30 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
             mailEnabled: isMailEnabled(),
         },
     };
+}
+
+/**
+ * PDF da declaração de um vínculo da solicitação (o atual ou um do histórico), para quem vê a
+ * solicitação. O download fica na auditoria (o PDF tem IP e navegador de quem assinou).
+ */
+export async function getDeclarationPdf(laborRequestId, assignmentId, context = {}) {
+    try {
+        const all = await assignmentModel.listByRequest(laborRequestId);
+        const assignment = assignmentId
+            ? all.find((item) => item.id === assignmentId)
+            : all.find((item) => item.status !== ASSIGNMENT_STATUSES.ENDED);
+        if (!assignment) return { success: false, status: 404, message: 'Fornecedor não encontrado nesta solicitação.' };
+        if (!assignment.declared_at) {
+            return { success: false, status: 400, message: 'A declaração deste fornecedor ainda não foi assinada.' };
+        }
+        const buffer = await buildDeclarationPdf(assignment);
+        await trasaction.executarEmTransacao((transaction) => auditAssignment(
+            transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_DECLARATION_DOWNLOAD, laborRequestId, null,
+            { assignment_id: assignment.id, declaration_code: assignment.declaration_code ?? null },
+        ));
+        return { success: true, body: { buffer, fileName: declarationFileName(assignment) } };
+    } catch (error) {
+        console.error('getDeclarationPdf error:', error);
+        return { success: false, status: 500, message: 'Erro ao gerar o PDF da declaração.' };
+    }
 }

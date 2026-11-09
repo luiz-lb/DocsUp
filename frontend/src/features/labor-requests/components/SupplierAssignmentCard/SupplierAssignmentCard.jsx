@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LuCheck, LuCopy, LuMail, LuRefreshCw, LuRepeat, LuTimer, LuTruck } from 'react-icons/lu';
+import { LuCheck, LuCopy, LuFileDown, LuMail, LuRefreshCw, LuRepeat, LuTimer, LuTruck } from 'react-icons/lu';
 import { Banner, Button, Card, CountdownTimer, StatusBadge } from '../../../../components/ui/index.js';
 import {
   ASSIGNMENT_END_REASON,
@@ -10,7 +10,7 @@ import {
 } from '../../../../constants/enums.js';
 import { useAsyncData } from '../../../../hooks/useAsyncData.js';
 import { formatCnpj, formatDateTime } from '../../../../utils/formatters.js';
-import { getRequestSupplier } from '../../api/laborRequestsApi.js';
+import { downloadSupplierDeclarationPdf, getRequestSupplier } from '../../api/laborRequestsApi.js';
 import SupplierInviteModal from '../SupplierInviteModal/index.js';
 import styles from './SupplierAssignmentCard.module.css';
 
@@ -27,6 +27,7 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
   const [modalMode, setModalMode] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState(null);
 
   if (isLoading && !response) return null;
   if (!response?.success) {
@@ -50,6 +51,14 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
     } catch {
       setCopied(false);
     }
+  };
+
+  // PDF da declaração (atual ou do histórico)
+  const handleDeclarationPdf = async (assignmentId) => {
+    setPdfLoadingId(assignmentId);
+    const result = await downloadSupplierDeclarationPdf(laborRequestId, assignmentId);
+    setPdfLoadingId(null);
+    if (!result.success) setFeedback({ tone: 'danger', message: result.body?.message ?? 'Erro ao baixar o PDF.' });
   };
 
   const isClosed = [LABOR_REQUEST_STATUS_ID.CONCLUIDA, LABOR_REQUEST_STATUS_ID.CANCELADA].includes(requestStatus);
@@ -121,6 +130,20 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
                 {current.declaredAt
                   ? `Assinada em ${formatDateTime(current.declaredAt)}${current.declaredByName ? ` por ${current.declaredByName}` : ''}${current.acceptanceIp ? ` (IP ${current.acceptanceIp})` : ''}`
                   : 'Ainda não assinada'}
+                {current.declaredAt && (
+                  <span className={styles.declarationPdf}>
+                    {current.declarationCode && <span className={styles.meta}>Código {current.declarationCode}</span>}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={LuFileDown}
+                      onClick={() => handleDeclarationPdf(current.id)}
+                      isLoading={pdfLoadingId === current.id}
+                    >
+                      Declaração (PDF)
+                    </Button>
+                  </span>
+                )}
               </dd>
             </dl>
 
@@ -227,6 +250,16 @@ export default function SupplierAssignmentCard({ laborRequestId, requestStatus, 
                     {item.endedByName ? ` por ${item.endedByName}` : ''}
                   </span>
                   {item.endComment && <span className={styles.reason}>Motivo: {item.endComment}</span>}
+                  {item.declaredAt && (
+                    <button
+                      type="button"
+                      className={styles.linkButton}
+                      onClick={() => handleDeclarationPdf(item.id)}
+                      disabled={pdfLoadingId === item.id}
+                    >
+                      <LuFileDown aria-hidden="true" /> {pdfLoadingId === item.id ? 'Gerando…' : 'Declaração (PDF)'}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

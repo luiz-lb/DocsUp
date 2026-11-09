@@ -1,5 +1,6 @@
 import { api } from '../../../utils/api.js';
 import { toErrorResult } from '../../../utils/apiError.js';
+import { blobErrorMessage, fileNameFromDisposition, saveBlob } from '../../../utils/download.js';
 
 // ---------------------------------------------------------------------------
 // Labor Requests
@@ -243,5 +244,22 @@ export async function concludeLaborRequest(laborRequestId) {
     return result.data;
   } catch (error) {
     return toErrorResult(error, 'Erro ao concluir o contrato.');
+  }
+}
+
+/**
+ * PDF da declaração do fornecedor (o atual ou um do histórico). Fica na auditoria.
+ * GET /laborRequest/:id/supplier/declaration.pdf?assignment=<id>
+ */
+export async function downloadSupplierDeclarationPdf(laborRequestId, assignmentId = null) {
+  try {
+    const result = await api.get(`/laborRequest/${laborRequestId}/supplier/declaration.pdf`, {
+      params: assignmentId ? { assignment: assignmentId } : undefined,
+      responseType: 'blob',
+    });
+    saveBlob(result.data, fileNameFromDisposition(result.headers['content-disposition'], 'declaracao.pdf'));
+    return { success: true };
+  } catch (error) {
+    return { success: false, body: { message: await blobErrorMessage(error, 'Erro ao baixar o PDF da declaração.') } };
   }
 }

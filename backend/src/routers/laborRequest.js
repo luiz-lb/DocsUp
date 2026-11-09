@@ -29,6 +29,8 @@ router.post('/:id/conclude', verificarToken, requireRole(...ACCESS.CONCLUDE_CONT
 // Fornecedor da solicitação (no lugar da cotação): todos veem; Compras indica e troca
 router.get('/supplier-lookup', verificarToken, podeGerenciarFornecedor, assignment.lookupSupplierEmail);
 router.get('/:id/supplier', verificarToken, assignment.getRequestSupplier);
+// PDF da declaração do fornecedor (atual ou do histórico: ?assignment=<id>)
+router.get('/:id/supplier/declaration.pdf', verificarToken, assignment.downloadDeclarationPdf);
 router.post('/:id/supplier', verificarToken, podeGerenciarFornecedor, assignment.assignSupplier);
 router.post('/:id/supplier/resend', verificarToken, podeGerenciarFornecedor, assignment.resendInvite);
 router.put('/:id/supplier/deadline', verificarToken, podeGerenciarFornecedor, assignment.changeDeadline);

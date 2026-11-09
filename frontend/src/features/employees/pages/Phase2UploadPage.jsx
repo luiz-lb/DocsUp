@@ -139,6 +139,7 @@ export default function Phase2UploadPage() {
           <ContractDeclaration
             token={token}
             items={phase2.declarationItems}
+            term={phase2.term}
             onDone={(result) => {
               setDeclarationResult(result);
               reload();
@@ -161,7 +162,7 @@ export default function Phase2UploadPage() {
             title="Convite pausado"
             description={`A empresa declarou que não tem: ${missing.join(', ') || '—'}. O setor de Compras foi avisado e vai entrar em contato. Se o convite for reenviado, ele aparece de novo em "Meus contratos".`}
           />
-          <DeclarationSummary declaration={declaration} assignment={assignment} />
+          <DeclarationSummary declaration={declaration} assignment={assignment} token={token} />
         </div>
       </SupplierLayout>
     );
@@ -365,7 +366,7 @@ export default function Phase2UploadPage() {
           Para cada colaborador, envie um documento por vez (ASO, certificados de NR, Ficha de EPI…).
         </p>
 
-        <DeclarationSummary declaration={declaration} assignment={assignment} employees={employees} />
+        <DeclarationSummary declaration={declaration} assignment={assignment} employees={employees} token={token} />
 
         {/* Banner de countdown com expiração automática */}
         <Phase2CountdownBanner deadline={deadline} />

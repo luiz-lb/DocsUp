@@ -202,3 +202,17 @@ export async function uploadMonthlyDocument(token, data, file) {
     return toErrorResult(error, 'Erro ao enviar o documento mensal.');
   }
 }
+
+/**
+ * O fornecedor baixa o PDF da declaração assinada do contrato.
+ * GET /phase2/:token/declaration.pdf  (exige cookie supplier_token)
+ */
+export async function downloadDeclarationPdf(token) {
+  try {
+    const result = await api.get(`/phase2/${token}/declaration.pdf`, { responseType: 'blob' });
+    saveBlob(result.data, fileNameFromDisposition(result.headers['content-disposition'], 'declaracao.pdf'));
+    return { success: true };
+  } catch (error) {
+    return { success: false, body: { message: await blobErrorMessage(error, 'Erro ao baixar o PDF da declaração.') } };
+  }
+}

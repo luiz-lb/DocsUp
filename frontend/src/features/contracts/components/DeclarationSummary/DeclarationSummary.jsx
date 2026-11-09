@@ -1,5 +1,7 @@
-import { LuChevronRight, LuFileCheck } from 'react-icons/lu';
+import { useState } from 'react';
+import { LuChevronRight, LuFileCheck, LuFileDown } from 'react-icons/lu';
 import { StatusBadge } from '../../../../components/ui/index.js';
+import { downloadDeclarationPdf } from '../../../employees/api/employeesApi.js';
 import { DOCUMENT_CATEGORY_ID } from '../../../../constants/enums.js';
 import { formatDateTime } from '../../../../utils/formatters.js';
 import styles from './DeclarationSummary.module.css';
@@ -12,8 +14,22 @@ import styles from './DeclarationSummary.module.css';
  * Props: declaration (linhas do backend), assignment ({ declaredAt, declaredByName }),
  *        employees (colaboradores com os documentos atuais; opcional)
  */
-export default function DeclarationSummary({ declaration = [], assignment, employees = [] }) {
+export default function DeclarationSummary({ declaration = [], assignment, employees = [], token }) {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
   if (declaration.length === 0) return null;
+
+  // Botão dentro do <summary>: não abre / fecha o resumo
+  const handleDownload = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!token || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    const result = await downloadDeclarationPdf(token);
+    setDownloading(false);
+    if (!result.success) setDownloadError(result.body?.message ?? 'Erro ao baixar o PDF.');
+  };
 
   const company = declaration.filter((row) => row.category === DOCUMENT_CATEGORY_ID.EMPRESA);
   const employeeRows = declaration.filter((row) => row.category !== DOCUMENT_CATEGORY_ID.EMPRESA);
@@ -36,9 +52,16 @@ export default function DeclarationSummary({ declaration = [], assignment, emplo
           <span className={styles.meta}>
             assinada em {formatDateTime(assignment.declaredAt)}
             {assignment.declaredByName ? ` por ${assignment.declaredByName}` : ''}
+            {assignment.declarationCode ? ` · código ${assignment.declarationCode}` : ''}
           </span>
         )}
+        {token && assignment?.declaredAt && (
+          <button type="button" className={styles.pdfButton} onClick={handleDownload} disabled={downloading}>
+            <LuFileDown aria-hidden="true" /> {downloading ? 'Gerando…' : 'Baixar PDF'}
+          </button>
+        )}
       </summary>
+      {downloadError && <p className={styles.error}>{downloadError}</p>}
       <div className={styles.grid}>
         {company.length > 0 && (
           <div>

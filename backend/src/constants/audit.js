@@ -36,6 +36,7 @@ export const AUDIT_ACTIONS = Object.freeze({
     SUPPLIER_ASSIGNMENT_DEADLINE: 'supplier_assignment.deadline_change',
     SUPPLIER_ASSIGNMENT_REPLACE: 'supplier_assignment.replace',
     SUPPLIER_ASSIGNMENT_DECLARE: 'supplier_assignment.declare',
+    SUPPLIER_ASSIGNMENT_DECLARATION_DOWNLOAD: 'supplier_assignment.declaration_download',
     LABOR_REQUEST_CONCLUDE: 'labor_request.conclude',
     // Todos os documentos iniciais aprovados: Serviço em andamento (automático)
     LABOR_REQUEST_IN_PROGRESS: 'labor_request.in_progress',
