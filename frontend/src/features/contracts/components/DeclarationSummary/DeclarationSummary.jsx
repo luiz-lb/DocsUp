@@ -1,3 +1,4 @@
+import { LuChevronRight, LuFileCheck } from 'react-icons/lu';
 import { StatusBadge } from '../../../../components/ui/index.js';
 import { DOCUMENT_CATEGORY_ID } from '../../../../constants/enums.js';
 import { formatDateTime } from '../../../../utils/formatters.js';
@@ -28,10 +29,12 @@ export default function DeclarationSummary({ declaration = [], assignment, emplo
   return (
     <details className={styles.box}>
       <summary>
+        <LuChevronRight className={styles.chevron} aria-hidden="true" />
+        <LuFileCheck aria-hidden="true" />
         Sua declaração
         {assignment?.declaredAt && (
           <span className={styles.meta}>
-            {' '}· assinada em {formatDateTime(assignment.declaredAt)}
+            assinada em {formatDateTime(assignment.declaredAt)}
             {assignment.declaredByName ? ` por ${assignment.declaredByName}` : ''}
           </span>
         )}

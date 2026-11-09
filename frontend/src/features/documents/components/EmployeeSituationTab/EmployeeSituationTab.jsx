@@ -3,7 +3,7 @@ import { LuPencil, LuSearch } from 'react-icons/lu';
 import { DataTable, StatusBadge, Button, Banner, FormField, SearchSelect } from '../../../../components/ui/index.js';
 import { EMPLOYEE_STATUS } from '../../../../constants/enums.js';
 import { useAsyncData } from '../../../../hooks/useAsyncData.js';
-import { formatDateOnly, formatDateTime } from '../../../../utils/formatters.js';
+import { formatCpf, formatDateOnly, formatDateTime } from '../../../../utils/formatters.js';
 import { listEmployeeSituations } from '../../api/documentsRealApi.js';
 import EmployeeSituationModal from '../EmployeeSituationModal/index.js';
 import { EMPTY_EMPLOYEE_FILTERS, NO_CONTRACT } from './employeeFilters.js';
@@ -103,7 +103,7 @@ export default function EmployeeSituationTab({ filters = EMPTY_EMPLOYEE_FILTERS,
         <div className={styles.cell}>
           <strong>{row.full_name}</strong>
           <span className={styles.meta}>
-            {row.cpf ?? 'Sem CPF'}
+            {row.cpf ? formatCpf(row.cpf) : 'Sem CPF'}
             {row.role_function ? ` · ${row.role_function}` : ''}
           </span>
         </div>

@@ -36,6 +36,15 @@ export function addDaysToToday(days) {
   return toDateInputValue(date);
 }
 
+/** Máscara de CPF enquanto digita: 000.000.000-00 (só dígitos, até 11). */
+export function formatCpf(value) {
+  const digits = String(value ?? '').replace(/\D/g, '').slice(0, 11);
+  return digits
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+}
+
 export function formatCnpj(value) {
   const digits = String(value ?? '').replace(/\D/g, '').slice(0, 14);
   return digits

@@ -15,7 +15,7 @@ import SupplierLayout from '../../suppliers/components/SupplierLayout/index.js';
 import SupplierPageHeader from '../../suppliers/components/SupplierPageHeader/index.js';
 import { ROUTES } from '../../../constants/routes.js';
 import { cn } from '../../../utils/cn.js';
-import { addDaysToToday, formatDateTime, toDateInputValue } from '../../../utils/formatters.js';
+import { addDaysToToday, formatCpf, formatDateTime, toDateInputValue } from '../../../utils/formatters.js';
 import styles from './Phase2UploadPage.module.css';
 
 const EMPTY_EMPLOYEE = { fullName: '', cpf: '', rg: '', roleFunction: '', documentTypeId: '', expiresAt: '' };
@@ -307,6 +307,7 @@ export default function Phase2UploadPage() {
 
   const validateEmployee = () => {
     if (!form.fullName.trim() || !form.cpf.trim()) return 'Informe o nome completo e o CPF do colaborador.';
+    if (form.cpf.length !== 11) return 'O CPF precisa ter 11 dígitos.';
     if (!form.documentTypeId) return 'Selecione qual documento é este arquivo.';
     if (employeeNeedsExpiry && !form.expiresAt) return 'Informe a validade do documento.';
     if (employeeNeedsExpiry && form.expiresAt < today) return 'A validade do documento não pode ser anterior a hoje.';
@@ -572,9 +573,11 @@ export default function Phase2UploadPage() {
                   </FormField>
                   <FormField label="CPF" required>
                     <input
-                      value={form.cpf}
-                      onChange={(e) => setForm((prev) => ({ ...prev, cpf: e.target.value }))}
+                      value={formatCpf(form.cpf)}
+                      onChange={(e) => setForm((prev) => ({ ...prev, cpf: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
                       placeholder="000.000.000-00"
+                      inputMode="numeric"
+                      maxLength={14}
                     />
                   </FormField>
                   <FormField label="Função">
