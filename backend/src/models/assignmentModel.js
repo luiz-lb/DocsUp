@@ -198,7 +198,9 @@ export async function claim(assignmentId, supplierId) {
 
 /**
  * Vincula ao fornecedor os convites aguardando, sem fornecedor, feitos para algum dos
- * e-mails dele (ex.: se cadastrou sem abrir o link). Retorna quantos vinculou.
+ * e-mails dele (ex.: se cadastrou sem abrir o link). Só conta e-mail CONFIRMADO de um
+ * usuário ativo do próprio fornecedor (confirmado = entrou com o código enviado a ele).
+ * Retorna quantos vinculou.
  */
 export async function claimByEmails(supplierId, emails = []) {
     if (emails.length === 0) return 0;
@@ -209,9 +211,19 @@ export async function claimByEmails(supplierId, emails = []) {
         return `@email${index}`;
     });
     const result = await request.query(`
-        UPDATE labor_request_suppliers
+        UPDATE l
         SET supplier_id = @supplier_id, linked_at = GETDATE()
-        WHERE supplier_id IS NULL AND [status] = 0 AND invite_email IN (${params.join(', ')})
+        FROM labor_request_suppliers AS l
+        WHERE l.supplier_id IS NULL
+          AND l.[status] = 0
+          AND l.invite_email IN (${params.join(', ')})
+          AND EXISTS (
+              SELECT 1 FROM supplier_users AS su
+              WHERE su.supplier_id = @supplier_id
+                AND su.email = l.invite_email
+                AND su.is_active = 1
+                AND su.email_verified_at IS NOT NULL
+          )
     `);
     return result.rowsAffected[0] ?? 0;
 }

@@ -271,15 +271,47 @@ export async function concludeRequest(transaction, laborRequestId, userId) {
     return result.rowsAffected[0] > 0;
 }
 
+/** Lista de status como parâmetros (@from0, @from1...) para o IN de um UPDATE condicional. */
+function fromStatusesParams(request, fromStatuses) {
+    return fromStatuses.map((status, index) => {
+        request.input(`from${index}`, sql.TinyInt, status);
+        return `@from${index}`;
+    }).join(', ');
+}
+
 /**
  * Muda o status sem trocar quem atualizou por último (mudança feita pelo fornecedor ou pelo
- * sistema, que não são usuários internos).
+ * sistema, que não são usuários internos). Só muda se o status atual for um de `fromStatuses`
+ * (ex.: não reabre um contrato concluído). Retorna true se mudou.
  */
-export async function setStatusBySystem(transaction, laborRequestId, status) {
-    const result = await new sql.Request(transaction)
+export async function setStatusBySystem(transaction, laborRequestId, status, fromStatuses) {
+    const request = new sql.Request(transaction)
+        .input('id', sql.Int, laborRequestId)
+        .input('status', sql.TinyInt, status);
+    const fromList = fromStatusesParams(request, fromStatuses);
+    const result = await request.query(`
+        UPDATE labor_requests SET [status] = @status, updated_at = GETDATE()
+        WHERE id = @id AND [status] IN (${fromList})
+    `);
+    return result.rowsAffected[0] > 0;
+}
+
+/**
+ * Muda o status (colaborador) só se o status atual for um de `fromStatuses`, na mesma
+ * transação da ação: duas ações ao mesmo tempo (ex.: concluir e trocar o fornecedor) não
+ * desfazem uma à outra. Retorna true se mudou.
+ */
+export async function updateStatusFrom(transaction, laborRequestId, status, updaterId, fromStatuses) {
+    const request = new sql.Request(transaction)
         .input('id', sql.Int, laborRequestId)
         .input('status', sql.TinyInt, status)
-        .query('UPDATE labor_requests SET [status] = @status, updated_at = GETDATE() WHERE id = @id');
+        .input('updater_id', sql.Int, updaterId);
+    const fromList = fromStatusesParams(request, fromStatuses);
+    const result = await request.query(`
+        UPDATE labor_requests
+        SET [status] = @status, updated_at = GETDATE(), update_by_id = @updater_id
+        WHERE id = @id AND [status] IN (${fromList})
+    `);
     return result.rowsAffected[0] > 0;
 }
 

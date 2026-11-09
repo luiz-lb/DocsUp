@@ -472,6 +472,9 @@ export async function loginPhase1(email, password, session) {
     const otp = generateOtp();
     session.mfaPending = {
         supplierUserId: user.id,
+        // O código vale para este e-mail: se o e-mail do usuário mudar antes de confirmar, o
+        // login não termina (senão o e-mail novo ficaria "confirmado" sem ter recebido o código)
+        email: user.email,
         otpHash: await bcrypt.hash(otp, 8),
         expiresAt: Date.now() + OTP_TTL_MS,
         attempts: 0,
@@ -548,8 +551,13 @@ export async function loginPhase2(otp, session) {
         return { success: false, message: 'Acesso não permitido. Entre em contato com Suprimentos.' };
     }
 
-    // O código chegou no e-mail: ele está confirmado (passa a receber convites direto)
-    if (!user.email_verified_at) await supplierUserModel.markEmailVerified(user.id);
+    // E-mail trocado depois que o código foi enviado: o código não vale para o e-mail novo
+    if (user.email !== pending.email) {
+        return { success: false, message: 'O e-mail deste usuário mudou. Faça login novamente.' };
+    }
+
+    // O código chegou neste e-mail: ele está confirmado (passa a receber convites direto)
+    if (!user.email_verified_at) await supplierUserModel.markEmailVerified(user.id, pending.email);
 
     return { success: true, token: signSupplierToken(user), supplier: sessionPayload(user) };
 }

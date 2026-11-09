@@ -70,6 +70,7 @@ export async function listEmployeeSituations({ search = '', status } = {}) {
               AND d.labor_request_id = e.labor_request_id
               AND d.is_current = 1
               AND d.[status] = 5
+              AND d.reference_month IS NULL
         ) AS company
         ${whereClause}
         ORDER BY s.razao_social ASC, e.full_name ASC
@@ -145,6 +146,7 @@ export async function runDailyDocumentCheck(transaction, { today, soon }) {
                     AND d.labor_request_id = e.labor_request_id
                     AND d.is_current = 1
                     AND d.[status] = 5
+                    AND d.reference_month IS NULL  -- só os documentos iniciais
               );
 
             -- 3) Documento do próprio colaborador vencido → Pendente de documentos
@@ -156,6 +158,7 @@ export async function runDailyDocumentCheck(transaction, { today, soon }) {
               AND EXISTS (
                   SELECT 1 FROM documents AS d
                   WHERE d.employee_id = e.id AND d.is_current = 1 AND d.[status] = 5
+                    AND d.reference_month IS NULL  -- só os documentos iniciais
               );
 
             -- 4) Documento do colaborador vencendo em até 1 mês → Documento a vencer
@@ -172,6 +175,7 @@ export async function runDailyDocumentCheck(transaction, { today, soon }) {
                     AND d.expires_at IS NOT NULL
                     AND d.expires_at >= @today
                     AND d.expires_at <= @soon
+                    AND d.reference_month IS NULL  -- só os documentos iniciais
               );
 
             -- Auditoria (autor: sistema)

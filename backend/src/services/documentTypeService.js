@@ -41,6 +41,9 @@ const NAME_IN_USE = { success: false, status: 409, message: 'Já existe um tipo 
 const NR_ALREADY_REGISTERED = { success: false, status: 409, message: 'Essa NR já está cadastrada.' };
 const NR_CODE_IN_USE = { success: false, status: 409, message: 'Já existe outra NR com este código.' };
 const CATEGORY_LOCKED = { success: false, status: 400, message: 'A categoria deste tipo não pode ser alterada.' };
+// Documento mensal não tem validade: cada mês tem a sua entrega (e a validade mexeria na
+// situação dos colaboradores pela rotina diária)
+const MONTHLY_WITHOUT_EXPIRATION = 'Documento mensal não tem validade: cada mês tem a sua entrega.';
 
 function badRequest(message) {
     return { success: false, status: 400, message };
@@ -243,6 +246,7 @@ export async function createDocumentType(payload = {}, context = {}) {
 
     const expiration = validateExpiration(payload.hasExpiration, payload.validityDays);
     if (expiration.error) return badRequest(expiration.error);
+    if (category === DOCUMENT_CATEGORIES.MONTHLY && expiration.hasExpiration) return badRequest(MONTHLY_WITHOUT_EXPIRATION);
 
     const validation = resolveValidation(payload);
     if (validation.error) return badRequest(validation.error);
@@ -365,6 +369,7 @@ export async function updateDocumentType(id, payload = {}, context = {}) {
         const validityDaysInput = payload.validityDays === undefined ? before.validity_days : payload.validityDays;
         const expiration = validateExpiration(payload.hasExpiration, validityDaysInput);
         if (expiration.error) return badRequest(expiration.error);
+        if (category === DOCUMENT_CATEGORIES.MONTHLY && expiration.hasExpiration) return badRequest(MONTHLY_WITHOUT_EXPIRATION);
 
         const validation = resolveValidation(payload, before);
         if (validation.error) return badRequest(validation.error);

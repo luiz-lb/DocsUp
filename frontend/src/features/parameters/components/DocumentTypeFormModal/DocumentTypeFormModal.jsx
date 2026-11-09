@@ -128,11 +128,12 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
       return;
     }
 
+    const hasExpiration = !isMonthly && form.hasExpiration;
     const payload = {
       name: form.name.trim(),
       description: form.description.trim() || null,
-      hasExpiration: form.hasExpiration,
-      validityDays: form.hasExpiration && form.validityDays !== '' ? Number(form.validityDays) : null,
+      hasExpiration,
+      validityDays: hasExpiration && form.validityDays !== '' ? Number(form.validityDays) : null,
     };
     payload.validationMethod = Number(form.validationMethod);
     if (form.validationMethod === VALIDATION.API) payload.apiIntegration = form.apiIntegration;
@@ -236,16 +237,19 @@ export default function DocumentTypeFormModal({ open, category, documentType, on
           </FormField>
         )}
 
-        <label className={styles.checkbox}>
-          <input
-            type="checkbox"
-            checked={form.hasExpiration}
-            onChange={(event) => setForm((prev) => ({ ...prev, hasExpiration: event.target.checked }))}
-          />
-          Tem validade
-        </label>
+        {/* Documento mensal não tem validade: cada mês tem a sua entrega */}
+        {!isMonthly && (
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={form.hasExpiration}
+              onChange={(event) => setForm((prev) => ({ ...prev, hasExpiration: event.target.checked }))}
+            />
+            Tem validade
+          </label>
+        )}
 
-        {form.hasExpiration && (
+        {!isMonthly && form.hasExpiration && (
           <FormField label="Prazo padrão (dias)" hint="Usado para sugerir a data de validade no envio.">
             <input
               type="number"

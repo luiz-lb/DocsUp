@@ -178,6 +178,20 @@ async function loadChangeableRequest(laborRequestId) {
     return { request };
 }
 
+// Status em que reenviar / trocar o fornecedor volta a solicitação para Em contratação
+const REOPENABLE_STATUSES = [LABOR_REQUEST_STATUSES.BLOCKED, LABOR_REQUEST_STATUSES.IN_CONTRACTING];
+
+/**
+ * Leva a solicitação para Em contratação, na transação da ação, só se ela ainda estiver num dos
+ * status esperados. Se mudou no meio do caminho (ex.: alguém concluiu o contrato), desfaz tudo.
+ */
+async function moveToInContracting(transaction, laborRequestId, actorId, fromStatuses) {
+    const moved = await laborRequestModel.updateStatusFrom(
+        transaction, laborRequestId, LABOR_REQUEST_STATUSES.IN_CONTRACTING, actorId, fromStatuses,
+    );
+    if (!moved) throw Object.assign(new Error('A solicitação mudou.'), { conflict: true });
+}
+
 /** Registra na auditoria uma ação de Compras sobre o fornecedor da solicitação. */
 async function auditAssignment(transaction, context, action, laborRequestId, oldValues, newValues) {
     await auditModel.insertAuditLog(transaction, collaboratorAuditEntry(
@@ -333,9 +347,7 @@ export async function assignSupplier(laborRequestId, payload = {}, actor, contex
                 deadlineAt: deadline.value,
                 createdBy: actor.id,
             });
-            await laborRequestModel.updateLaborRequestStatus(
-                transaction, laborRequestId, LABOR_REQUEST_STATUSES.IN_CONTRACTING, actor.id,
-            );
+            await moveToInContracting(transaction, laborRequestId, actor.id, [LABOR_REQUEST_STATUSES.AWAITING_SUPPLIER]);
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_CREATE, laborRequestId, null, {
                 invite_email: email,
                 supplier: supplier.supplierName,
@@ -345,6 +357,9 @@ export async function assignSupplier(laborRequestId, payload = {}, actor, contex
     } catch (error) {
         if (SQL_DUPLICATE_KEY_ERRORS.includes(error.number)) {
             return { success: false, status: 409, message: 'Esta solicitação já tem um fornecedor indicado.' };
+        }
+        if (error.conflict) {
+            return { success: false, status: 409, message: 'A solicitação mudou. Atualize a tela.' };
         }
         console.error('assignSupplier error:', error);
         return { success: false, status: 500, message: 'Erro ao indicar o fornecedor.' };
@@ -418,9 +433,7 @@ export async function resendInvite(laborRequestId, payload = {}, actor, context 
                 deadlineAt: deadline.value,
                 createdBy: actor.id,
             });
-            await laborRequestModel.updateLaborRequestStatus(
-                transaction, laborRequestId, LABOR_REQUEST_STATUSES.IN_CONTRACTING, actor.id,
-            );
+            await moveToInContracting(transaction, laborRequestId, actor.id, REOPENABLE_STATUSES);
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_RESEND, laborRequestId,
                 auditSnapshot(current),
                 { invite_email: current.invite_email, deadline_at: toLocalDateTimeText(deadline.value) });
@@ -532,9 +545,7 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
                 deadlineAt: deadline.value,
                 createdBy: actor.id,
             });
-            await laborRequestModel.updateLaborRequestStatus(
-                transaction, laborRequestId, LABOR_REQUEST_STATUSES.IN_CONTRACTING, actor.id,
-            );
+            await moveToInContracting(transaction, laborRequestId, actor.id, REOPENABLE_STATUSES);
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_REPLACE, laborRequestId,
                 auditSnapshot(current),
                 {

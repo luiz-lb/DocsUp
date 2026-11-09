@@ -5,6 +5,7 @@ import * as assignmentModel from '../models/assignmentModel.js';
 import * as employeeModel from '../models/employeeModel.js';
 import * as laborRequestModel from '../models/laborRequestModel.js';
 import * as documentTypeModel from '../models/documentTypeModel.js';
+import * as supplierUserModel from '../models/supplierUserModel.js';
 import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
 import * as deliveryModel from '../models/deliveryModel.js';
@@ -357,6 +358,10 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
     if (assignment.status !== ASSIGNMENT_STATUSES.WAITING_SUPPLIER) {
         return { success: false, status: 409, message: 'A declaração deste contrato já foi enviada.' };
     }
+    // Contrato concluído (ou cancelado) enquanto o convite esperava: não há mais o que declarar
+    if ([LABOR_REQUEST_STATUSES.CONCLUDED, LABOR_REQUEST_STATUSES.CANCELED].includes(assignment.labor_request_status)) {
+        return { success: false, status: 409, message: 'O contrato desta solicitação já foi concluído.' };
+    }
     if (payload.termAccepted !== true) {
         return { success: false, status: 400, message: 'Leia e assine o termo de aceite para continuar.' };
     }
@@ -424,7 +429,13 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
             if (!declared) throw Object.assign(new Error('Declaração já enviada.'), { conflict: true });
 
             if (blocked) {
-                await laborRequestModel.setStatusBySystem(transaction, assignment.labor_request_id, LABOR_REQUEST_STATUSES.BLOCKED);
+                // Só bloqueia a solicitação que está em contratação: se ela mudou no meio do
+                // caminho (ex.: concluída), a declaração inteira é desfeita
+                const changed = await laborRequestModel.setStatusBySystem(
+                    transaction, assignment.labor_request_id, LABOR_REQUEST_STATUSES.BLOCKED,
+                    [LABOR_REQUEST_STATUSES.IN_CONTRACTING],
+                );
+                if (!changed) throw Object.assign(new Error('A solicitação mudou.'), { conflict: true });
             }
             await auditModel.insertAuditLog(transaction, {
                 actorType: AUDIT_ACTOR_TYPES.SUPPLIER,
@@ -445,7 +456,7 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
         });
     } catch (error) {
         if (error.conflict) {
-            return { success: false, status: 409, message: 'A declaração deste contrato já foi enviada.' };
+            return { success: false, status: 409, message: 'O contrato mudou enquanto você declarava. Abra-o de novo.' };
         }
         console.error('submitDeclaration error:', error);
         return { success: false, status: 500, message: 'Erro ao enviar a declaração.' };
@@ -764,17 +775,15 @@ export async function addCompanyDocuments(token, supplierId, data, files = []) {
 
 /**
  * Contratos (vínculos abertos) do fornecedor, com o prazo e o resumo dos documentos. Antes,
- * vincula a ele os convites ainda sem fornecedor feitos para o e-mail de QUEM ESTÁ LOGADO
- * (ex.: se cadastrou sem abrir o link). Só esse e-mail conta: ele foi confirmado pelo código
- * enviado no login. O e-mail do outro usuário pode ter sido digitado pelo Responsável e ainda
- * não foi confirmado por ninguém, então não puxa convites.
- *
- * @param {number} supplierId
- * @param {string} userEmail — e-mail do usuário logado (req.fornecedor.email)
+ * vincula a ele os convites ainda sem fornecedor feitos para os e-mails dos usuários dele
+ * (ex.: se cadastrou sem abrir o link). Só e-mail CONFIRMADO puxa convite (claimByEmails
+ * confere no banco): um e-mail digitado no cadastro ou trocado no Perfil só conta depois que
+ * alguém entrar com o código enviado para ele.
  */
-export async function listSupplierPhase2Requests(supplierId, userEmail) {
+export async function listSupplierPhase2Requests(supplierId) {
     try {
-        if (userEmail) await assignmentModel.claimByEmails(supplierId, [userEmail]);
+        const emails = (await supplierUserModel.getActiveEmailsBySupplier(supplierId)).map((row) => row.email);
+        await assignmentModel.claimByEmails(supplierId, emails);
 
         const rows = await assignmentModel.listOpenBySupplier(supplierId);
         const result = rows.map((row) => ({

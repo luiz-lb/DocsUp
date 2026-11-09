@@ -153,12 +153,20 @@ export async function updateUser(transaction, id, { name, email }) {
     return result.rowsAffected[0] > 0;
 }
 
-/** Marca o e-mail como confirmado (login com o código enviado para ele). */
-export async function markEmailVerified(id) {
+/**
+ * Marca o e-mail como confirmado (login com o código enviado para ele). Só confirma se o
+ * e-mail do usuário ainda é o mesmo para onde o código foi enviado.
+ */
+export async function markEmailVerified(id, email) {
     const pool = await poolPromise;
     await pool.request()
         .input('id', sql.Int, id)
-        .query('UPDATE supplier_users SET email_verified_at = GETDATE() WHERE id = @id AND email_verified_at IS NULL');
+        .input('email', sql.NVarChar(200), email)
+        .query(`
+            UPDATE supplier_users
+            SET email_verified_at = GETDATE()
+            WHERE id = @id AND email = @email AND email_verified_at IS NULL
+        `);
 }
 
 /**
