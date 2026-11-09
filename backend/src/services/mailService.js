@@ -24,6 +24,11 @@ function getTransporter() {
             port: Number(process.env.SMTP_PORT || 587),
             secure: process.env.SMTP_SECURE === 'true',
             ...(hasAuth ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } } : {}),
+            // Conexões reaproveitadas (vários avisos de uma vez não abrem uma conexão cada).
+            // SMTP_POOL=false volta para uma conexão por e-mail.
+            pool: process.env.SMTP_POOL !== 'false',
+            maxConnections: 3,
+            maxMessages: 50,
             connectionTimeout: 15000,
             greetingTimeout: 15000,
             socketTimeout: 30000,
