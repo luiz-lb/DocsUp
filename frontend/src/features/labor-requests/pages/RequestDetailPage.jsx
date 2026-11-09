@@ -15,6 +15,7 @@ import { concludeLaborRequest } from '../api/laborRequestsApi.js';
 import {
   LABOR_REQUEST_STATUS,
   LABOR_REQUEST_STATUS_ID,
+  CONCLUDABLE_STATUS_IDS,
   URGENCY,
   DOCUMENT_CATEGORY,
   DOCUMENT_CATEGORY_ID,
@@ -27,11 +28,13 @@ import ApprovePanel from '../components/ApprovePanel.jsx';
 import SupplierAssignmentCard from '../components/SupplierAssignmentCard/index.js';
 import styles from './RequestDetailPage.module.css';
 
-// Solicitações com fornecedor (aguardando indicação, bloqueada, em contratação, concluída)
+// Solicitações com fornecedor (aguardando indicação, bloqueada, pendente de documentação,
+// serviço em andamento, concluída)
 const SUPPLIER_STATUSES = [
   LABOR_REQUEST_STATUS_ID.AGUARDANDO_FORNECEDOR,
   LABOR_REQUEST_STATUS_ID.BLOQUEADA,
-  LABOR_REQUEST_STATUS_ID.EM_CONTRATACAO,
+  LABOR_REQUEST_STATUS_ID.PENDENTE_DOCUMENTACAO,
+  LABOR_REQUEST_STATUS_ID.EM_ANDAMENTO,
   LABOR_REQUEST_STATUS_ID.CONCLUIDA,
 ];
 
@@ -80,8 +83,8 @@ export default function RequestDetailPage() {
   const hasSupplierStage = SUPPLIER_STATUSES.includes(request.status);
 
   const canApprove = necessaryAprove && isPending && !approvalDone;
-  // RH e Compras concluem o contrato de uma solicitação em contratação
-  const canConclude = request.status === LABOR_REQUEST_STATUS_ID.EM_CONTRATACAO
+  // RH e Compras concluem o contrato (Pendente de documentação ou Serviço em andamento)
+  const canConclude = CONCLUDABLE_STATUS_IDS.includes(request.status)
     && canAccess(user.department, ACCESS.concludeContract);
 
   const handleApprovalSuccess = () => {

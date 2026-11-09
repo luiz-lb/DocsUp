@@ -20,6 +20,7 @@ import {
     DEADLINE_MAX_DAYS_AHEAD,
     DEADLINE_MAX_HOURS,
     LABOR_REQUEST_STATUSES,
+    REOPENABLE_STATUSES,
 } from '../constants/laborRequest.js';
 
 // Violação de UNIQUE (dois cliques ao mesmo tempo criando o vínculo da mesma solicitação)
@@ -178,16 +179,14 @@ async function loadChangeableRequest(laborRequestId) {
     return { request };
 }
 
-// Status em que reenviar / trocar o fornecedor volta a solicitação para Em contratação
-const REOPENABLE_STATUSES = [LABOR_REQUEST_STATUSES.BLOCKED, LABOR_REQUEST_STATUSES.IN_CONTRACTING];
-
 /**
- * Leva a solicitação para Em contratação, na transação da ação, só se ela ainda estiver num dos
- * status esperados. Se mudou no meio do caminho (ex.: alguém concluiu o contrato), desfaz tudo.
+ * Leva a solicitação para Pendente de documentação, na transação da ação, só se ela ainda
+ * estiver num dos status esperados. Se mudou no meio do caminho (ex.: alguém concluiu o
+ * contrato), desfaz tudo.
  */
-async function moveToInContracting(transaction, laborRequestId, actorId, fromStatuses) {
+async function moveToPendingDocumentation(transaction, laborRequestId, actorId, fromStatuses) {
     const moved = await laborRequestModel.updateStatusFrom(
-        transaction, laborRequestId, LABOR_REQUEST_STATUSES.IN_CONTRACTING, actorId, fromStatuses,
+        transaction, laborRequestId, LABOR_REQUEST_STATUSES.PENDING_DOCUMENTATION, actorId, fromStatuses,
     );
     if (!moved) throw Object.assign(new Error('A solicitação mudou.'), { conflict: true });
 }
@@ -309,7 +308,7 @@ export async function lookupSupplierEmail(rawEmail) {
  * Indica o fornecedor da solicitação (aprovada, ainda sem fornecedor) pelo e-mail e define o
  * prazo dos documentos iniciais. E-mail de um usuário do portal → vinculado na hora (a
  * solicitação aparece para ele); senão o link leva ao cadastro. A solicitação vai para
- * Em contratação.
+ * Pendente de documentação.
  *
  * @param {{ email, deadlineHours?, deadlineAt? }} payload
  * @param {{ id }} actor — colaborador logado (Compras / Admin)
@@ -347,7 +346,7 @@ export async function assignSupplier(laborRequestId, payload = {}, actor, contex
                 deadlineAt: deadline.value,
                 createdBy: actor.id,
             });
-            await moveToInContracting(transaction, laborRequestId, actor.id, [LABOR_REQUEST_STATUSES.AWAITING_SUPPLIER]);
+            await moveToPendingDocumentation(transaction, laborRequestId, actor.id, [LABOR_REQUEST_STATUSES.AWAITING_SUPPLIER]);
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_CREATE, laborRequestId, null, {
                 invite_email: email,
                 supplier: supplier.supplierName,
@@ -433,7 +432,7 @@ export async function resendInvite(laborRequestId, payload = {}, actor, context 
                 deadlineAt: deadline.value,
                 createdBy: actor.id,
             });
-            await moveToInContracting(transaction, laborRequestId, actor.id, REOPENABLE_STATUSES);
+            await moveToPendingDocumentation(transaction, laborRequestId, actor.id, REOPENABLE_STATUSES);
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_RESEND, laborRequestId,
                 auditSnapshot(current),
                 { invite_email: current.invite_email, deadline_at: toLocalDateTimeText(deadline.value) });
@@ -545,7 +544,7 @@ export async function replaceSupplier(laborRequestId, payload = {}, actor, conte
                 deadlineAt: deadline.value,
                 createdBy: actor.id,
             });
-            await moveToInContracting(transaction, laborRequestId, actor.id, REOPENABLE_STATUSES);
+            await moveToPendingDocumentation(transaction, laborRequestId, actor.id, REOPENABLE_STATUSES);
             await auditAssignment(transaction, context, AUDIT_ACTIONS.SUPPLIER_ASSIGNMENT_REPLACE, laborRequestId,
                 auditSnapshot(current),
                 {

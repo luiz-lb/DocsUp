@@ -4,10 +4,25 @@ export const LABOR_REQUEST_STATUSES = Object.freeze({
     REJECTED: 2,           // Reprovada
     AWAITING_SUPPLIER: 3,  // Aprovada: aguardando Compras indicar o fornecedor
     BLOCKED: 4,            // Fornecedor declarou não ter documento da empresa (Compras decide)
-    IN_CONTRACTING: 5,     // Fornecedor indicado: declaração e documentos
+    PENDING_DOCUMENTATION: 5, // Pendente de documentação: fornecedor indicado (declaração e documentos iniciais)
     CONCLUDED: 6,          // Contrato concluído (encerra a cobrança dos documentos mensais)
     CANCELED: 7,
+    IN_PROGRESS: 8,        // Serviço em andamento: o RH aprovou todos os documentos iniciais
 });
+
+// Status em que o contrato pode ser concluído (RH / Compras)
+export const CONCLUDABLE_STATUSES = [
+    LABOR_REQUEST_STATUSES.PENDING_DOCUMENTATION,
+    LABOR_REQUEST_STATUSES.IN_PROGRESS,
+];
+
+// Status em que reenviar o convite / trocar o fornecedor volta a solicitação para
+// Pendente de documentação
+export const REOPENABLE_STATUSES = [
+    LABOR_REQUEST_STATUSES.BLOCKED,
+    LABOR_REQUEST_STATUSES.PENDING_DOCUMENTATION,
+    LABOR_REQUEST_STATUSES.IN_PROGRESS,
+];
 
 // labor_request_suppliers.status
 export const ASSIGNMENT_STATUSES = Object.freeze({

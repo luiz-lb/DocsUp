@@ -46,7 +46,8 @@ export function useDashboardSummary(department) {
       pendingApprovals: countOf(LABOR_REQUEST_STATUS_ID.PENDENTE),
       awaitingSupplier: countOf(LABOR_REQUEST_STATUS_ID.AGUARDANDO_FORNECEDOR),
       blocked: countOf(LABOR_REQUEST_STATUS_ID.BLOQUEADA),
-      inContracting: countOf(LABOR_REQUEST_STATUS_ID.EM_CONTRATACAO),
+      pendingDocumentation: countOf(LABOR_REQUEST_STATUS_ID.PENDENTE_DOCUMENTACAO),
+      inProgress: countOf(LABOR_REQUEST_STATUS_ID.EM_ANDAMENTO),
       statusDistribution: byStatus,
       urgencyDistribution: byUrgency,
       // 5 solicitações mais recentes (a lista já vem da mais nova para a mais antiga)

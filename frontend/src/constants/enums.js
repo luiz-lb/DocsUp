@@ -102,9 +102,10 @@ export const LABOR_REQUEST_STATUS = {
   2: { label: 'Reprovado', tone: 'danger' },
   3: { label: 'Aguardando fornecedor', tone: 'indigo' },
   4: { label: 'Bloqueada (fornecedor sem documento)', tone: 'danger' },
-  5: { label: 'Em Contratação', tone: 'teal' },
+  5: { label: 'Pendente de documentação', tone: 'warning' },
   6: { label: 'Concluído', tone: 'success' },
   7: { label: 'Cancelado', tone: 'danger' },
+  8: { label: 'Serviço em andamento', tone: 'teal' },
 };
 
 // Ids do LABOR_REQUEST_STATUS por nome (mesmos valores do backend)
@@ -113,10 +114,14 @@ export const LABOR_REQUEST_STATUS_ID = {
   REPROVADA: 2,
   AGUARDANDO_FORNECEDOR: 3,
   BLOQUEADA: 4,
-  EM_CONTRATACAO: 5,
+  PENDENTE_DOCUMENTACAO: 5, // fornecedor indicado: declaração e documentos iniciais
   CONCLUIDA: 6,
   CANCELADA: 7,
+  EM_ANDAMENTO: 8,          // RH aprovou todos os documentos iniciais
 };
+
+// Status em que o contrato pode ser concluído (RH / Compras)
+export const CONCLUDABLE_STATUS_IDS = [LABOR_REQUEST_STATUS_ID.PENDENTE_DOCUMENTACAO, LABOR_REQUEST_STATUS_ID.EM_ANDAMENTO];
 
 // labor_request_suppliers.status: o fornecedor indicado na solicitação
 export const ASSIGNMENT_STATUS = {
@@ -264,6 +269,7 @@ export const AUDIT_ACTION = {
   'supplier_assignment.replace': { label: 'Fornecedor trocado', tone: 'warning' },
   'supplier_assignment.declare': { label: 'Declaração do fornecedor assinada', tone: 'info' },
   'labor_request.conclude': { label: 'Contrato concluído', tone: 'success' },
+  'labor_request.in_progress': { label: 'Serviço em andamento (documentos iniciais aprovados)', tone: 'teal' },
 };
 
 /** Helper genérico: resolve { label, tone } de um enum, com fallback seguro. */

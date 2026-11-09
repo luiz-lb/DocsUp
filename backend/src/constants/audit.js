@@ -37,6 +37,8 @@ export const AUDIT_ACTIONS = Object.freeze({
     SUPPLIER_ASSIGNMENT_REPLACE: 'supplier_assignment.replace',
     SUPPLIER_ASSIGNMENT_DECLARE: 'supplier_assignment.declare',
     LABOR_REQUEST_CONCLUDE: 'labor_request.conclude',
+    // Todos os documentos iniciais aprovados: Serviço em andamento (automático)
+    LABOR_REQUEST_IN_PROGRESS: 'labor_request.in_progress',
     SETTINGS_UPDATE: 'settings.update',
 });
 

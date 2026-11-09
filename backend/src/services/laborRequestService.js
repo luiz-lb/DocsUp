@@ -7,7 +7,7 @@ import { toInteger } from '../utils/parse.js'
 import * as auditModel from '../models/auditModel.js'
 import { collaboratorAuditEntry } from '../utils/audit.js'
 import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js'
-import { LABOR_REQUEST_STATUSES } from '../constants/laborRequest.js'
+import { CONCLUDABLE_STATUSES, LABOR_REQUEST_STATUSES } from '../constants/laborRequest.js'
 import { parseLocalDate } from '../utils/dates.js'
 
 // Categorias que a Segurança escolhe na aprovação: empresa e outros do colaborador.
@@ -305,7 +305,8 @@ export async function approveRequest(laborRequestId, approverId, department, dec
 }
 
 /**
- * Conclui o contrato (RH ou Compras): a solicitação precisa estar em contratação. Depois disso
+ * Conclui o contrato (RH ou Compras): a solicitação precisa estar Pendente de documentação ou
+ * com o Serviço em andamento. Depois disso
  * não há novas competências de documentos mensais a cobrar; o fornecedor ainda vê o contrato
  * e pode enviar o que ficou pendente até o mês da conclusão. Grava na auditoria.
  */
@@ -313,11 +314,11 @@ export async function concludeRequest(laborRequestId, actor, context = {}) {
     try {
         const request = await laborRequestModel.getLaborRequestById(laborRequestId);
         if (!request) return { success: false, status: 404, message: 'Solicitação não encontrada.' };
-        if (request.status !== LABOR_REQUEST_STATUSES.IN_CONTRACTING) {
+        if (!CONCLUDABLE_STATUSES.includes(request.status)) {
             return {
                 success: false,
                 status: 400,
-                message: 'Só dá para concluir o contrato de uma solicitação em contratação.',
+                message: 'Só dá para concluir o contrato com o fornecedor indicado (Pendente de documentação ou Serviço em andamento).',
             };
         }
 

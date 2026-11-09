@@ -1,3 +1,4 @@
+import * as contractProgressService from './contractProgressService.js';
 import axios from 'axios';
 import { sql, poolPromise } from '../config/dbConfig.js';
 import * as documentValidationModel from '../models/documentValidationModel.js';
@@ -151,6 +152,7 @@ export async function triggerDocumentValidation(documentId, supplierId) {
                     finalStatus: 1, // Aprovado
                 });
                 await documentValidationModel.updateDocumentStatus(transaction, documentId, 2); // Aprovado
+                await contractProgressService.onDocumentStatusChanged(transaction, documentId, 2);
             } else if (valid === false) {
                 // Reprovado pela API
                 validationRecord = await documentValidationModel.insertValidation(transaction, {
@@ -304,6 +306,7 @@ export async function reviewDocument(validationId, documentId, reviewerId, decis
         // status do documento: 2=Aprovado, 3=Reprovado / 4=Reenvio Necessário
         const docStatus = decision === 1 ? 2 : 4;
         await documentValidationModel.updateDocumentStatus(transaction, documentId, docStatus);
+        await contractProgressService.onDocumentStatusChanged(transaction, documentId, docStatus, { actorId: reviewerId });
 
         await trasaction.finalizarTransacao(transaction, true);
         transactionDone = true;
@@ -386,6 +389,7 @@ export async function setDocumentStatus(documentId, status, reviewer, comments, 
         const { manualDecision, finalStatus } = reviewDecision(status);
         await trasaction.executarEmTransacao(async (transaction) => {
             await documentValidationModel.updateDocumentStatus(transaction, documentId, status);
+            await contractProgressService.onDocumentStatusChanged(transaction, documentId, status, context);
             await documentValidationModel.insertManualReview(transaction, {
                 documentId,
                 reviewerId: reviewer.id,

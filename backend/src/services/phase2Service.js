@@ -1,3 +1,4 @@
+import * as contractProgressService from './contractProgressService.js';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -429,11 +430,11 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
             if (!declared) throw Object.assign(new Error('Declaração já enviada.'), { conflict: true });
 
             if (blocked) {
-                // Só bloqueia a solicitação que está em contratação: se ela mudou no meio do
+                // Só bloqueia a solicitação que está Pendente de documentação: se ela mudou no meio do
                 // caminho (ex.: concluída), a declaração inteira é desfeita
                 const changed = await laborRequestModel.setStatusBySystem(
                     transaction, assignment.labor_request_id, LABOR_REQUEST_STATUSES.BLOCKED,
-                    [LABOR_REQUEST_STATUSES.IN_CONTRACTING],
+                    [LABOR_REQUEST_STATUSES.PENDING_DOCUMENTATION],
                 );
                 if (!changed) throw Object.assign(new Error('A solicitação mudou.'), { conflict: true });
             }
@@ -453,6 +454,14 @@ export async function submitDeclaration(token, supplier, payload = {}, context =
                 ipAddress: context.ipAddress ?? null,
                 userAgent: context.userAgent ?? null,
             });
+            // Reenvio para o mesmo fornecedor com tudo já aprovado (ou nada a enviar): o contrato
+            // já está com a documentação completa
+            if (!blocked) {
+                await contractProgressService.advanceIfInitialDocumentationApproved(transaction, {
+                    laborRequestId: assignment.labor_request_id,
+                    supplierId: supplier.supplierId,
+                });
+            }
         });
     } catch (error) {
         if (error.conflict) {

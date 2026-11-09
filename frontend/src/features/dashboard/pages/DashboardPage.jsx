@@ -7,6 +7,7 @@ import {
   LuMail,
   LuOctagonAlert,
   LuArrowRight,
+  LuHardHat,
 } from 'react-icons/lu';
 import { Banner, Button, Card, PageHeader, StatusBadge, EmptyState } from '../../../components/ui/index.js';
 import {
@@ -22,8 +23,6 @@ import { formatDate } from '../../../utils/formatters.js';
 import { useDashboardSummary } from '../hooks/useDashboardSummary.js';
 import styles from './DashboardPage.module.css';
 
-// Filtro combinado: Aguardando fornecedor (3) + Bloqueada (4) + Em Contratação (5)
-const EM_ANDAMENTO_STATUS = '3,4,5';
 
 export default function DashboardPage() {
   const { user, departmentLabel } = useAuth();
@@ -40,15 +39,6 @@ export default function DashboardPage() {
 
   const metrics = [
     {
-      key: 'requests',
-      icon: LuClipboardList,
-      // "Em andamento": aguardando fornecedor + bloqueadas + em contratação
-      label: 'Em andamento (fornecedor)',
-      value: data.awaitingSupplier + data.blocked + data.inContracting,
-      to: listWithStatus(EM_ANDAMENTO_STATUS),
-      tone: 'indigo',
-    },
-    {
       key: 'approvals',
       icon: LuTriangleAlert,
       label: isSeguranca ? 'Aguardando sua aprovação' : 'Aguardando aprovação de Segurança do Trabalho',
@@ -63,6 +53,22 @@ export default function DashboardPage() {
       value: data.awaitingSupplier,
       to: listWithStatus(LABOR_REQUEST_STATUS_ID.AGUARDANDO_FORNECEDOR),
       tone: 'info',
+    },
+    {
+      key: 'pendingDocumentation',
+      icon: LuClipboardList,
+      label: 'Pendentes de documentação',
+      value: data.pendingDocumentation,
+      to: listWithStatus(LABOR_REQUEST_STATUS_ID.PENDENTE_DOCUMENTACAO),
+      tone: 'indigo',
+    },
+    {
+      key: 'inProgress',
+      icon: LuHardHat,
+      label: 'Serviços em andamento',
+      value: data.inProgress,
+      to: listWithStatus(LABOR_REQUEST_STATUS_ID.EM_ANDAMENTO),
+      tone: 'teal',
     },
     {
       key: 'blocked',

@@ -266,7 +266,7 @@ export async function concludeRequest(transaction, laborRequestId, userId) {
                 concluded_by = @user_id,
                 updated_at = GETDATE(),
                 update_by_id = @user_id
-            WHERE id = @id AND [status] = 5
+            WHERE id = @id AND [status] IN (5, 8) -- Pendente de documentação / Serviço em andamento
         `);
     return result.rowsAffected[0] > 0;
 }

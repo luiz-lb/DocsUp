@@ -9,9 +9,9 @@ import { useDebouncedValue } from '../../../hooks/useDebouncedValue.js';
 import { useLaborRequests } from '../hooks/useLaborRequests.js';
 import styles from './RequestListPage.module.css';
 
-// Filtro combinado usado no atalho do painel "Solicitações em aberto":
-// Aguardando fornecedor (3) + Bloqueada (4) + Em Contratação (5).
-const EM_ANDAMENTO_STATUS = '3,4,5';
+// Filtro combinado: solicitações com o fornecedor em aberto (aguardando indicação, bloqueada,
+// pendente de documentação e serviço em andamento)
+const OPEN_SUPPLIER_STATUS = '3,4,5,8';
 
 const COLUMNS = [
   {
@@ -89,7 +89,7 @@ export default function RequestListPage() {
         <div className={styles.filters}>
           <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Filtrar por status">
             <option value="">Todos os status</option>
-            <option value={EM_ANDAMENTO_STATUS}>Em andamento (fornecedor)</option>
+            <option value={OPEN_SUPPLIER_STATUS}>Em aberto (com fornecedor)</option>
             {Object.entries(LABOR_REQUEST_STATUS).map(([value, { label }]) => (
               <option key={value} value={value}>
                 {label}
