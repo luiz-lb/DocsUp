@@ -1,6 +1,6 @@
 import { EVENT_TYPES } from '../../events/catalog.js';
 import {
-    appUrl, badge, bulletList, callout, dataTable, esc, infoRows, layout, paragraph, plainText, sectionTitle,
+    appUrl, badge, bulletList, callout, dataTable, esc, infoRows, layout, paragraph, plainText, sectionTitle, statCards,
 } from './layout.js';
 
 /**
@@ -133,7 +133,80 @@ function monthlyRender(data) {
     };
 }
 
+const DOC_STATUS_TONES = { 0: 'warning', 1: 'info', 2: 'success', 3: 'danger', 4: 'danger', 5: 'neutral' };
+
+function digestRender(data) {
+    const t = data.totals;
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const subject = t.documents > 0
+        ? `Resumo do RH: ${plural(t.documents, 'documento', 'documentos')} de ${plural(t.suppliers, 'fornecedor', 'fornecedores')} (${data.periodText})`
+        : `Resumo do RH: novidades de ${data.periodText}`;
+    const stats = statCards([
+        { label: 'Documentos recebidos', value: t.documents, tone: 'brand' },
+        { label: 'Reenviados', value: t.resent, tone: t.resent > 0 ? 'warning' : 'neutral' },
+        { label: 'Fornecedores', value: t.suppliers, tone: 'info' },
+        { label: 'Bloqueios / prazos', value: t.blocked + t.expired, tone: t.blocked + t.expired > 0 ? 'danger' : 'neutral' },
+    ]);
+
+    const documentsBlock = (data.suppliers ?? []).map((supplier) => {
+        const contracts = supplier.contracts.map((contract) => {
+            const label = contract.contractNumber ? `Contrato ${contract.contractNumber} · ${contract.title}` : contract.title;
+            const link = contract.requestId ? ` <a href="${esc(appUrl(`/solicitacoes/${contract.requestId}`))}" style="color:#004643;font-size:12px;">abrir</a>` : '';
+            return `<p style="margin:10px 0 4px;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#374151;">${esc(label)}${link}</p>`
+                + dataTable(
+                    [{ label: 'Documento' }, { label: 'Colaborador / mês' }, { label: 'Situação', width: '30%' }],
+                    contract.documents.map((doc) => [
+                        `${esc(doc.name)}${doc.resent ? ` ${badge('Reenviado', 'warning')}` : ''}`,
+                        [doc.employee ? esc(doc.employee) : '<span style="color:#6b7280;">Empresa</span>', doc.competence ? `<span style="color:#6b7280;">${esc(doc.competence)}</span>` : ''].filter(Boolean).join('<br>'),
+                        badge(doc.statusLabel, DOC_STATUS_TONES[doc.status] ?? 'neutral'),
+                    ]),
+                );
+        }).join('');
+        return `<p style="margin:22px 0 2px;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;font-weight:800;color:#004643;">${esc(supplier.name)}</p>` + contracts;
+    }).join('');
+
+    const declarations = (data.declarations ?? []).length > 0
+        ? sectionTitle('Declarações assinadas') + bulletList(data.declarations.map((item) =>
+            `${item.supplierName}: ${item.contractNumber ? `Contrato ${item.contractNumber} · ` : ''}${item.title}${item.blocked ? ' (bloqueada: não tem documento da empresa)' : ''}`))
+        : '';
+    const expired = (data.expired ?? []).length > 0
+        ? sectionTitle('Prazos dos documentos iniciais que venceram') + bulletList(data.expired.map((item) =>
+            `${item.supplierName}: ${item.contractNumber ? `Contrato ${item.contractNumber} · ` : ''}${item.title} (prazo ${item.deadlineText})`), 'danger')
+        : '';
+    const more = data.moreDocuments > 0 ? paragraph(`<span style="color:#6b7280;">e mais ${data.moreDocuments} documento(s) no sistema.</span>`) : '';
+    const url = appUrl('/documentos/fornecedores');
+
+    return {
+        subject,
+        html: layout({
+            preheader: `${plural(t.documents, 'documento recebido', 'documentos recebidos')}${t.resent ? `, ${t.resent} reenviado(s)` : ''}.`,
+            eyebrow: 'Resumo do RH',
+            eyebrowTone: 'brand',
+            title: 'Novidades da documentação',
+            intro: `Período: <strong>${esc(data.periodText)}</strong>.`,
+            body: stats
+                + (documentsBlock ? sectionTitle('Documentos recebidos') + documentsBlock + more : '')
+                + declarations + expired,
+            cta: { label: 'Abrir Docs de Fornecedores', url },
+            note: `Este resumo sai a cada ${data.intervalHours ?? 1} hora(s), só quando há novidade. Para mudar, use Parâmetros → Notificações.`,
+        }),
+        text: plainText({
+            title: `Resumo do RH (${data.periodText})`,
+            lines: [
+                `Documentos recebidos: ${t.documents} (reenviados: ${t.resent})`,
+                ...(data.suppliers ?? []).flatMap((supplier) => supplier.contracts.flatMap((contract) => contract.documents.map((doc) =>
+                    `- ${supplier.name} · ${contract.contractNumber ?? contract.title}: ${doc.name}${doc.employee ? ` (${doc.employee})` : ''}${doc.resent ? ' [reenviado]' : ''}`))),
+                t.declarations ? `Declarações assinadas: ${t.declarations} (bloqueadas: ${t.blocked})` : null,
+                t.expired ? `Prazos vencidos: ${t.expired}` : null,
+            ],
+            url,
+        }),
+    };
+}
+
 const RENDERERS = {
+    [EVENT_TYPES.RH_DIGEST]: digestRender,
+
     [EVENT_TYPES.SUPPLIER_INVITED](data) {
         const texts = INVITE_TEXTS[data.kind] ?? INVITE_TEXTS.new;
         const title = 'Sua empresa foi indicada para um serviço';

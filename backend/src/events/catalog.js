@@ -34,6 +34,8 @@ export const EVENT_TYPES = Object.freeze({
     // Compras
     PURCHASING_CONTRACT_BLOCKED: 'purchasing.contract_blocked',
     PURCHASING_INITIAL_DEADLINE_EXPIRED: 'purchasing.initial_deadline_expired',
+    // RH
+    RH_DIGEST: 'rh.digest',
 });
 
 /**
@@ -130,6 +132,13 @@ export const EVENT_DEFINITIONS = Object.freeze({
         audience: AUDIENCES.PURCHASING,
         label: 'Prazo dos documentos iniciais vencido',
         description: 'Aviso a Compras quando o prazo acaba sem o fornecedor ter enviado tudo (alterar o prazo ou trocar o fornecedor).',
+        scheduled: true,
+    },
+    [EVENT_TYPES.RH_DIGEST]: {
+        topic: TOPICS.INTERNAL,
+        audience: AUDIENCES.RH,
+        label: 'Resumo do RH',
+        description: 'A cada X horas (Prazos dos avisos): documentos enviados e reenviados por fornecedor e contrato, declarações, bloqueios e prazos vencidos. Sem novidade, não sai e-mail.',
         scheduled: true,
     },
 });
