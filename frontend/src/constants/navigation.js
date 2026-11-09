@@ -33,7 +33,9 @@ export const NAV_ITEMS = [
   { label: 'Auditoria', to: ROUTES.audit.list, icon: LuHistory, department: ACCESS.admin },
 ];
 
+// hidden: fora do menu por enquanto (a rota continua). "Documentos" volta depois com outro título.
 export function visibleNavItems(department) {
-  if (department === DEPARTMENT_ID.ADMIN) return NAV_ITEMS;
-  return NAV_ITEMS.filter((item) => !item.department || item.department.includes(department));
+  const items = NAV_ITEMS.filter((item) => !item.hidden);
+  if (department === DEPARTMENT_ID.ADMIN) return items;
+  return items.filter((item) => !item.department || item.department.includes(department));
 }
