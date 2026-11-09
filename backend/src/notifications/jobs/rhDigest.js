@@ -128,7 +128,9 @@ registerJob({
         const recipients = digest ? await digestModel.rhEmails() : [];
         let enqueued = null;
         await trasaction.executarEmTransacao(async (transaction) => {
-            await settingsModel.setSetting(transaction, CURSOR_KEY, toLocalDateTimeText(end), null);
+            // Primeiro o evento, depois o cursor: o enqueueEvent lê os parâmetros (app_settings)
+            // por outra conexão; com o cursor já gravado nesta transação, essa leitura esperaria
+            // o bloqueio da própria transação.
             if (digest && recipients.length > 0) {
                 enqueued = await enqueueEvent(transaction, {
                     type: EVENT_TYPES.RH_DIGEST,
@@ -138,6 +140,7 @@ registerJob({
                     data: { ...digest, intervalHours: settings.rhDigestIntervalHours },
                 });
             }
+            await settingsModel.setSetting(transaction, CURSOR_KEY, toLocalDateTimeText(end), null);
         });
         return enqueued ? 1 : 0;
     },
