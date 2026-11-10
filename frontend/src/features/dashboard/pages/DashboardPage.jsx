@@ -127,7 +127,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className={styles.metricGrid}>
+      <div className={styles.metricGrid} style={{ '--cols': metrics.length }}>
         {metrics.map(({ key, icon: Icon, label, value, to, tone }) => (
           <button key={key} type="button" className={styles.metricCard} onClick={() => navigate(to)}>
             <Icon className={styles.metricIcon} data-tone={tone} />

@@ -1,8 +1,28 @@
 .metricGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    /* Celular: 1 coluna; tablet / notebook pequeno: 3; tela larga: todos numa linha (--cols) */
+    grid-template-columns: 1fr;
     gap: 1em;
     margin-bottom: 1.5em;
+}
+
+@media (min-width: 560px) {
+    .metricGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 900px) {
+    .metricGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .metricGrid {
+        grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
+        gap: 0.75em;
+    }
 }
 
 .metricCard {
