@@ -1,3 +1,4 @@
+import { open } from '../../utils/secretBox.js';
 import { EVENT_TYPES } from '../../events/catalog.js';
 import {
     appUrl, badge, bulletList, callout, dataTable, esc, infoRows, layout, paragraph, plainText, sectionTitle, statCards,
@@ -207,6 +208,25 @@ function digestRender(data) {
 }
 
 const RENDERERS = {
+    // Código de acesso: aberto só aqui, na hora de montar o e-mail (nunca vai para log nem para o registro)
+    [EVENT_TYPES.SUPPLIER_ACCESS_CODE](data) {
+        const code = open(data.sealedCode);
+        if (!/^[0-9]{6}$/.test(code)) throw new Error('código de acesso inválido');
+        return {
+            subject: 'Seu código de acesso ao Portal do Fornecedor',
+            html: layout({
+                preheader: 'Use este código para entrar no Portal do Fornecedor.',
+                eyebrow: 'Código de acesso',
+                title: 'Portal do Fornecedor',
+                intro: `Olá, ${esc(data.name)}. Um acesso foi pedido para <strong>${esc(data.companyName)}</strong>. Seu código é:`,
+                body: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;"><tr>
+                    <td align="center" style="background:#f6f7f6;border:1px dashed #b9d3d0;border-radius:12px;padding:18px;font-family:Consolas,'Courier New',monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#004643;">${code}</td>
+                </tr></table>`,
+                note: 'O código vale por 10 minutos. Se não foi você, ignore este e-mail: ninguém entra sem a senha.',
+            }),
+        };
+    },
+
     [EVENT_TYPES.RH_DIGEST]: digestRender,
 
     [EVENT_TYPES.SUPPLIER_INVITED](data) {

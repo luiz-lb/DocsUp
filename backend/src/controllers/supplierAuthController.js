@@ -67,7 +67,7 @@ export async function login(req, res) {
             body: {
                 message: 'Código enviado para o seu e-mail.',
                 requiresMfa: true,
-                // Apenas fora de produção, para testar sem SMTP
+                // Apenas fora de produção, para testar sem e-mail
                 ...(result.devOtp && { devOtp: result.devOtp }),
             },
         });

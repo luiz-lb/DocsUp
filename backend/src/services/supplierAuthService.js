@@ -7,8 +7,8 @@ import * as supplierUserModel from '../models/supplierUserModel.js';
 import * as auditModel from '../models/auditModel.js';
 import * as trasaction from '../models/trasaction.js';
 import { getSupplierJwtSecret } from '../config/jwtSecrets.js';
-import { sendMail } from './mailService.js';
-import { esc, layout } from '../notifications/templates/layout.js';
+import * as producers from '../events/producers.js';
+import { hasSecretKey } from '../utils/secretBox.js';
 import { cnpjDigits, formatCnpj, isValidCnpj } from '../utils/cnpj.js';
 import { normalizeEmail } from '../utils/email.js';
 import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
@@ -481,32 +481,32 @@ export async function loginPhase1(email, password, session) {
         attempts: 0,
     };
 
-    // Código de segurança: vai direto (não passa pela fila de eventos nem fica em log)
-    const sent = await sendMail({
-        to: user.email,
-        subject: 'Seu código de acesso ao Portal do Fornecedor',
-        html: layout({
-            preheader: 'Use este código para entrar no Portal do Fornecedor.',
-            eyebrow: 'Código de acesso',
-            title: 'Portal do Fornecedor',
-            intro: `Olá, ${esc(user.name)}. Um acesso foi pedido para <strong>${esc(user.razao_social)}</strong>. Seu código é:`,
-            body: `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;"><tr>
-                <td align="center" style="background:#f6f7f6;border:1px dashed #b9d3d0;border-radius:12px;padding:18px;font-family:Consolas,'Courier New',monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:#004643;">${otp}</td>
-            </tr></table>`,
-            note: 'O código vale por 10 minutos. Se não foi você, ignore este e-mail: ninguém entra sem a senha.',
-        }),
-        text: `Seu código de acesso ao Portal do Fornecedor: ${otp}
-Vale por 10 minutos. Se não foi você, ignore este e-mail.`,
-    });
-
-    if (!sent && process.env.NODE_ENV !== 'production') {
-        console.log(`[DEV] Código de acesso para ${user.email}: ${otp}`);
+    // O código vai por e-mail pelo Kafka (notifier → Microsoft Graph), criptografado no evento.
+    // Nunca aparece em log nem em "Últimos envios".
+    if (hasSecretKey()) {
+        try {
+            await producers.supplierAccessCode({
+                email: user.email,
+                name: user.name,
+                companyName: user.razao_social,
+                code: otp,
+                expiresAt: session.mfaPending.expiresAt,
+            });
+        } catch (error) {
+            console.error('loginPhase1: erro ao gravar o envio do código:', error.message);
+            delete session.mfaPending;
+            return { success: false, status: 500, message: 'Não foi possível enviar o código de acesso. Tente de novo.' };
+        }
+    } else if (process.env.NODE_ENV === 'production') {
+        console.error('loginPhase1: MAIL_SECRET_KEY não configurada: o código de acesso não pode ser enviado.');
+        delete session.mfaPending;
+        return { success: false, status: 500, message: 'Envio do código de acesso não configurado. Fale com o suporte.' };
     }
 
     return {
         success: true,
         requiresMfa: true,
-        // Fora de produção o código volta na resposta (para testar sem SMTP)
+        // Fora de produção o código volta na resposta (para testar sem e-mail)
         ...(process.env.NODE_ENV !== 'production' && { devOtp: otp }),
     };
 }

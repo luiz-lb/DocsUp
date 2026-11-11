@@ -15,13 +15,16 @@ import { isMailEnabled } from './src/services/mailService.js';
  *  3. novas tentativas: reenviam o que falhou (espera crescente; na 5ª falha, fila de erro);
  *  4. agendador: prazos, calendário dos mensais e resumo do RH.
  *
- * Se o Kafka estiver fora do ar, os eventos esperam na outbox e o notifier continua tentando.
+ * E-mails pelo Microsoft Graph (caixa GRAPH_SENDER). Se o Kafka estiver fora do ar, os eventos
+ * esperam na outbox e o notifier continua tentando; se o Kafka voltar sem os tópicos (container
+ * recriado), eles são recriados sozinhos.
  */
 
 const log = (message) => console.log(`${new Date().toISOString()} ${message}`);
 const RELAY_INTERVAL_MS = Number(process.env.NOTIFIER_RELAY_INTERVAL_MS || 1000);
 const RETRY_INTERVAL_MS = Number(process.env.NOTIFIER_RETRY_INTERVAL_MS || 15000);
 const SCHEDULER_INTERVAL_MS = Number(process.env.NOTIFIER_SCHEDULER_INTERVAL_MS || 60000);
+const TOPIC_CHECK_MS = Number(process.env.NOTIFIER_TOPIC_CHECK_MS || 30000);
 
 const kafka = createKafka();
 const dlqProducer = createProducer(kafka);
@@ -56,6 +59,23 @@ async function waitForKafka() {
     }
 }
 
+// Recria os tópicos que sumirem (Kafka recriado sem o volume, por exemplo). Chamado de tempos em
+// tempos e quando um consumidor cai; nunca roda duas vezes ao mesmo tempo.
+let topicCheck = null;
+function recreateMissingTopics(reason) {
+    if (topicCheck || shuttingDown) return topicCheck;
+    topicCheck = ensureTopics(kafka)
+        .then((created) => { if (created.length > 0) log(`[notifier] tópicos recriados (${reason}): ${created.join(', ')}`); })
+        .catch((error) => log(`[notifier] não conferiu os tópicos (${reason}): ${error.message}`))
+        .finally(() => { topicCheck = null; });
+    return topicCheck;
+}
+
+function startTopicWatch() {
+    const timer = setInterval(() => recreateMissingTopics('conferência'), TOPIC_CHECK_MS);
+    return { async stop() { clearInterval(timer); if (topicCheck) await topicCheck; } };
+}
+
 function startRetryLoop() {
     let stopped = false;
     let timer = null;
@@ -77,7 +97,7 @@ function startRetryLoop() {
 }
 
 async function main() {
-    log(`[notifier] iniciando (e-mail ${isMailEnabled() ? 'LIGADO' : 'DESLIGADO: os envios ficam como "não enviado"'}${process.env.MAIL_REDIRECT_TO ? `, redirecionado para ${process.env.MAIL_REDIRECT_TO}` : ''})`);
+    log(`[notifier] iniciando (e-mail pelo Microsoft Graph ${isMailEnabled() ? `LIGADO, remetente ${process.env.GRAPH_SENDER}` : 'DESLIGADO (variáveis GRAPH_* vazias): os envios ficam como "não enviado"'}${process.env.MAIL_REDIRECT_TO ? `, redirecionado para ${process.env.MAIL_REDIRECT_TO}` : ''})`);
 
     // O relay já começa: se o Kafka ainda não subiu, ele espera e tenta de novo sozinho
     stoppers.push(startRelay(kafka, { intervalMs: RELAY_INTERVAL_MS, log }));
@@ -86,7 +106,12 @@ async function main() {
 
     await waitForKafka();
     if (shuttingDown) return;
-    stoppers.push(await startConsumers(kafka, { onEvent: (event) => processEvent(event, deps), log }));
+    stoppers.push(startTopicWatch());
+    stoppers.push(await startConsumers(kafka, {
+        onEvent: (event) => processEvent(event, deps),
+        onCrash: () => recreateMissingTopics('consumidor caiu'),
+        log,
+    }));
     log('[notifier] pronto');
 }
 

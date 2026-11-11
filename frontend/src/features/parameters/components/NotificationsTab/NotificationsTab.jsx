@@ -244,7 +244,7 @@ export default function NotificationsTab() {
           {deliveries && !deliveries.mailEnabled && (
             <Banner
               tone="warning"
-              description="O envio de e-mail está desligado no servidor (SMTP_ENABLED). Os avisos ficam como &quot;Não enviado&quot;; depois de ligar, dá para reenviar."
+              description="O envio de e-mail (Microsoft Graph) está desligado no servidor: preencha as variáveis GRAPH_* no .env. Os avisos ficam como &quot;Não enviado&quot;; depois de ligar, dá para reenviar."
             />
           )}
           <div className={styles.filters} role="group" aria-label="Filtrar envios">

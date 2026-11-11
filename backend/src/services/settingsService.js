@@ -4,7 +4,7 @@ import * as trasaction from '../models/trasaction.js';
 import { collaboratorAuditEntry } from '../utils/audit.js';
 import { toInteger } from '../utils/parse.js';
 import { AUDIT_ACTIONS, AUDIT_ENTITIES } from '../constants/audit.js';
-import { EVENT_DEFINITIONS, EVENT_TYPE_LIST } from '../events/catalog.js';
+import { EVENT_DEFINITIONS, TOGGLEABLE_EVENT_TYPES as EVENT_TYPE_LIST } from '../events/catalog.js';
 
 /**
  * Parâmetros do sistema (Admin, em Parâmetros): calendário dos documentos mensais e as
@@ -81,6 +81,7 @@ export async function getMonthlyCalendar() {
 
 /** O aviso deste tipo está ligado? (padrão: ligado) */
 export async function isNotificationEnabled(type) {
+    if (EVENT_DEFINITIONS[type]?.system) return true;
     const snapshot = await getSnapshot();
     return snapshot.enabled[type] !== false;
 }
@@ -146,7 +147,7 @@ export async function updateSettings(payload = {}, context = {}) {
             return { success: false, status: 400, message: 'Lista de avisos inválida.' };
         }
         for (const [type, value] of Object.entries(payload.notificationsEnabled)) {
-            if (!EVENT_DEFINITIONS[type] || typeof value !== 'boolean') {
+            if (!EVENT_DEFINITIONS[type] || EVENT_DEFINITIONS[type].system || typeof value !== 'boolean') {
                 return { success: false, status: 400, message: 'Lista de avisos inválida.' };
             }
             next.enabled[type] = value;

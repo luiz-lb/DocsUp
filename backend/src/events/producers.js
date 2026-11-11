@@ -1,3 +1,4 @@
+import { seal } from '../utils/secretBox.js';
 import { enqueueEvent } from './outbox.js';
 import { EVENT_TYPES } from './catalog.js';
 import * as recipientModel from '../models/notificationRecipientModel.js';
@@ -20,6 +21,19 @@ function requestData(request) {
         contractNumber: request.contract_number ?? null,
         location: request.location ?? null,
     };
+}
+
+/**
+ * Código de acesso do login (sem transação: o login não grava nada). O código vai
+ * criptografado (MAIL_SECRET_KEY) e com o vencimento: vencido, o notifier não envia.
+ */
+export function supplierAccessCode({ email, name, companyName, code, expiresAt }) {
+    return enqueueEvent(null, {
+        type: EVENT_TYPES.SUPPLIER_ACCESS_CODE,
+        recipients: [email],
+        key: `login:${email}`,
+        data: { name, companyName, sealedCode: seal(code), expiresAt: new Date(expiresAt).toISOString() },
+    });
 }
 
 /**

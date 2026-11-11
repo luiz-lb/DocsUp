@@ -5,9 +5,15 @@
  */
 
 export const TOPICS = Object.freeze({
+    SECURITY: 'notifications.security', // código de acesso do login (retenção de 1 hora)
     SUPPLIER: 'notifications.supplier', // avisos ao fornecedor (na hora)
     INTERNAL: 'notifications.internal', // Compras e RH
     DLQ: 'notifications.dlq',           // fila de erro: envios que falharam 5 vezes
+});
+
+// Configuração de cada tópico ao ser criado (o de segurança guarda as mensagens só 1 hora)
+export const TOPIC_CONFIGS = Object.freeze({
+    [TOPICS.SECURITY]: [{ name: 'retention.ms', value: String(60 * 60 * 1000) }],
 });
 
 export const AUDIENCES = Object.freeze({
@@ -17,6 +23,8 @@ export const AUDIENCES = Object.freeze({
 });
 
 export const EVENT_TYPES = Object.freeze({
+    // Código de acesso do login (criptografado no evento)
+    SUPPLIER_ACCESS_CODE: 'supplier.access_code',
     // Fornecedor (na hora)
     SUPPLIER_INVITED: 'supplier.invited',
     SUPPLIER_DEADLINE_CHANGED: 'supplier.deadline_changed',
@@ -43,6 +51,14 @@ export const EVENT_TYPES = Object.freeze({
  * scheduled: disparado pelo agendador (data / hora), não por uma ação.
  */
 export const EVENT_DEFINITIONS = Object.freeze({
+    [EVENT_TYPES.SUPPLIER_ACCESS_CODE]: {
+        topic: TOPICS.SECURITY,
+        audience: AUDIENCES.SUPPLIER,
+        label: 'Código de acesso (login)',
+        description: 'Código de 6 dígitos do login do fornecedor. Sempre ligado; vencido (10 min), não é enviado.',
+        // Sempre ligado: não aparece para ligar / desligar em Parâmetros
+        system: true,
+    },
     [EVENT_TYPES.SUPPLIER_INVITED]: {
         topic: TOPICS.SUPPLIER,
         audience: AUDIENCES.SUPPLIER,
@@ -148,3 +164,6 @@ export function eventDefinition(type) {
 }
 
 export const EVENT_TYPE_LIST = Object.keys(EVENT_DEFINITIONS);
+
+// Avisos que o Admin liga / desliga em Parâmetros (os de sistema ficam sempre ligados)
+export const TOGGLEABLE_EVENT_TYPES = EVENT_TYPE_LIST.filter((type) => !EVENT_DEFINITIONS[type].system);

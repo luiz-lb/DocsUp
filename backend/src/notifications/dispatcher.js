@@ -9,7 +9,7 @@ import { renderEvent } from './templates/index.js';
  * entregar a mensagem de novo (ex.: o notifier reiniciou antes de confirmar), o envio já
  * existe e é ignorado.
  *
- * Falha no SMTP: tenta de novo com espera crescente (RETRY_DELAYS_MS); na 5ª falha vai para a
+ * Falha no envio (Microsoft Graph): tenta de novo com espera crescente; na 5ª falha (ou erro que não se resolve) vai para a
  * fila de erro (status DLQ e tópico notifications.dlq).
  */
 
@@ -32,6 +32,11 @@ function delayFor(attempt) {
  */
 export async function attemptDelivery(delivery, attempt, event, deps = {}) {
     const log = deps.log ?? console.log;
+    // Código de acesso vencido (o login vale 10 min): não adianta mandar
+    if (event.data?.expiresAt && Date.now() > new Date(event.data.expiresAt).getTime()) {
+        await deliveryModel.markSkipped(delivery.id, null, 'Vencido antes do envio (não enviado).');
+        return 'skipped';
+    }
     let message;
     try {
         message = renderEvent(event, delivery.recipient);
@@ -43,7 +48,7 @@ export async function attemptDelivery(delivery, attempt, event, deps = {}) {
         return 'dlq';
     }
 
-    const result = await deliverMail({ to: delivery.recipient, subject: message.subject, html: message.html, text: message.text });
+    const result = await deliverMail({ to: delivery.recipient, subject: message.subject, html: message.html });
     if (result.status === 'sent') {
         await deliveryModel.markSent(delivery.id, message.subject);
         return 'sent';
@@ -52,14 +57,17 @@ export async function attemptDelivery(delivery, attempt, event, deps = {}) {
         await deliveryModel.markSkipped(delivery.id, message.subject, result.error);
         return 'skipped';
     }
-    if (attempt >= MAX_ATTEMPTS) {
+    // Erro que não se resolve tentando de novo (ex.: destinatário inválido): direto para a fila de erro
+    if (attempt >= MAX_ATTEMPTS || result.permanent) {
         await deliveryModel.markDlq(delivery.id, message.subject, result.error);
         await deps.publishDlq?.({ event, recipient: delivery.recipient, attempts: attempt, error: result.error })
             .catch((error) => log(`[notifier] não publicou na fila de erro: ${error.message}`));
         log(`[notifier] ${event.type} → ${delivery.recipient}: fila de erro depois de ${attempt} tentativas (${result.error})`);
         return 'dlq';
     }
-    await deliveryModel.markFailed(delivery.id, message.subject, result.error, delayFor(attempt));
+    // Microsoft pediu para esperar (429 / 503): respeita, se for mais que a espera normal
+    const wait = Math.max(delayFor(attempt), result.retryAfterMs ?? 0);
+    await deliveryModel.markFailed(delivery.id, message.subject, result.error, wait);
     log(`[notifier] ${event.type} → ${delivery.recipient}: falhou (tentativa ${attempt}), tenta de novo depois: ${result.error}`);
     return 'failed';
 }

@@ -7,15 +7,16 @@ import { TOPICS } from './catalog.js';
  * e-mail repetido.
  */
 const LANES = [
+    { name: 'security', topic: TOPICS.SECURITY },
     { name: 'supplier', topic: TOPICS.SUPPLIER },
     { name: 'internal', topic: TOPICS.INTERNAL },
 ];
 
 /**
  * @param {import('kafkajs').Kafka} kafka
- * @param {{ onEvent: (event: object) => Promise<void>, log?: Function }} options
+ * @param {{ onEvent: (event: object) => Promise<void>, onCrash?: (error: Error) => void, log?: Function }} options
  */
-export async function startConsumers(kafka, { onEvent, log = console.log }) {
+export async function startConsumers(kafka, { onEvent, onCrash, log = console.log }) {
     const consumers = [];
     for (const lane of LANES) {
         const consumer = kafka.consumer({
@@ -24,6 +25,8 @@ export async function startConsumers(kafka, { onEvent, log = console.log }) {
             heartbeatInterval: 3000,
             allowAutoTopicCreation: false,
         });
+        // Kafka recriado sem os tópicos: quem criou o consumidor recria (o kafkajs reinicia sozinho)
+        consumer.on(consumer.events.CRASH, (crash) => onCrash?.(crash.payload?.error));
         await consumer.connect();
         await consumer.subscribe({ topic: lane.topic, fromBeginning: true });
         await consumer.run({

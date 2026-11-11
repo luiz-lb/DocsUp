@@ -1,5 +1,5 @@
 import { Kafka, logLevel, Partitioners } from 'kafkajs';
-import { TOPICS } from './catalog.js';
+import { TOPICS, TOPIC_CONFIGS } from './catalog.js';
 
 /**
  * Cliente Kafka do notifier. KAFKA_BROKERS: lista separada por vírgula (no Docker,
@@ -32,7 +32,12 @@ export async function ensureTopics(kafka) {
         if (missing.length > 0) {
             await admin.createTopics({
                 waitForLeaders: true,
-                topics: missing.map((topic) => ({ topic, numPartitions: PARTITIONS, replicationFactor: 1 })),
+                topics: missing.map((topic) => ({
+                    topic,
+                    numPartitions: PARTITIONS,
+                    replicationFactor: 1,
+                    ...(TOPIC_CONFIGS[topic] ? { configEntries: TOPIC_CONFIGS[topic] } : {}),
+                })),
             });
         }
         return missing;

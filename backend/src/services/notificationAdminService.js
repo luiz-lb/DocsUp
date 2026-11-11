@@ -59,7 +59,7 @@ export async function listDeliveries(query = {}) {
     }
 }
 
-/** Reenviar um envio que falhou / foi para a fila de erro / não foi enviado (SMTP desligado). */
+/** Reenviar um envio que falhou / foi para a fila de erro / não foi enviado (e-mail desligado). */
 export async function retryDelivery(id, context = {}) {
     try {
         let ok = false;

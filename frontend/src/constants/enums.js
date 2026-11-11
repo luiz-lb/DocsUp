@@ -285,7 +285,7 @@ export const DELIVERY_STATUS = {
   2: { label: 'Enviado', tone: 'success' },
   3: { label: 'Falhou (vai tentar de novo)', tone: 'warning' },
   4: { label: 'Fila de erro', tone: 'danger' },
-  5: { label: 'Não enviado (e-mail desligado)', tone: 'neutral' },
+  5: { label: 'Não enviado', tone: 'neutral' },
 };
 
 export const DELIVERY_STATUS_ID = {

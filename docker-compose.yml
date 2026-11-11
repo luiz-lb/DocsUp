@@ -75,16 +75,15 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-}
       USER_ADMIN: ${USER_ADMIN:-}
       SENHA_ADMIN: ${SENHA_ADMIN:-}
-      SMTP_ENABLED: ${SMTP_ENABLED:-false}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
+      # E-mail pelo Microsoft Graph (caixa GRAPH_SENDER). Quem envia é o notifier.
+      GRAPH_TENANT_ID: ${GRAPH_TENANT_ID:-}
+      GRAPH_CLIENT_ID: ${GRAPH_CLIENT_ID:-}
+      GRAPH_CLIENT_SECRET: ${GRAPH_CLIENT_SECRET:-}
+      GRAPH_SENDER: ${GRAPH_SENDER:-}
+      MAIL_SECRET_KEY: ${MAIL_SECRET_KEY:-}
       MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
       MAIL_COMPANY_NAME: ${MAIL_COMPANY_NAME:-}
-      SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-${SMTP_USER:-}}
+      SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-}
       HUBDEV_TOKEN: ${HUBDEV_TOKEN:-}
     ports:
       - "${BACKEND_PORT:-3003}:3003"
@@ -152,16 +151,15 @@ services:
       DB_TRUST_CERT: ${DB_TRUST_CERT:-true}
       KAFKA_BROKERS: kafka:9092
       FRONTEND_URL: ${FRONTEND_URL:?Defina FRONTEND_URL no .env}
-      SMTP_ENABLED: ${SMTP_ENABLED:-false}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
+      # E-mail pelo Microsoft Graph (caixa GRAPH_SENDER). Quem envia é o notifier.
+      GRAPH_TENANT_ID: ${GRAPH_TENANT_ID:-}
+      GRAPH_CLIENT_ID: ${GRAPH_CLIENT_ID:-}
+      GRAPH_CLIENT_SECRET: ${GRAPH_CLIENT_SECRET:-}
+      GRAPH_SENDER: ${GRAPH_SENDER:-}
+      MAIL_SECRET_KEY: ${MAIL_SECRET_KEY:-}
       MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
       MAIL_COMPANY_NAME: ${MAIL_COMPANY_NAME:-}
-      SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-${SMTP_USER:-}}
+      SUPRIMENTOS_EMAIL: ${SUPRIMENTOS_EMAIL:-}
     restart: unless-stopped
 
   frontend:

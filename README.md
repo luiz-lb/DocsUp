@@ -45,19 +45,22 @@ monta o e-mail (modelo visual único) e envia, um por destinatário:
 - tópicos `notifications.supplier` (fornecedor, na hora) e `notifications.internal` (Compras e RH),
   separados para um resumo grande do RH não atrasar um aviso de fornecedor;
 - sem e-mail repetido: cada envio fica em `notification_deliveries` (evento + destinatário);
-- SMTP fora do ar: novas tentativas com espera crescente; na 5ª falha, fila de erro
-  (`notifications.dlq`), com "Reenviar" em Parâmetros → Notificações;
+- e-mail pelo **Microsoft Graph** (caixa `GRAPH_SENDER`); Graph fora do ar ou pedindo para esperar
+  (429 / 503): novas tentativas com espera crescente; na 5ª falha (ou erro que não se resolve, como
+  destinatário inválido), fila de erro (`notifications.dlq`), com "Reenviar" em Parâmetros → Notificações;
 - Kafka fora do ar: os eventos esperam na outbox e são publicados quando ele voltar;
 - agendador: lembrete e vencimento do prazo dos iniciais, calendário dos mensais (dias 1, 19, 21 e
   atrasado no dia seguinte) e o **resumo do RH** a cada X horas (só com novidade).
 
 Avisos ao fornecedor vão para o Responsável e o Operador com e-mail confirmado (sem nenhum, para o
 e-mail indicado). Em Parâmetros → Notificações: intervalo do resumo, lembrete do prazo, horário dos
-avisos, ligar / desligar cada aviso e os últimos envios. O código de acesso do login sai direto do
-backend (código de segurança: não passa por fila).
+avisos, ligar / desligar cada aviso e os últimos envios. O código de acesso do login também vai
+pelo Kafka, num tópico próprio (`notifications.security`, retenção de 1 hora), criptografado no
+evento (`MAIL_SECRET_KEY`) e descartado se vencer (10 min) antes do envio. Se o Kafka voltar sem os
+tópicos, o notifier recria sozinho.
 
-Para testar com SMTP de verdade sem disparar para fornecedores: `MAIL_REDIRECT_TO=seu@email` manda
-tudo para esse endereço.
+Para testar sem disparar para fornecedores: `MAIL_REDIRECT_TO=seu@email` manda tudo para esse
+endereço.
 
 ## Fornecedor
 
@@ -80,8 +83,10 @@ em `frontend/` (variável `VITE_URL_BACKEND`).
 
 ### E-mail
 
-O envio fica desligado enquanto `SMTP_ENABLED` não for `true` no `.env` (só registra no log). Com ele
-desligado, o código de acesso do fornecedor só funciona fora de produção (volta na resposta do login).
+Microsoft Graph, pela caixa `GRAPH_SENDER`: preencha `GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`,
+`GRAPH_CLIENT_SECRET`, `GRAPH_SENDER` e `MAIL_SECRET_KEY` no `.env`. Com alguma vazia, o envio fica
+desligado (o link do convite aparece na tela de Compras e, fora de produção, o código de acesso volta
+na resposta do login).
 
 ## Migrações desta versão
 
